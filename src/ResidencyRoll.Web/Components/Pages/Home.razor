@@ -1,0 +1,178 @@
+@page "/"
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Web.Services
+@inject TripService TripService
+@rendermode InteractiveServer
+
+<PageTitle>ResidencyRoll - Travel Tracker</PageTitle>
+
+<h1>ResidencyRoll - Travel Tracking Dashboard</h1>
+
+<RadzenRow Gap="1rem" class="rz-mt-4">
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard>
+            <h3>Days Distribution (Last 365 Days)</h3>
+            <RadzenArcGauge Style="width: 100%; height: 300px;">
+                <RadzenArcGaugeScale Min="0" Max="365" Y="0.8">
+                    <RadzenArcGaugeScaleValue Value="@daysAway" Fill="#ff6b6b">
+                        <Template Context="value">
+                            <h4>@value.Value Days Away</h4>
+                        </Template>
+                    </RadzenArcGaugeScaleValue>
+                    <RadzenArcGaugeScaleValue Value="@daysHome" Fill="#51cf66">
+                        <Template Context="value">
+                            <h4>@value.Value Days Home</h4>
+                        </Template>
+                    </RadzenArcGaugeScaleValue>
+                </RadzenArcGaugeScale>
+            </RadzenArcGauge>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard>
+            <h3>Days per Country (Last 365 Days)</h3>
+            <RadzenChart Style="width: 100%; height: 300px;">
+                <RadzenDonutSeries Data="@chartData" CategoryProperty="Country" ValueProperty="Days" />
+            </RadzenChart>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+<RadzenRow Gap="1rem" class="rz-mt-4">
+    <RadzenColumn Size="12">
+        <RadzenCard>
+            <h3>Manage Trips</h3>
+            <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="Trip" 
+                            AllowFiltering="true" AllowSorting="true" 
+                            EditMode="DataGridEditMode.Single"
+                            RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
+                <Columns>
+                    <RadzenDataGridColumn TItem="Trip" Property="CountryName" Title="Country" Width="200px">
+                        <EditTemplate Context="trip">
+                            <RadzenTextBox @bind-Value="trip.CountryName" Style="width:100%; display: block" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Trip" Property="StartDate" Title="Start Date" Width="150px">
+                        <Template Context="trip">
+                            @trip.StartDate.ToString("yyyy-MM-dd")
+                        </Template>
+                        <EditTemplate Context="trip">
+                            <RadzenDatePicker @bind-Value="trip.StartDate" Style="width:100%; display: block" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Trip" Property="EndDate" Title="End Date" Width="150px">
+                        <Template Context="trip">
+                            @trip.EndDate.ToString("yyyy-MM-dd")
+                        </Template>
+                        <EditTemplate Context="trip">
+                            <RadzenDatePicker @bind-Value="trip.EndDate" Style="width:100%; display: block" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Trip" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+                        <Template Context="trip">
+                            <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" />
+                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" />
+                        </Template>
+                        <EditTemplate Context="trip">
+                            <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(args => SaveRow(trip))" />
+                            <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(args => CancelEdit(trip))" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+            <RadzenButton Icon="add_circle_outline" Text="Add Trip" Click="@InsertRow" ButtonStyle="ButtonStyle.Primary" class="rz-mt-2" />
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+<RadzenRow Gap="1rem" class="rz-mt-4">
+    <RadzenColumn Size="12">
+        <RadzenCard>
+            <h3>Trip Timeline</h3>
+            <RadzenTimeline>
+                @foreach (var trip in timelineTrips)
+                {
+                    <RadzenTimelineItem>
+                        <ChildContent>
+                            <strong>@trip.CountryName</strong><br />
+                            @trip.StartDate.ToString("MMM dd, yyyy") - @trip.EndDate.ToString("MMM dd, yyyy")<br />
+                            <small>(@((trip.EndDate - trip.StartDate).Days + 1) days)</small>
+                        </ChildContent>
+                    </RadzenTimelineItem>
+                }
+            </RadzenTimeline>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@code {
+    private List<Trip> trips = new();
+    private List<Trip> timelineTrips = new();
+    private RadzenDataGrid<Trip>? tripsGrid;
+    private int daysAway;
+    private int daysHome;
+    private List<ChartData> chartData = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        trips = await TripService.GetAllTripsAsync();
+        timelineTrips = await TripService.GetTripsForTimelineAsync();
+        daysAway = await TripService.GetTotalDaysAwayInLast365DaysAsync();
+        daysHome = await TripService.GetDaysAtHomeInLast365DaysAsync();
+        
+        var daysPerCountry = await TripService.GetDaysPerCountryInLast365DaysAsync();
+        chartData = daysPerCountry.Select(kvp => new ChartData { Country = kvp.Key, Days = kvp.Value }).ToList();
+    }
+
+    private async Task OnUpdateRow(Trip trip)
+    {
+        await TripService.UpdateTripAsync(trip);
+        await LoadData();
+    }
+
+    private async Task OnCreateRow(Trip trip)
+    {
+        await TripService.CreateTripAsync(trip);
+        await LoadData();
+    }
+
+    private async Task EditRow(Trip trip)
+    {
+        await tripsGrid!.EditRow(trip);
+    }
+
+    private async Task SaveRow(Trip trip)
+    {
+        await tripsGrid!.UpdateRow(trip);
+    }
+
+    private void CancelEdit(Trip trip)
+    {
+        tripsGrid!.CancelEditRow(trip);
+    }
+
+    private async Task DeleteRow(Trip trip)
+    {
+        await TripService.DeleteTripAsync(trip.Id);
+        await LoadData();
+    }
+
+    private async Task InsertRow()
+    {
+        var newTrip = new Trip { StartDate = DateTime.Today, EndDate = DateTime.Today };
+        await tripsGrid!.InsertRow(newTrip);
+    }
+
+    public class ChartData
+    {
+        public string Country { get; set; } = string.Empty;
+        public int Days { get; set; }
+    }
+}
