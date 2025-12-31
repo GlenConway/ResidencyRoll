@@ -14,7 +14,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddRadzenComponents();
 
 // Configure SQLite database
-var dataDirectory = Path.Combine("/app", "data");
+var dataDirectory = builder.Environment.IsDevelopment() 
+    ? Path.Combine(builder.Environment.ContentRootPath, "data")
+    : Path.Combine("/app", "data");
 Directory.CreateDirectory(dataDirectory);
 var connectionString = $"Data Source={Path.Combine(dataDirectory, "residencyroll.db")}";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
