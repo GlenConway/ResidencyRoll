@@ -14,20 +14,14 @@
     <RadzenColumn Size="12" SizeMD="6">
         <RadzenCard>
             <h3>Days Distribution (Last 365 Days)</h3>
-            <RadzenArcGauge Style="width: 100%; height: 300px;">
-                <RadzenArcGaugeScale Min="0" Max="365" Y="0.8">
-                    <RadzenArcGaugeScaleValue Value="@daysAway" Fill="#ff6b6b">
-                        <Template Context="value">
-                            <h4>@value.Value Days Away</h4>
-                        </Template>
-                    </RadzenArcGaugeScaleValue>
-                    <RadzenArcGaugeScaleValue Value="@daysHome" Fill="#51cf66">
-                        <Template Context="value">
-                            <h4>@value.Value Days Home</h4>
-                        </Template>
-                    </RadzenArcGaugeScaleValue>
-                </RadzenArcGaugeScale>
-            </RadzenArcGauge>
+            <RadzenChart Style="width: 100%; height: 300px;">
+                <RadzenBarSeries Data="@distributionData" CategoryProperty="Label" ValueProperty="Value">
+                    <RadzenSeriesDataLabels Visible="true" />
+                </RadzenBarSeries>
+                <RadzenChartOptions>
+                    <RadzenLegend Visible="false" />
+                </RadzenChartOptions>
+            </RadzenChart>
         </RadzenCard>
     </RadzenColumn>
     <RadzenColumn Size="12" SizeMD="6">
@@ -114,6 +108,7 @@
     private int daysAway;
     private int daysHome;
     private List<ChartData> chartData = new();
+    private List<DistributionData> distributionData = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -129,6 +124,12 @@
         
         var daysPerCountry = await TripService.GetDaysPerCountryInLast365DaysAsync();
         chartData = daysPerCountry.Select(kvp => new ChartData { Country = kvp.Key, Days = kvp.Value }).ToList();
+        
+        distributionData = new List<DistributionData>
+        {
+            new DistributionData { Label = "Days Away", Value = daysAway },
+            new DistributionData { Label = "Days Home", Value = daysHome }
+        };
     }
 
     private async Task OnUpdateRow(Trip trip)
@@ -174,5 +175,11 @@
     {
         public string Country { get; set; } = string.Empty;
         public int Days { get; set; }
+    }
+
+    public class DistributionData
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
     }
 }
