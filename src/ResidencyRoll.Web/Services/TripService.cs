@@ -15,7 +15,7 @@ public class TripService
 
     public async Task<List<Trip>> GetAllTripsAsync()
     {
-        return await _context.Trips.OrderByDescending(t => t.StartDate).ToListAsync();
+        return await _context.Trips.OrderBy(t => t.StartDate).ToListAsync();
     }
 
     public async Task<Trip?> GetTripByIdAsync(int id)

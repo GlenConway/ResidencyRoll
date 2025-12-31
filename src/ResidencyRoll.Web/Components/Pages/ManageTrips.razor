@@ -1,0 +1,119 @@
+@page "/manage-trips"
+@using Radzen
+@using Radzen.Blazor
+@using System.Globalization
+@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Web.Services
+@inject TripService TripService
+@rendermode InteractiveServer
+
+<PageTitle>Manage Trips</PageTitle>
+
+<h1>Manage Trips</h1>
+
+<RadzenCard class="rz-mt-3">
+    <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="Trip"
+                    AllowFiltering="true" AllowSorting="true"
+                    EditMode="DataGridEditMode.Single"
+                    RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
+        <Columns>
+            <RadzenDataGridColumn TItem="Trip" Property="CountryName" Title="Country" Width="200px">
+                <EditTemplate Context="trip">
+                    <RadzenDropDown @bind-Value="trip.CountryName"
+                                    Data="@countryOptions"
+                                    AllowClear="true"
+                                    AllowFiltering="true"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Style="width:100%; display: block" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Trip" Property="StartDate" Title="Start Date" Width="150px">
+                <Template Context="trip">
+                    @trip.StartDate.ToString("yyyy-MM-dd")
+                </Template>
+                <EditTemplate Context="trip">
+                    <RadzenDatePicker @bind-Value="trip.StartDate" Style="width:100%; display: block" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Trip" Property="EndDate" Title="End Date" Width="150px">
+                <Template Context="trip">
+                    @trip.EndDate.ToString("yyyy-MM-dd")
+                </Template>
+                <EditTemplate Context="trip">
+                    <RadzenDatePicker @bind-Value="trip.EndDate" Style="width:100%; display: block" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Trip" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+                <Template Context="trip">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" />
+                </Template>
+                <EditTemplate Context="trip">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(args => SaveRow(trip))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(args => CancelEdit(trip))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+    <RadzenButton Icon="add_circle_outline" Text="Add Trip" Click="@InsertRow" ButtonStyle="ButtonStyle.Primary" class="rz-mt-2" />
+</RadzenCard>
+
+@code {
+    private List<Trip> trips = new();
+    private RadzenDataGrid<Trip>? tripsGrid;
+    private static readonly List<string> countryOptions = CultureInfo
+        .GetCultures(CultureTypes.SpecificCultures)
+        .Select(c => new RegionInfo(c.Name).EnglishName)
+        .Distinct()
+        .OrderBy(name => name)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        trips = await TripService.GetAllTripsAsync();
+    }
+
+    private async Task OnUpdateRow(Trip trip)
+    {
+        await TripService.UpdateTripAsync(trip);
+        await LoadData();
+    }
+
+    private async Task OnCreateRow(Trip trip)
+    {
+        await TripService.CreateTripAsync(trip);
+        await LoadData();
+    }
+
+    private async Task EditRow(Trip trip)
+    {
+        await tripsGrid!.EditRow(trip);
+    }
+
+    private async Task SaveRow(Trip trip)
+    {
+        await tripsGrid!.UpdateRow(trip);
+    }
+
+    private void CancelEdit(Trip trip)
+    {
+        tripsGrid!.CancelEditRow(trip);
+    }
+
+    private async Task DeleteRow(Trip trip)
+    {
+        await TripService.DeleteTripAsync(trip.Id);
+        await LoadData();
+    }
+
+    private async Task InsertRow()
+    {
+        var newTrip = new Trip { StartDate = DateTime.Today, EndDate = DateTime.Today };
+        await tripsGrid!.InsertRow(newTrip);
+    }
+}
