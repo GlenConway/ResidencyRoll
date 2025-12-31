@@ -85,18 +85,29 @@
     <RadzenColumn Size="12">
         <RadzenCard>
             <h3>Trip Timeline</h3>
-            <RadzenTimeline>
-                @foreach (var trip in timelineTrips)
-                {
-                    <RadzenTimelineItem>
-                        <ChildContent>
-                            <strong>@trip.CountryName</strong><br />
-                            @trip.StartDate.ToString("MMM dd, yyyy") - @trip.EndDate.ToString("MMM dd, yyyy")<br />
-                            <small>(@((trip.EndDate - trip.StartDate).Days + 1) days)</small>
-                        </ChildContent>
-                    </RadzenTimelineItem>
-                }
-            </RadzenTimeline>
+            @if (timelineItems.Count == 0)
+            {
+                <RadzenAlert Severity="AlertSeverity.Info" Style="margin: 0">Add a trip to see your timeline.</RadzenAlert>
+            }
+            else
+            {
+                <div style="max-height: 320px; overflow-y: auto; padding-right: 0.5rem;">
+                    <RadzenTimeline LineColor="#0d6efd" IndicatorColor="#0d6efd">
+                        @foreach (var item in timelineItems)
+                        {
+                            <RadzenTimelineItem>
+                                <ChildContent>
+                                    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <div style="font-weight: 700; font-size: 1rem;">@item.Title</div>
+                                        <div style="color: #6c757d;">@item.Subtitle</div>
+                                        <div style="font-size: 0.9rem; color: #0d6efd; font-weight: 600;">@item.DurationText</div>
+                                    </div>
+                                </ChildContent>
+                            </RadzenTimelineItem>
+                        }
+                    </RadzenTimeline>
+                </div>
+            }
         </RadzenCard>
     </RadzenColumn>
 </RadzenRow>
@@ -104,6 +115,7 @@
 @code {
     private List<Trip> trips = new();
     private List<Trip> timelineTrips = new();
+    private List<TimelineItem> timelineItems = new();
     private RadzenDataGrid<Trip>? tripsGrid;
     private int daysAway;
     private int daysHome;
@@ -130,6 +142,18 @@
             new DistributionData { Label = "Days Away", Value = daysAway },
             new DistributionData { Label = "Days Home", Value = daysHome }
         };
+
+        timelineItems = timelineTrips
+            .OrderByDescending(t => t.StartDate)
+            .Select(t => new TimelineItem
+            {
+                Title = t.CountryName,
+                Subtitle = $"{t.StartDate:MMM dd, yyyy} – {t.EndDate:MMM dd, yyyy}",
+                DurationText = $"{(t.EndDate - t.StartDate).Days + 1} days"
+            })
+            .ToList();
+        
+        StateHasChanged();
     }
 
     private async Task OnUpdateRow(Trip trip)
@@ -181,5 +205,12 @@
     {
         public string Label { get; set; } = string.Empty;
         public int Value { get; set; }
+    }
+
+    public class TimelineItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Subtitle { get; set; } = string.Empty;
+        public string DurationText { get; set; } = string.Empty;
     }
 }
