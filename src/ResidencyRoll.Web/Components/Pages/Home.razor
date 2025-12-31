@@ -1,6 +1,7 @@
 @page "/"
 @using Radzen
 @using Radzen.Blazor
+@using System.Globalization
 @using ResidencyRoll.Web.Models
 @using ResidencyRoll.Web.Services
 @inject TripService TripService
@@ -28,7 +29,7 @@
         <RadzenCard>
             <h3>Days per Country (Last 365 Days)</h3>
             <RadzenChart Style="width: 100%; height: 300px;">
-                <RadzenDonutSeries Data="@chartData" CategoryProperty="Country" ValueProperty="Days" />
+                <RadzenDonutSeries Data="@chartData" CategoryProperty="Label" ValueProperty="Days" />
             </RadzenChart>
         </RadzenCard>
     </RadzenColumn>
@@ -45,7 +46,12 @@
                 <Columns>
                     <RadzenDataGridColumn TItem="Trip" Property="CountryName" Title="Country" Width="200px">
                         <EditTemplate Context="trip">
-                            <RadzenTextBox @bind-Value="trip.CountryName" Style="width:100%; display: block" />
+                            <RadzenDropDown @bind-Value="trip.CountryName"
+                                            Data="@countryOptions"
+                                            AllowClear="true"
+                                            AllowFiltering="true"
+                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                            Style="width:100%; display: block" />
                         </EditTemplate>
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn TItem="Trip" Property="StartDate" Title="Start Date" Width="150px">
@@ -121,6 +127,12 @@
     private int daysHome;
     private List<ChartData> chartData = new();
     private List<DistributionData> distributionData = new();
+    private static readonly List<string> countryOptions = CultureInfo
+        .GetCultures(CultureTypes.SpecificCultures)
+        .Select(c => new RegionInfo(c.Name).EnglishName)
+        .Distinct()
+        .OrderBy(name => name)
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -135,7 +147,9 @@
         daysHome = await TripService.GetDaysAtHomeInLast365DaysAsync();
         
         var daysPerCountry = await TripService.GetDaysPerCountryInLast365DaysAsync();
-        chartData = daysPerCountry.Select(kvp => new ChartData { Country = kvp.Key, Days = kvp.Value }).ToList();
+        chartData = daysPerCountry
+            .Select(kvp => new ChartData { Label = $"{kvp.Key} ({kvp.Value} days)", Days = kvp.Value })
+            .ToList();
         
         distributionData = new List<DistributionData>
         {
@@ -197,7 +211,7 @@
 
     public class ChartData
     {
-        public string Country { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
         public int Days { get; set; }
     }
 

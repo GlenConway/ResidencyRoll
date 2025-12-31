@@ -37,6 +37,31 @@ public class TripService
         return trip;
     }
 
+    /// <summary>
+    /// Calculates total days spent per country across all recorded trips
+    /// </summary>
+    public async Task<Dictionary<string, int>> GetTotalDaysPerCountryAsync()
+    {
+        var trips = await _context.Trips.ToListAsync();
+        var totals = new Dictionary<string, int>();
+
+        foreach (var trip in trips)
+        {
+            var days = (trip.EndDate - trip.StartDate).Days + 1;
+
+            if (totals.ContainsKey(trip.CountryName))
+            {
+                totals[trip.CountryName] += days;
+            }
+            else
+            {
+                totals[trip.CountryName] = days;
+            }
+        }
+
+        return totals;
+    }
+
     public async Task DeleteTripAsync(int id)
     {
         var trip = await _context.Trips.FindAsync(id);
