@@ -1,5 +1,8 @@
 # ResidencyRoll
 
+[![Tests](https://github.com/GlenConway/ResidencyRoll/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/GlenConway/ResidencyRoll/actions/workflows/tests.yml)
+[![License](https://img.shields.io/github/license/GlenConway/ResidencyRoll.svg)](LICENSE)
+
 A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10) that helps you track international trips and calculate days spent in each country over a rolling 12-month (365-day) period for residency and tax purposes.
 
 ## Features
