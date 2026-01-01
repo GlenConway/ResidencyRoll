@@ -50,8 +50,6 @@ docker push ghcr.io/glenconway/residencyroll:latest
 Create a `docker-compose.yml` on your target machine:
 
 ```yaml
-version: '3.8'
-
 services:
   residencyroll:
     image: ghcr.io/glenconway/residencyroll:latest
