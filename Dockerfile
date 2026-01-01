@@ -25,10 +25,10 @@ RUN mkdir -p /app/data
 COPY --from=publish /app/publish .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8753
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:8753
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 ENTRYPOINT ["dotnet", "ResidencyRoll.Web.dll"]

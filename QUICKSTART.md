@@ -15,7 +15,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-Access at: `http://localhost:8080`
+Access at: `http://localhost:8753`
 
 The SQLite database will be stored in the `./db` folder and persists across restarts.
 

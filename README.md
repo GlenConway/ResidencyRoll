@@ -41,7 +41,7 @@ mkdir -p db
 docker-compose up -d
 ```
 
-4. Access the application at: `http://localhost:8080`
+4. Access the application at: `http://localhost:8753`
 
 The SQLite database will be persisted in the `./db` folder.
 
@@ -52,7 +52,7 @@ The SQLite database will be persisted in the `./db` folder.
 docker-compose up -d --build
 ```
 
-2. Access the application at: `http://localhost:8080`
+2. Access the application at: `http://localhost:8753`
 
 ### Running Locally (Development)
 
