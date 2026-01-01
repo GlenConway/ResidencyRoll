@@ -17,7 +17,7 @@ docker-compose down
 
 Access at: `http://localhost:8753`
 
-The SQLite database will be stored in the `./db` folder and persists across restarts.
+The SQLite database will be stored in a Docker-managed volume (`residencyroll-data`) at `/var/lib/docker/volumes/` and persists across restarts.
 
 ## Option 2: Local Development
 
@@ -95,8 +95,8 @@ dotnet --version
 
 ### Database Location
 
-- **Docker:** `./db/residencyroll.db`
-- **Local:** `/app/data/residencyroll.db` (created automatically)
+- **Docker:** `/var/lib/docker/volumes/residencyroll-data/_data/residencyroll.db`
+- **Local:** `./data/residencyroll.db` (created automatically)
 
 ## Next Steps
 

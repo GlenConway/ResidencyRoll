@@ -7,8 +7,11 @@ services:
     ports:
       - "8753:8753"
     volumes:
-      - ./db:/app/data
+      - residencyroll-data:/app/data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8753
     restart: unless-stopped
+
+volumes:
+  residencyroll-data:

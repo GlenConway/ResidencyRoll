@@ -31,19 +31,14 @@ A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10
 curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
 ```
 
-2. Create the database directory:
-```bash
-mkdir -p db
-```
-
-3. Start the container:
+2. Start the container:
 ```bash
 docker-compose up -d
 ```
 
-4. Access the application at: `http://localhost:8753`
+3. Access the application at: `http://localhost:8753`
 
-The SQLite database will be persisted in the `./db` folder.
+The SQLite database will be persisted in a Docker-managed volume at `/var/lib/docker/volumes/residencyroll-data`.
 
 #### Option 2: Building Locally
 
@@ -106,9 +101,9 @@ The application implements smart overlap detection:
 - **Delete Trip**: Click the delete icon on any row
 - All changes are immediately persisted to the SQLite database
 
-### Docker Volume Mapping
+### Docker Volume
 
-The `docker-compose.yml` maps `./db:/app/data` to ensure your SQLite database persists across container restarts.
+The application uses a named Docker volume (`residencyroll-data`) stored in `/var/lib/docker/volumes/` to ensure your SQLite database persists across container restarts.
 
 ## Development Notes
 

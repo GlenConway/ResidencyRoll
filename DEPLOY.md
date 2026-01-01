@@ -59,11 +59,14 @@ services:
     ports:
       - "8753:8753"
     volumes:
-      - ./db:/app/data
+      - residencyroll-data:/app/data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8753
     restart: unless-stopped
+
+volumes:
+  residencyroll-data:
 ```
 
 Then run:
@@ -77,12 +80,14 @@ docker-compose up -d
 docker run -d \
   --name residencyroll-app \
   -p 8753:8753 \
-  -v $(pwd)/db:/app/data \
+  -v residencyroll-data:/app/data \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -e ASPNETCORE_URLS=http://+:8753 \
   --restart unless-stopped \
   ghcr.io/glenconway/residencyroll:latest
 ```
+
+**Note**: This creates a Docker-managed volume at `/var/lib/docker/volumes/residencyroll-data`.
 
 ## Image Tags
 
