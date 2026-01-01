@@ -62,7 +62,7 @@
             {
                 Title = t.CountryName,
                 Subtitle = $"{t.StartDate:MMM dd, yyyy} – {t.EndDate:MMM dd, yyyy}",
-                DurationText = $"{(t.EndDate - t.StartDate).Days + 1} days"
+                DurationText = $"{t.DurationDays} days"
             })
             .ToList();
         
