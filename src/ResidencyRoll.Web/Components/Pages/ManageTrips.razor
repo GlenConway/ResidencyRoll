@@ -2,14 +2,32 @@
 @using Radzen
 @using Radzen.Blazor
 @using System.Globalization
+@using System.Net.Http.Headers
+@using Microsoft.AspNetCore.Components.Forms
 @using ResidencyRoll.Web.Models
 @using ResidencyRoll.Web.Services
 @inject TripService TripService
+@inject HttpClient Http
+@inject NavigationManager Navigation
 @rendermode InteractiveServer
 
 <PageTitle>Manage Trips</PageTitle>
 
 <h1>Manage Trips</h1>
+
+<RadzenRow Gap="1rem" class="rz-mt-3">
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenButton Icon="download" Text="Export Trips (CSV)" ButtonStyle="ButtonStyle.Secondary" Click="@ExportTrips" />
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="6" Style="display: flex; gap: 0.5rem; align-items: center;">
+        <InputFile OnChange="@OnFileSelected" style="flex: 1" />
+        <RadzenButton Icon="upload" Text="Import" Click="OnImport" Disabled="@(importing || selectedFile is null)" />
+        @if (!string.IsNullOrEmpty(importMessage))
+        {
+            <span style="color: @(importError ? "#dc3545" : "#198754"); font-size: 0.9rem;">@importMessage</span>
+        }
+    </RadzenColumn>
+</RadzenRow>
 
 <RadzenCard class="rz-mt-3">
     <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="Trip"
@@ -61,6 +79,10 @@
 @code {
     private List<Trip> trips = new();
     private RadzenDataGrid<Trip>? tripsGrid;
+    private IBrowserFile? selectedFile;
+    private bool importing;
+    private string importMessage = string.Empty;
+    private bool importError;
     private static readonly List<string> countryOptions = CultureInfo
         .GetCultures(CultureTypes.SpecificCultures)
         .Select(c => new RegionInfo(c.Name).EnglishName)
@@ -78,6 +100,57 @@
         trips = await TripService.GetAllTripsAsync();
     }
 
+    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+        importMessage = string.Empty;
+        importError = false;
+        await Task.CompletedTask;
+    }
+
+    private async Task OnImport()
+    {
+        if (selectedFile == null)
+        {
+            return;
+        }
+
+        importing = true;
+        importMessage = string.Empty;
+        importError = false;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = selectedFile.OpenReadStream(long.MaxValue);
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType ?? "text/csv");
+            content.Add(streamContent, "file", selectedFile.Name);
+
+            var response = await Http.PostAsync("/api/trips/import", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                importMessage = "Import completed";
+                await LoadData();
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                importMessage = string.IsNullOrWhiteSpace(body) ? "Import failed" : body;
+                importError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            importMessage = $"Error: {ex.Message}";
+            importError = true;
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
     private async Task OnUpdateRow(Trip trip)
     {
         await TripService.UpdateTripAsync(trip);
@@ -88,6 +161,11 @@
     {
         await TripService.CreateTripAsync(trip);
         await LoadData();
+    }
+
+    private void ExportTrips()
+    {
+        Navigation.NavigateTo("/api/trips/export", forceLoad: true);
     }
 
     private async Task EditRow(Trip trip)
