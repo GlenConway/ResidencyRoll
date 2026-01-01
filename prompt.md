@@ -25,7 +25,7 @@ Build a travel tracking web application named "ResidencyRoll" using ASP.NET Core
 4. Data Persistence & Docker:
    - Store the SQLite database file in a folder named `/app/data`.
    - Provide a Dockerfile using the .NET 10 SDK/Runtime.
-   - Provide a docker-compose.yml that includes a volume mapping (e.g., `./db:/app/data`) to ensure the SQLite file persists across container restarts.
+   - Provide a docker compose.yml that includes a volume mapping (e.g., `./db:/app/data`) to ensure the SQLite file persists across container restarts.
 
 5. Code Structure:
    - Initialize Radzen services in Program.cs.

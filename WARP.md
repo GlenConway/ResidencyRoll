@@ -24,16 +24,16 @@ dotnet watch run --project src/ResidencyRoll.Web/ResidencyRoll.Web.csproj
 ### Docker
 ```bash
 # Build and run with Docker (recommended for production testing)
-docker-compose up -d
+docker compose up -d
 
 # Stop the container
-docker-compose down
+docker compose down
 
 # View logs
 docker logs residencyroll-app
 
 # Rebuild after code changes
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### Testing

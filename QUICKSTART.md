@@ -6,13 +6,13 @@ The fastest way to run the application with persistent data.
 
 ```bash
 # From the ResidencyRoll directory
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop the application
-docker-compose down
+docker compose down
 ```
 
 Access at: `http://localhost:8753`
@@ -71,14 +71,14 @@ The calculation automatically updates each day!
 
 ```bash
 # Rebuild the container
-docker-compose up --build
+docker compose up --build
 
 # View container logs
-docker-compose logs -f
+docker compose logs -f
 
 # Clean up everything and start fresh
-docker-compose down -v
-docker-compose up --build
+docker compose down -v
+docker compose up --build
 ```
 
 ### Local Development Issues

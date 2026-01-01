@@ -45,9 +45,9 @@ docker push ghcr.io/glenconway/residencyroll:latest
 
 ## Running from GHCR
 
-### Using docker-compose
+### Using docker compose
 
-Create a `docker-compose.yml` on your target machine:
+Create a `docker compose.yml` on your target machine:
 
 ```yaml
 services:
@@ -69,7 +69,7 @@ volumes:
 
 Then run:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Using docker run
@@ -103,8 +103,8 @@ The workflow creates multiple tags:
 To pull the latest image:
 
 ```bash
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 Or with docker run:

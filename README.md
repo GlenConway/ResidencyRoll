@@ -26,14 +26,14 @@ A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10
 
 #### Option 1: Using Pre-built Image (Production)
 
-1. Download the docker-compose file:
+1. Download the docker compose file:
 ```bash
-curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker compose.yml
 ```
 
 2. Start the container:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. Access the application at: `http://localhost:8753`
@@ -44,7 +44,7 @@ The SQLite database will be persisted in a Docker-managed volume at `/var/lib/do
 
 1. Clone the repository and build:
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 2. Access the application at: `http://localhost:8753`
@@ -81,7 +81,7 @@ ResidencyRoll/
 │       │   └── TripService.cs           # Rolling calculation logic
 │       └── Program.cs
 ├── Dockerfile
-├── docker-compose.yml
+├── docker compose.yml
 └── README.md
 ```
 
