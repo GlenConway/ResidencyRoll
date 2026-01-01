@@ -55,12 +55,12 @@ services:
     image: ghcr.io/glenconway/residencyroll:latest
     container_name: residencyroll-app
     ports:
-      - "8753:8753"
+      - "8753:8080"  # Maps external port 8753 to internal container port 8080
     volumes:
       - residencyroll-data:/app/data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8753
+      - ASPNETCORE_URLS=http://+:8080
     restart: unless-stopped
 
 volumes:
@@ -77,10 +77,10 @@ docker compose up -d
 ```bash
 docker run -d \
   --name residencyroll-app \
-  -p 8753:8753 \
+  -p 8753:8080 \
   -v residencyroll-data:/app/data \
   -e ASPNETCORE_ENVIRONMENT=Production \
-  -e ASPNETCORE_URLS=http://+:8753 \
+  -e ASPNETCORE_URLS=http://+:8080 \
   --restart unless-stopped \
   ghcr.io/glenconway/residencyroll:latest
 ```

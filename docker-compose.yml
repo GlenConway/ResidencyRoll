@@ -3,12 +3,12 @@ services:
     image: ghcr.io/glenconway/residencyroll:latest
     container_name: residencyroll-app
     ports:
-      - "8753:8753"
+      - "8753:8080"
     volumes:
       - residencyroll-data:/app/data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8753
+      - ASPNETCORE_URLS=http://+:8080
     restart: unless-stopped
 
 volumes:
