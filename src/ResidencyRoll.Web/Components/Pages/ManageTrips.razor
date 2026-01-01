@@ -61,6 +61,11 @@
                     <RadzenDatePicker @bind-Value="trip.EndDate" Style="width:100%; display: block" />
                 </EditTemplate>
             </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Trip" Property="DurationDays" Title="Duration (days)" Width="150px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
+                <Template Context="trip">
+                    @trip.DurationDays
+                </Template>
+            </RadzenDataGridColumn>
             <RadzenDataGridColumn TItem="Trip" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
                 <Template Context="trip">
                     <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" />
