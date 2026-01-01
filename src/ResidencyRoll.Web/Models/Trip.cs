@@ -9,6 +9,6 @@ public class Trip
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
 
-    // Inclusive duration in days; not mapped to the database.
-    public int DurationDays => Math.Max(0, (EndDate - StartDate).Days + 1);
+    // Counts midnights between arrival (inclusive) and departure (exclusive).
+    public int DurationDays => Math.Max(0, (EndDate - StartDate).Days);
 }

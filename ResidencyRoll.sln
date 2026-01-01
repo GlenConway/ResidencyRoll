@@ -6,6 +6,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResidencyRoll.Web", "src\ResidencyRoll.Web\ResidencyRoll.Web.csproj", "{E00CAF0E-4445-2A82-B285-612458189077}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{FA1C1A06-2388-4F25-9B50-4E77D21E85D0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResidencyRoll.Tests", "tests\ResidencyRoll.Tests\ResidencyRoll.Tests.csproj", "{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -16,12 +20,17 @@ Global
 		{E00CAF0E-4445-2A82-B285-612458189077}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E00CAF0E-4445-2A82-B285-612458189077}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E00CAF0E-4445-2A82-B285-612458189077}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E00CAF0E-4445-2A82-B285-612458189077} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B4C3C8DA-4E3A-4C77-9C5B-AD5AF50785C0} = {FA1C1A06-2388-4F25-9B50-4E77D21E85D0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {63BC4287-3182-49A1-A0E4-9D1E44FF9B99}

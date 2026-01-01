@@ -47,7 +47,8 @@ public class TripService
 
         foreach (var trip in trips)
         {
-            var days = (trip.EndDate - trip.StartDate).Days + 1;
+            // Midnights present: arrival counts, departure does not.
+            var days = Math.Max(0, (trip.EndDate - trip.StartDate).Days);
 
             if (totals.ContainsKey(trip.CountryName))
             {
@@ -85,15 +86,13 @@ public class TripService
 
         foreach (var trip in trips)
         {
-            // Calculate the overlap between the trip and the 365-day window
+            // Calculate the overlap between the trip and the 365-day window using end-exclusive counting.
             var overlapStart = trip.StartDate > windowStart ? trip.StartDate : windowStart;
-            var overlapEnd = trip.EndDate < today ? trip.EndDate : today;
+            var overlapEndExclusive = trip.EndDate < today ? trip.EndDate : today;
 
-            // Only count if there's an overlap
-            if (overlapStart <= overlapEnd)
+            if (overlapStart < overlapEndExclusive)
             {
-                // Calculate days (inclusive of both start and end dates)
-                var days = (overlapEnd - overlapStart).Days + 1;
+                var days = (overlapEndExclusive - overlapStart).Days;
 
                 if (daysPerCountry.ContainsKey(trip.CountryName))
                 {
