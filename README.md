@@ -24,14 +24,35 @@ A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10
 
 ### Running with Docker (Recommended)
 
-1. Build and start the container:
+#### Option 1: Using Pre-built Image (Production)
+
+1. Download the docker-compose file:
+```bash
+curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
+```
+
+2. Create the database directory:
+```bash
+mkdir -p db
+```
+
+3. Start the container:
 ```bash
 docker-compose up -d
 ```
 
-2. Access the application at: `http://localhost:8080`
+4. Access the application at: `http://localhost:8080`
 
-3. The SQLite database will be persisted in the `./db` folder
+The SQLite database will be persisted in the `./db` folder.
+
+#### Option 2: Building Locally
+
+1. Clone the repository and build:
+```bash
+docker-compose up -d --build
+```
+
+2. Access the application at: `http://localhost:8080`
 
 ### Running Locally (Development)
 

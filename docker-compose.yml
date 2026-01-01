@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   residencyroll:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/glenconway/residencyroll:latest
     container_name: residencyroll-app
     ports:
       - "8080:8080"
