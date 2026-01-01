@@ -28,7 +28,7 @@ A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10
 
 1. Download the docker compose file:
 ```bash
-curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker compose.yml
+curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
 ```
 
 2. Start the container:
