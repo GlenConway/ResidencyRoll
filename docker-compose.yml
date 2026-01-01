@@ -1,7 +1,7 @@
 services:
   residencyroll:
     image: ghcr.io/glenconway/residencyroll:latest
-    container_name: residencyroll-app
+    container_name: ResidencyRoll
     ports:
       - "8753:8080"
     volumes:

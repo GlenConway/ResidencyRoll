@@ -53,7 +53,7 @@ Create a `docker compose.yml` on your target machine:
 services:
   residencyroll:
     image: ghcr.io/glenconway/residencyroll:latest
-    container_name: residencyroll-app
+    container_name: ResidencyRoll
     ports:
       - "8753:8080"  # Maps external port 8753 to internal container port 8080
     volumes:
@@ -76,7 +76,7 @@ docker compose up -d
 
 ```bash
 docker run -d \
-  --name residencyroll-app \
+  --name ResidencyRoll \
   -p 8753:8080 \
   -v residencyroll-data:/app/data \
   -e ASPNETCORE_ENVIRONMENT=Production \
@@ -111,8 +111,8 @@ Or with docker run:
 
 ```bash
 docker pull ghcr.io/glenconway/residencyroll:latest
-docker stop residencyroll-app
-docker rm residencyroll-app
+docker stop ResidencyRoll
+docker rm ResidencyRoll
 # Then run the docker run command again
 ```
 

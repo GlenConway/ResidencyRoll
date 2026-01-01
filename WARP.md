@@ -30,7 +30,7 @@ docker compose up -d
 docker compose down
 
 # View logs
-docker logs residencyroll-app
+docker logs ResidencyRoll
 
 # Rebuild after code changes
 docker compose up -d --build
