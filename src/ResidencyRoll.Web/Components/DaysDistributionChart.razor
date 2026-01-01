@@ -1,0 +1,18 @@
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Web.Components
+
+<RadzenCard>
+    <h3>Days Distribution (Last 365 Days)</h3>
+    <RadzenChart Style="width: 100%; height: 300px;">
+        <RadzenBarSeries Data="@DistributionData" CategoryProperty="Label" ValueProperty="Value">
+            <RadzenSeriesDataLabels Visible="true" />
+        </RadzenBarSeries>
+        <RadzenLegend Visible="false" />
+    </RadzenChart>
+</RadzenCard>
+
+@code {
+    [Parameter]
+    public List<DistributionData> DistributionData { get; set; } = new();
+}

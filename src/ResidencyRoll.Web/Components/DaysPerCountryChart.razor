@@ -1,0 +1,15 @@
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Web.Components
+
+<RadzenCard>
+    <h3>Days per Country (Last 365 Days)</h3>
+    <RadzenChart Style="width: 100%; height: 300px;">
+        <RadzenDonutSeries Data="@ChartData" CategoryProperty="Label" ValueProperty="Days" />
+    </RadzenChart>
+</RadzenCard>
+
+@code {
+    [Parameter]
+    public List<ChartData> ChartData { get; set; } = new();
+}

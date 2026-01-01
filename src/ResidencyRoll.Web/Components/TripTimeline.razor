@@ -1,0 +1,45 @@
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenCard>
+    <h3>Trip Timeline (@TimelineItems.Count)</h3>
+    @if (TimelineItems.Count == 0)
+    {
+        <RadzenAlert Severity="AlertSeverity.Info" Style="margin: 0">Add a trip to see your timeline.</RadzenAlert>
+    }
+    else
+    {
+        <div style="max-height: 320px; overflow-y: auto; padding-right: 0.5rem;">
+            <RadzenTimeline LineColor="#0d6efd" IndicatorColor="#0d6efd">
+                <Items>
+                    @foreach (var item in TimelineItems)
+                    {
+                        <RadzenTimelineItem>
+                            <LabelContent>
+                                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-m-0">@item.Title</RadzenText>
+                            </LabelContent>
+                            <ChildContent>
+                                <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div style="color: #6c757d;">@item.Subtitle</div>
+                                    <div style="font-size: 0.9rem; color: #0d6efd; font-weight: 600;">@item.DurationText</div>
+                                </div>
+                            </ChildContent>
+                        </RadzenTimelineItem>
+                    }
+                </Items>
+            </RadzenTimeline>
+        </div>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter]
+    public List<TimelineItem> TimelineItems { get; set; } = new();
+
+    public class TimelineItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Subtitle { get; set; } = string.Empty;
+        public string DurationText { get; set; } = string.Empty;
+    }
+}

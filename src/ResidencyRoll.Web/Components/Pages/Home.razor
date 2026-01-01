@@ -3,6 +3,7 @@
 @using Radzen.Blazor
 @using ResidencyRoll.Web.Models
 @using ResidencyRoll.Web.Services
+@using ResidencyRoll.Web.Components
 @inject TripService TripService
 @rendermode InteractiveServer
 
@@ -12,64 +13,22 @@
 
 <RadzenRow Gap="1rem" class="rz-mt-4">
     <RadzenColumn Size="12" SizeMD="6">
-        <RadzenCard>
-            <h3>Days Distribution (Last 365 Days)</h3>
-            <RadzenChart Style="width: 100%; height: 300px;">
-                <RadzenBarSeries Data="@distributionData" CategoryProperty="Label" ValueProperty="Value">
-                    <RadzenSeriesDataLabels Visible="true" />
-                </RadzenBarSeries>
-                <RadzenLegend Visible="false" />
-            </RadzenChart>
-        </RadzenCard>
+        <DaysDistributionChart DistributionData="@distributionData" />
     </RadzenColumn>
     <RadzenColumn Size="12" SizeMD="6">
-        <RadzenCard>
-            <h3>Days per Country (Last 365 Days)</h3>
-            <RadzenChart Style="width: 100%; height: 300px;">
-                <RadzenDonutSeries Data="@chartData" CategoryProperty="Label" ValueProperty="Days" />
-            </RadzenChart>
-        </RadzenCard>
+        <DaysPerCountryChart ChartData="@chartData" />
     </RadzenColumn>
 </RadzenRow>
 
 <RadzenRow Gap="1rem" class="rz-mt-4">
     <RadzenColumn Size="12">
-        <RadzenCard>
-            <h3>Trip Timeline (@timelineItems.Count)</h3>
-            @if (timelineItems.Count == 0)
-            {
-                <RadzenAlert Severity="AlertSeverity.Info" Style="margin: 0">Add a trip to see your timeline.</RadzenAlert>
-            }
-            else
-            {
-                <div style="max-height: 320px; overflow-y: auto; padding-right: 0.5rem;">
-                    <RadzenTimeline LineColor="#0d6efd" IndicatorColor="#0d6efd">
-                        <Items>
-                            @foreach (var item in timelineItems)
-                            {
-                                <RadzenTimelineItem>
-                                    <LabelContent>
-                                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-m-0">@item.Title</RadzenText>
-                                    </LabelContent>
-                                    <ChildContent>
-                                        <div style="display: flex; flex-direction: column; gap: 0.15rem;">
-                                            <div style="color: #6c757d;">@item.Subtitle</div>
-                                            <div style="font-size: 0.9rem; color: #0d6efd; font-weight: 600;">@item.DurationText</div>
-                                        </div>
-                                    </ChildContent>
-                                </RadzenTimelineItem>
-                            }
-                        </Items>
-                    </RadzenTimeline>
-                </div>
-            }
-        </RadzenCard>
+        <TripTimeline TimelineItems="@timelineItems" />
     </RadzenColumn>
 </RadzenRow>
 
 @code {
     private List<Trip> timelineTrips = new();
-    private List<TimelineItem> timelineItems = new();
+    private List<TripTimeline.TimelineItem> timelineItems = new();
     private int daysAway;
     private int daysHome;
     private List<ChartData> chartData = new();
@@ -99,7 +58,7 @@
 
         timelineItems = timelineTrips
             .OrderByDescending(t => t.StartDate)
-            .Select(t => new TimelineItem
+            .Select(t => new TripTimeline.TimelineItem
             {
                 Title = t.CountryName,
                 Subtitle = $"{t.StartDate:MMM dd, yyyy} – {t.EndDate:MMM dd, yyyy}",
@@ -108,24 +67,5 @@
             .ToList();
         
         StateHasChanged();
-    }
-
-    public class ChartData
-    {
-        public string Label { get; set; } = string.Empty;
-        public int Days { get; set; }
-    }
-
-    public class DistributionData
-    {
-        public string Label { get; set; } = string.Empty;
-        public int Value { get; set; }
-    }
-
-    public class TimelineItem
-    {
-        public string Title { get; set; } = string.Empty;
-        public string Subtitle { get; set; } = string.Empty;
-        public string DurationText { get; set; } = string.Empty;
     }
 }
