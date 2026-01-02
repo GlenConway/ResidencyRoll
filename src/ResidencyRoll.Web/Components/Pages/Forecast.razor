@@ -1,0 +1,214 @@
+@page "/forecast"
+@using Radzen
+@using Radzen.Blazor
+@using System.Globalization
+@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Web.Services
+@inject TripService TripService
+
+<PageTitle>Forecast - Residency Roll</PageTitle>
+
+<h1>Trip Forecast</h1>
+
+<RadzenCard class="rz-mt-4">
+    <div style="display: flex; gap: 2rem; flex-direction: column;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>Country</label>
+                <RadzenDropDown @bind-Value="forecastCountry"
+                                Data="@countryOptions"
+                                AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                Placeholder="Select a country"
+                                Style="width: 200px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>Start Date</label>
+                <RadzenDatePicker @bind-Value="forecastStartDate" Style="width: 200px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>End Date</label>
+                <RadzenDatePicker @bind-Value="forecastEndDate" Style="width: 200px;" />
+            </div>
+            <RadzenButton Click="CalculateForecast" Text="Calculate" ButtonStyle="ButtonStyle.Primary" />
+        </div>
+
+        @if (forecastCalculated && forecastCountry != null && forecastStartDate.HasValue && forecastEndDate.HasValue)
+        {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div>
+                    <h3>Current (Last 365 Days)</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        @if (currentDaysPerCountry.Count == 0)
+                        {
+                            <RadzenAlert Severity="AlertSeverity.Info">No trips recorded in the last 365 days.</RadzenAlert>
+                        }
+                        else
+                        {
+                            @foreach (var kvp in currentDaysPerCountry.OrderByDescending(x => x.Value))
+                            {
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">
+                                    <span><strong>@kvp.Key</strong></span>
+                                    <span>@kvp.Value days</span>
+                                </div>
+                            }
+                            <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
+                                <span>Total Away</span>
+                                <span>@currentDaysPerCountry.Values.Sum() days</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Forecast (365 Days from Trip End)</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        @if (forecastDaysPerCountry.Count == 0)
+                        {
+                            <RadzenAlert Severity="AlertSeverity.Info">No trips in forecast period.</RadzenAlert>
+                        }
+                        else
+                        {
+                            @foreach (var kvp in forecastDaysPerCountry.OrderByDescending(x => x.Value))
+                            {
+                                var isNewTrip = kvp.Key == forecastCountry;
+                                var daysInCountry = kvp.Value;
+                                var exceedsLimit = daysInCountry > 183;
+                                var style = isNewTrip ? (exceedsLimit ? "background: #f8d7da; border: 2px solid #dc3545;" : "background: #d4edda; border: 2px solid #28a745;") : "background: #f8f9fa;";
+                                
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; @style border-radius: 4px;">
+                                    <span>
+                                        <strong>@kvp.Key</strong>
+                                        @if (isNewTrip)
+                                        {
+                                            <span style="font-size: 0.9rem; margin-left: 0.5rem;">
+                                                (+ @((forecastEndDate.Value - forecastStartDate.Value).Days) days)
+                                                @if (exceedsLimit)
+                                                {
+                                                    <span style="color: #dc3545; font-weight: bold;"> ⚠️ Exceeds 183</span>
+                                                }
+                                            </span>
+                                        }
+                                    </span>
+                                    <span>@daysInCountry days</span>
+                                </div>
+                            }
+                            <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
+                                <span>Total Away</span>
+                                <span>@forecastDaysPerCountry.Values.Sum() days</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (forecastCountry != null)
+            {
+                var forecastCountryDays = forecastDaysPerCountry.ContainsKey(forecastCountry) ? forecastDaysPerCountry[forecastCountry] : 0;
+                
+                @if (forecastCountryDays > 183)
+                {
+                    <div style="margin-top: 2rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                        <h3 style="margin-top: 0;">183-Day Limit Planning</h3>
+                        
+                        @if (maxEndDateForLimit.HasValue)
+                        {
+                            <div style="margin-bottom: 1rem;">
+                                <p><strong>Maximum safe end date:</strong> @maxEndDateForLimit.Value.ToString("MMM dd, yyyy")</p>
+                                <p style="font-size: 0.9rem; color: #666;">This is the latest you can end your trip and stay at or below 183 days in @forecastCountry during the 365-day window.</p>
+                            </div>
+                        }
+
+                        <h4>Standard Duration Windows</h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            @foreach (var window in standardDurationForecasts)
+                            {
+                                var exceeds = window.ExceedsLimit;
+                                var windowStyle = exceeds ? "background: #ffebee; border-left: 4px solid #dc3545;" : "background: #e8f5e9; border-left: 4px solid #28a745;";
+                                
+                                <div style="padding: 0.75rem; @windowStyle border-radius: 2px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>
+                                            <strong>@window.DurationDays days</strong> 
+                                            (@forecastStartDate.Value.ToString("MMM dd") – @window.EndDate.ToString("MMM dd, yyyy"))
+                                        </span>
+                                        <span style="font-weight: 600; @(exceeds ? "color: #dc3545;" : "color: #28a745;")">
+                                            @window.TotalDaysInCountry days
+                                            @if (exceeds)
+                                            {
+                                                <span>❌ Over limit</span>
+                                            }
+                                            else
+                                            {
+                                                <span>✓ Safe</span>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </div>
+</RadzenCard>
+
+@code {
+    private string? forecastCountry;
+    private DateTime? forecastStartDate = DateTime.Today.AddMonths(1);
+    private DateTime? forecastEndDate = DateTime.Today.AddMonths(1).AddDays(30);
+    private bool forecastCalculated = false;
+    private Dictionary<string, int> currentDaysPerCountry = new();
+    private Dictionary<string, int> forecastDaysPerCountry = new();
+    private DateTime? maxEndDateForLimit;
+    private List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)> standardDurationForecasts = new();
+    private static readonly List<string> countryOptions = CultureInfo
+        .GetCultures(CultureTypes.SpecificCultures)
+        .Select(c => new RegionInfo(c.Name).EnglishName)
+        .Distinct()
+        .OrderBy(name => name)
+        .ToList();
+
+    private async Task CalculateForecast()
+    {
+        if (string.IsNullOrWhiteSpace(forecastCountry) || !forecastStartDate.HasValue || !forecastEndDate.HasValue)
+        {
+            return;
+        }
+
+        var (current, forecast) = await TripService.ForecastDaysWithTripAsync(
+            forecastCountry,
+            forecastStartDate.Value,
+            forecastEndDate.Value
+        );
+
+        currentDaysPerCountry = current;
+        forecastDaysPerCountry = forecast;
+        forecastCalculated = true;
+
+        // Calculate 183-day limit planning if forecast exceeds 183 days
+        var countryDays = forecast.ContainsKey(forecastCountry) ? forecast[forecastCountry] : 0;
+        if (countryDays > 183)
+        {
+            var (maxDate, _) = await TripService.CalculateMaxTripEndDateAsync(
+                forecastCountry,
+                forecastStartDate.Value,
+                183
+            );
+            maxEndDateForLimit = maxDate;
+        }
+        else
+        {
+            maxEndDateForLimit = null;
+        }
+
+        // Calculate standard duration forecasts
+        standardDurationForecasts = await TripService.CalculateStandardDurationForecastsAsync(
+            forecastCountry,
+            forecastStartDate.Value,
+            183
+        );
+    }
+}
