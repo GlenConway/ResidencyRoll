@@ -210,4 +210,68 @@ public class TripService
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
     }
+
+    /// <summary>
+    /// Calculates the maximum end date for a trip starting on tripStart in a given country
+    /// such that the total days in that country within the 365-day window (ending at that max end date)
+    /// does not exceed the limit (183 days). Returns the date and the actual day count.
+    /// </summary>
+    public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(
+        string countryName, DateTime tripStart, int dayLimit = 183)
+    {
+        var trips = await _context.Trips.ToListAsync();
+        
+        // Start with the trip start date; we'll increment the end date to find the maximum
+        DateTime currentEnd = tripStart;
+        int daysUsed = 0;
+
+        // Binary search approach: find the latest end date that keeps us at or under the limit
+        DateTime minDate = tripStart;
+        DateTime maxDate = tripStart.AddDays(365); // reasonable upper bound
+
+        while (minDate < maxDate)
+        {
+            DateTime midDate = minDate.AddDays((maxDate - minDate).Days / 2);
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(countryName, tripStart, midDate);
+            
+            int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
+
+            if (totalDays <= dayLimit)
+            {
+                currentEnd = midDate;
+                daysUsed = totalDays;
+                minDate = midDate.AddDays(1);
+            }
+            else
+            {
+                maxDate = midDate;
+            }
+        }
+
+        return (currentEnd, daysUsed);
+    }
+
+    /// <summary>
+    /// Calculates forecast results for standard trip durations (7, 14, 21 days) 
+    /// starting from the given start date.
+    /// </summary>
+    public async Task<List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)>> 
+        CalculateStandardDurationForecastsAsync(string countryName, DateTime tripStart, int dayLimit = 183)
+    {
+        var results = new List<(int, DateTime, int, bool)>();
+        int[] durations = { 7, 14, 21 };
+
+        foreach (var duration in durations)
+        {
+            var endDate = tripStart.AddDays(duration);
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(countryName, tripStart, endDate);
+            
+            int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
+            bool exceedsLimit = totalDays > dayLimit;
+
+            results.Add((duration, endDate, totalDays, exceedsLimit));
+        }
+
+        return results;
+    }
 }
