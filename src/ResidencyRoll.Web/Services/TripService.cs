@@ -135,23 +135,26 @@ public class TripService
     }
 
     /// <summary>
-    /// Forecasts days per country in the next 365 days including a hypothetical future trip
+    /// Forecasts days per country in a 365-day window ending at the forecast trip's end date.
+    /// Recalculates the rolling 365-day window based on the end of the hypothetical trip.
     /// </summary>
     public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string countryName, DateTime tripStart, DateTime tripEnd)
     {
         var today = DateTime.Today;
-        var windowStart = today.AddDays(-365);
-        var forecastWindowStart = today;
-        var forecastWindowEnd = today.AddDays(365);
+        var currentWindowStart = today.AddDays(-365);
+
+        // Forecast window: 365 days ending at the forecast trip's end date
+        var forecastWindowEnd = tripEnd;
+        var forecastWindowStart = tripEnd.AddDays(-365);
 
         var trips = await _context.Trips.ToListAsync();
         var currentDaysPerCountry = new Dictionary<string, int>();
         var forecastDaysPerCountry = new Dictionary<string, int>();
 
-        // Calculate current (last 365 days)
+        // Calculate current (last 365 days from today)
         foreach (var trip in trips)
         {
-            var overlapStart = trip.StartDate > windowStart ? trip.StartDate : windowStart;
+            var overlapStart = trip.StartDate > currentWindowStart ? trip.StartDate : currentWindowStart;
             var overlapEndExclusive = trip.EndDate < today ? trip.EndDate : today;
 
             if (overlapStart < overlapEndExclusive)
@@ -168,8 +171,7 @@ public class TripService
             }
         }
 
-        // Calculate forecast (next 365 days, including hypothetical trip)
-        // First add actual trips that extend into forecast window
+        // Calculate forecast (365 days ending at forecast trip end date, including all overlapping trips + hypothetical trip)
         foreach (var trip in trips)
         {
             var overlapStart = trip.StartDate > forecastWindowStart ? trip.StartDate : forecastWindowStart;
