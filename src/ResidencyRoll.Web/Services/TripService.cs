@@ -133,4 +133,79 @@ public class TripService
     {
         return await _context.Trips.OrderBy(t => t.StartDate).ToListAsync();
     }
+
+    /// <summary>
+    /// Forecasts days per country in the next 365 days including a hypothetical future trip
+    /// </summary>
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string countryName, DateTime tripStart, DateTime tripEnd)
+    {
+        var today = DateTime.Today;
+        var windowStart = today.AddDays(-365);
+        var forecastWindowStart = today;
+        var forecastWindowEnd = today.AddDays(365);
+
+        var trips = await _context.Trips.ToListAsync();
+        var currentDaysPerCountry = new Dictionary<string, int>();
+        var forecastDaysPerCountry = new Dictionary<string, int>();
+
+        // Calculate current (last 365 days)
+        foreach (var trip in trips)
+        {
+            var overlapStart = trip.StartDate > windowStart ? trip.StartDate : windowStart;
+            var overlapEndExclusive = trip.EndDate < today ? trip.EndDate : today;
+
+            if (overlapStart < overlapEndExclusive)
+            {
+                var days = (overlapEndExclusive - overlapStart).Days;
+                if (currentDaysPerCountry.ContainsKey(trip.CountryName))
+                {
+                    currentDaysPerCountry[trip.CountryName] += days;
+                }
+                else
+                {
+                    currentDaysPerCountry[trip.CountryName] = days;
+                }
+            }
+        }
+
+        // Calculate forecast (next 365 days, including hypothetical trip)
+        // First add actual trips that extend into forecast window
+        foreach (var trip in trips)
+        {
+            var overlapStart = trip.StartDate > forecastWindowStart ? trip.StartDate : forecastWindowStart;
+            var overlapEndExclusive = trip.EndDate < forecastWindowEnd ? trip.EndDate : forecastWindowEnd;
+
+            if (overlapStart < overlapEndExclusive)
+            {
+                var days = (overlapEndExclusive - overlapStart).Days;
+                if (forecastDaysPerCountry.ContainsKey(trip.CountryName))
+                {
+                    forecastDaysPerCountry[trip.CountryName] += days;
+                }
+                else
+                {
+                    forecastDaysPerCountry[trip.CountryName] = days;
+                }
+            }
+        }
+
+        // Add the hypothetical trip to forecast
+        var hypotheticalStart = tripStart > forecastWindowStart ? tripStart : forecastWindowStart;
+        var hypotheticalEndExclusive = tripEnd < forecastWindowEnd ? tripEnd : forecastWindowEnd;
+
+        if (hypotheticalStart < hypotheticalEndExclusive)
+        {
+            var days = (hypotheticalEndExclusive - hypotheticalStart).Days;
+            if (forecastDaysPerCountry.ContainsKey(countryName))
+            {
+                forecastDaysPerCountry[countryName] += days;
+            }
+            else
+            {
+                forecastDaysPerCountry[countryName] = days;
+            }
+        }
+
+        return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
 }

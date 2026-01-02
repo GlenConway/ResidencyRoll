@@ -1,0 +1,119 @@
+@page "/forecast"
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Web.Services
+@inject TripService TripService
+
+<PageTitle>Forecast - Residency Roll</PageTitle>
+
+<h1>Trip Forecast</h1>
+
+<RadzenCard class="rz-mt-4">
+    <div style="display: flex; gap: 2rem; flex-direction: column;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>Country</label>
+                <RadzenTextBox @bind-Value="forecastCountry" Placeholder="e.g., Spain" Style="width: 200px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>Start Date</label>
+                <RadzenDatePicker @bind-Value="forecastStartDate" Style="width: 200px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label>End Date</label>
+                <RadzenDatePicker @bind-Value="forecastEndDate" Style="width: 200px;" />
+            </div>
+            <RadzenButton Click="CalculateForecast" Text="Calculate" ButtonStyle="ButtonStyle.Primary" />
+        </div>
+
+        @if (forecastCalculated && forecastCountry != null && forecastStartDate.HasValue && forecastEndDate.HasValue)
+        {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div>
+                    <h3>Current (Last 365 Days)</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        @if (currentDaysPerCountry.Count == 0)
+                        {
+                            <RadzenAlert Severity="AlertSeverity.Info">No trips recorded in the last 365 days.</RadzenAlert>
+                        }
+                        else
+                        {
+                            @foreach (var kvp in currentDaysPerCountry.OrderByDescending(x => x.Value))
+                            {
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">
+                                    <span><strong>@kvp.Key</strong></span>
+                                    <span>@kvp.Value days</span>
+                                </div>
+                            }
+                            <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
+                                <span>Total Away</span>
+                                <span>@currentDaysPerCountry.Values.Sum() days</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Forecast (Next 365 Days + Trip)</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        @if (forecastDaysPerCountry.Count == 0)
+                        {
+                            <RadzenAlert Severity="AlertSeverity.Info">No trips in forecast period.</RadzenAlert>
+                        }
+                        else
+                        {
+                            @foreach (var kvp in forecastDaysPerCountry.OrderByDescending(x => x.Value))
+                            {
+                                var isNewTrip = kvp.Key == forecastCountry;
+                                var style = isNewTrip ? "background: #d4edda; border: 2px solid #28a745;" : "background: #f8f9fa;";
+                                
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; @style border-radius: 4px;">
+                                    <span>
+                                        <strong>@kvp.Key</strong>
+                                        @if (isNewTrip)
+                                        {
+                                            <span style="color: #28a745; font-size: 0.9rem; margin-left: 0.5rem;">(+ @((forecastEndDate.Value - forecastStartDate.Value).Days) days)</span>
+                                        }
+                                    </span>
+                                    <span>@kvp.Value days</span>
+                                </div>
+                            }
+                            <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
+                                <span>Total Away</span>
+                                <span>@forecastDaysPerCountry.Values.Sum() days</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</RadzenCard>
+
+@code {
+    private string? forecastCountry;
+    private DateTime? forecastStartDate = DateTime.Today.AddMonths(1);
+    private DateTime? forecastEndDate = DateTime.Today.AddMonths(1).AddDays(30);
+    private bool forecastCalculated = false;
+    private Dictionary<string, int> currentDaysPerCountry = new();
+    private Dictionary<string, int> forecastDaysPerCountry = new();
+
+    private async Task CalculateForecast()
+    {
+        if (string.IsNullOrWhiteSpace(forecastCountry) || !forecastStartDate.HasValue || !forecastEndDate.HasValue)
+        {
+            return;
+        }
+
+        var (current, forecast) = await TripService.ForecastDaysWithTripAsync(
+            forecastCountry,
+            forecastStartDate.Value,
+            forecastEndDate.Value
+        );
+
+        currentDaysPerCountry = current;
+        forecastDaysPerCountry = forecast;
+        forecastCalculated = true;
+    }
+}
