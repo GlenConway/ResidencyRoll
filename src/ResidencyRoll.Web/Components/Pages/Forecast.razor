@@ -1,6 +1,7 @@
 @page "/forecast"
 @using Radzen
 @using Radzen.Blazor
+@using System.Globalization
 @using ResidencyRoll.Web.Models
 @using ResidencyRoll.Web.Services
 @inject TripService TripService
@@ -14,7 +15,13 @@
         <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                 <label>Country</label>
-                <RadzenTextBox @bind-Value="forecastCountry" Placeholder="e.g., Spain" Style="width: 200px;" />
+                <RadzenDropDown @bind-Value="forecastCountry"
+                                Data="@countryOptions"
+                                AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                Placeholder="Select a country"
+                                Style="width: 200px;" />
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                 <label>Start Date</label>
@@ -98,6 +105,12 @@
     private bool forecastCalculated = false;
     private Dictionary<string, int> currentDaysPerCountry = new();
     private Dictionary<string, int> forecastDaysPerCountry = new();
+    private static readonly List<string> countryOptions = CultureInfo
+        .GetCultures(CultureTypes.SpecificCultures)
+        .Select(c => new RegionInfo(c.Name).EnglishName)
+        .Distinct()
+        .OrderBy(name => name)
+        .ToList();
 
     private async Task CalculateForecast()
     {
