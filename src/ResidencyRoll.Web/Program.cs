@@ -31,7 +31,16 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(navigation.BaseUri) };
 });
 
-// Add application services
+// Add typed HTTP client for API
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5000";
+builder.Services.AddHttpClient<TripsApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+// Add application services (kept for now for import/export endpoints)
+// TODO: Move import/export to API and remove TripService completely
 builder.Services.AddScoped<TripService>();
 
 var app = builder.Build();

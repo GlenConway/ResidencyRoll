@@ -1,70 +1,94 @@
-# Deployment Guide - GitHub Container Registry (GHCR)
+# Deployment Guide
 
-## Automated Deployment (Recommended)
+## Architecture Overview
 
-The GitHub Actions workflow (`.github/workflows/docker-publish.yml`) automatically builds and pushes to GHCR when you:
+ResidencyRoll now uses a split architecture:
+- **API Service** (`Dockerfile.api`): Backend REST API with business logic and database
+- **Web Service** (`Dockerfile`): Blazor frontend that consumes the API
 
-1. **Push to main branch**: Creates `ghcr.io/glenconway/residencyroll:latest` and `ghcr.io/glenconway/residencyroll:main`
-2. **Create a version tag**: Creates versioned images (e.g., `v1.0.0` → `ghcr.io/glenconway/residencyroll:1.0.0`)
-3. **Manual trigger**: Use the "Actions" tab → "Build and Push to GHCR" → "Run workflow"
+Both services run in separate containers and communicate over a shared Docker network.
 
-### Setup Steps
+## Quick Start - Local Development
 
-1. Commit and push the workflow file:
+### Using Docker Compose (Recommended)
+
+1. Build and start both services:
+   ```bash
+   docker compose up --build
+   ```
+
+2. Access the applications:
+   - Web UI: http://localhost:8081
+   - API: http://localhost:8080
+   - API Swagger: http://localhost:8080/swagger
+
+3. Stop the services:
+   ```bash
+   docker compose down
+   ```
+
+### Build Individual Images
+
+**API:**
 ```bash
-git add .github/workflows/docker-publish.yml
-git commit -m "Add GitHub Actions workflow for GHCR deployment"
-git push origin main
+docker build -f Dockerfile.api -t residencyroll-api:latest .
 ```
 
-2. The workflow will automatically run and push the image to GHCR
-
-3. Make the package public (optional):
-   - Go to https://github.com/GlenConway?tab=packages
-   - Click on `residencyroll` package
-   - Click "Package settings"
-   - Scroll down to "Danger Zone" → "Change package visibility"
-   - Select "Public"
-
-## Manual Deployment
-
-If you prefer to build and push manually:
-
+**Web:**
 ```bash
-# 1. Login to GHCR (one-time setup)
-echo $GITHUB_TOKEN | docker login ghcr.io -u GlenConway --password-stdin
-
-# 2. Build the image
-docker build -t ghcr.io/glenconway/residencyroll:latest .
-
-# 3. Push to GHCR
-docker push ghcr.io/glenconway/residencyroll:latest
+docker build -f Dockerfile -t residencyroll-web:latest .
 ```
 
-**Note**: You'll need a GitHub Personal Access Token (PAT) with `write:packages` scope. Create one at: https://github.com/settings/tokens
+## Production Deployment
 
-## Running from GHCR
+### Using Docker Compose with Pre-built Images
 
-### Using docker compose
-
-Create a `docker compose.yml` on your target machine:
+Create a `docker-compose.yml` on your target machine:
 
 ```yaml
 services:
-  residencyroll:
-    image: ghcr.io/glenconway/residencyroll:latest
-    container_name: ResidencyRoll
+  residencyroll-api:
+    image: ghcr.io/glenconway/residencyroll-api:latest
+    container_name: ResidencyRoll-Api
     ports:
-      - "8753:8080"  # Maps external port 8753 to internal container port 8080
+      - "8080:80"
     volumes:
-      - residencyroll-data:/app/data
+      - residencyroll-api-data:/app/data
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__Default=Data Source=/app/data/residencyroll.db
+      - Jwt__Authority=${JWT_AUTHORITY}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      - Cors__AllowedOrigins__0=http://localhost:8081
+    restart: unless-stopped
+    networks:
+      - residencyroll-network
+
+  residencyroll-web:
+    image: ghcr.io/glenconway/residencyroll-web:latest
+    container_name: ResidencyRoll-Web
+    ports:
+      - "8081:8080"
+    volumes:
+      - residencyroll-web-data:/app/data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
+      - Api__BaseUrl=http://residencyroll-api:80
     restart: unless-stopped
+    depends_on:
+      - residencyroll-api
+    networks:
+      - residencyroll-network
 
 volumes:
-  residencyroll-data:
+  residencyroll-api-data:
+  residencyroll-web-data:
+
+networks:
+  residencyroll-network:
+    driver: bridge
 ```
 
 Then run:
@@ -72,57 +96,111 @@ Then run:
 docker compose up -d
 ```
 
-### Using docker run
+### Environment Configuration
+
+Create a `.env` file for sensitive configuration:
 
 ```bash
-docker run -d \
-  --name ResidencyRoll \
-  -p 8753:8080 \
-  -v residencyroll-data:/app/data \
-  -e ASPNETCORE_ENVIRONMENT=Production \
-  -e ASPNETCORE_URLS=http://+:8080 \
-  --restart unless-stopped \
-  ghcr.io/glenconway/residencyroll:latest
+JWT_AUTHORITY=https://your-identity-provider.com/
+JWT_AUDIENCE=residencyroll-api
+JWT_REQUIRE_HTTPS=true
 ```
 
-**Note**: This creates a Docker-managed volume at `/var/lib/docker/volumes/residencyroll-data`.
+See `.env.example` for all available options.
 
-## Image Tags
+## GitHub Container Registry (GHCR) Setup
 
-The workflow creates multiple tags:
+### Automated CI/CD
 
-- `latest` - Always points to the most recent main branch build
-- `main` - Latest build from main branch
-- `v1.0.0` - Specific version (when you create git tags)
-- `1.0` - Major.minor version
-- `1` - Major version only
-- `main-abc1234` - Branch name + commit SHA
+Update `.github/workflows/docker-publish.yml` to build both images:
 
-## Updating Your Deployment
+```yaml
+jobs:
+  build-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and push API
+        run: |
+          docker build -f Dockerfile.api -t ghcr.io/glenconway/residencyroll-api:latest .
+          docker push ghcr.io/glenconway/residencyroll-api:latest
+  
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and push Web
+        run: |
+          docker build -f Dockerfile -t ghcr.io/glenconway/residencyroll-web:latest .
+          docker push ghcr.io/glenconway/residencyroll-web:latest
+```
 
-To pull the latest image:
+### Manual Push to GHCR
 
 ```bash
-docker compose pull
-docker compose up -d
+# Login to GHCR
+echo $GITHUB_TOKEN | docker login ghcr.io -u GlenConway --password-stdin
+
+# Build and push API
+docker build -f Dockerfile.api -t ghcr.io/glenconway/residencyroll-api:latest .
+docker push ghcr.io/glenconway/residencyroll-api:latest
+
+# Build and push Web
+docker build -f Dockerfile -t ghcr.io/glenconway/residencyroll-web:latest .
+docker push ghcr.io/glenconway/residencyroll-web:latest
 ```
 
-Or with docker run:
+## Database Persistence
 
+SQLite databases are stored in Docker volumes:
+
+**Backup:**
 ```bash
-docker pull ghcr.io/glenconway/residencyroll:latest
-docker stop ResidencyRoll
-docker rm ResidencyRoll
-# Then run the docker run command again
+docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/api-backup.tar.gz -C /data .
 ```
 
-## Creating Version Releases
-
-To create a versioned release:
-
+**Restore:**
 ```bash
-git tag -a v1.0.0 -m "Release version 1.0.0"
-git push origin v1.0.0
+docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/api-backup.tar.gz -C /data
 ```
 
-This will trigger the workflow to build and push with version tags.
+## Authentication Setup
+
+Before enabling JWT auth in production:
+
+1. Configure OIDC provider (Auth0, Keycloak, Azure AD)
+2. Set `JWT_AUTHORITY` and `JWT_AUDIENCE` environment variables
+3. Configure Blazor OIDC client
+4. Re-enable `[Authorize]` attribute in API controllers
+5. Test token acquisition and API calls
+
+## Troubleshooting
+
+**View logs:**
+```bash
+docker compose logs -f
+docker compose logs -f residencyroll-api
+docker compose logs -f residencyroll-web
+```
+
+**Check container status:**
+```bash
+docker compose ps
+```
+
+**Access container shell:**
+```bash
+docker exec -it ResidencyRoll-Api /bin/bash
+```
+
+**Reset and rebuild:**
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+## Legacy Single-Container Deployment
+
+For the legacy monolith deployment (ResidencyRoll.Web only), see git history before the API split.
