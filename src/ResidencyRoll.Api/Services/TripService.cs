@@ -13,14 +13,18 @@ public class TripService
         _context = context;
     }
 
-    public async Task<List<Trip>> GetAllTripsAsync()
+    public async Task<List<Trip>> GetAllTripsAsync(string userId)
     {
-        return await _context.Trips.OrderBy(t => t.StartDate).ToListAsync();
+        return await _context.Trips
+            .Where(t => t.UserId == userId)
+            .OrderBy(t => t.StartDate)
+            .ToListAsync();
     }
 
-    public async Task<Trip?> GetTripByIdAsync(int id)
+    public async Task<Trip?> GetTripByIdAsync(int id, string userId)
     {
-        return await _context.Trips.FindAsync(id);
+        return await _context.Trips
+            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
     }
 
     public async Task<Trip> CreateTripAsync(Trip trip)
@@ -30,16 +34,21 @@ public class TripService
         return trip;
     }
 
-    public async Task<Trip> UpdateTripAsync(Trip trip)
+    public async Task<Trip> UpdateTripAsync(Trip trip, string userId)
     {
+        var existing = await GetTripByIdAsync(trip.Id, userId);
+        if (existing == null)
+        {
+            throw new UnauthorizedAccessException("Trip not found or you don't have permission to update it.");
+        }
         _context.Trips.Update(trip);
         await _context.SaveChangesAsync();
         return trip;
     }
 
-    public async Task DeleteTripAsync(int id)
+    public async Task DeleteTripAsync(int id, string userId)
     {
-        var trip = await _context.Trips.FindAsync(id);
+        var trip = await GetTripByIdAsync(id, userId);
         if (trip != null)
         {
             _context.Trips.Remove(trip);
@@ -47,9 +56,11 @@ public class TripService
         }
     }
 
-    public async Task<Dictionary<string, int>> GetTotalDaysPerCountryAsync()
+    public async Task<Dictionary<string, int>> GetTotalDaysPerCountryAsync(string userId)
     {
-        var trips = await _context.Trips.ToListAsync();
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
         var totals = new Dictionary<string, int>();
 
         foreach (var trip in trips)
@@ -69,12 +80,14 @@ public class TripService
         return totals;
     }
 
-    public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync()
+    public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync(string userId)
     {
         var today = DateTime.Today;
         var windowStart = today.AddDays(-365);
 
-        var trips = await _context.Trips.ToListAsync();
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
         var daysPerCountry = new Dictionary<string, int>();
 
         foreach (var trip in trips)
@@ -100,24 +113,27 @@ public class TripService
         return daysPerCountry;
     }
 
-    public async Task<int> GetTotalDaysAwayInLast365DaysAsync()
+    public async Task<int> GetTotalDaysAwayInLast365DaysAsync(string userId)
     {
-        var daysPerCountry = await GetDaysPerCountryInLast365DaysAsync();
+        var daysPerCountry = await GetDaysPerCountryInLast365DaysAsync(userId);
         return daysPerCountry.Values.Sum();
     }
 
-    public async Task<int> GetDaysAtHomeInLast365DaysAsync()
+    public async Task<int> GetDaysAtHomeInLast365DaysAsync(string userId)
     {
-        var totalDaysAway = await GetTotalDaysAwayInLast365DaysAsync();
+        var totalDaysAway = await GetTotalDaysAwayInLast365DaysAsync(userId);
         return 365 - totalDaysAway;
     }
 
-    public async Task<List<Trip>> GetTripsForTimelineAsync()
+    public async Task<List<Trip>> GetTripsForTimelineAsync(string userId)
     {
-        return await _context.Trips.OrderBy(t => t.StartDate).ToListAsync();
+        return await _context.Trips
+            .Where(t => t.UserId == userId)
+            .OrderBy(t => t.StartDate)
+            .ToListAsync();
     }
 
-    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string countryName, DateTime tripStart, DateTime tripEnd)
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string userId, string countryName, DateTime tripStart, DateTime tripEnd)
     {
         var today = DateTime.Today;
         var currentWindowStart = today.AddDays(-365);
@@ -125,7 +141,9 @@ public class TripService
         var forecastWindowEnd = tripEnd;
         var forecastWindowStart = tripEnd.AddDays(-365);
 
-        var trips = await _context.Trips.ToListAsync();
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
         var currentDaysPerCountry = new Dictionary<string, int>();
         var forecastDaysPerCountry = new Dictionary<string, int>();
 
@@ -186,9 +204,11 @@ public class TripService
         return (currentDaysPerCountry, forecastDaysPerCountry);
     }
 
-    public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(string countryName, DateTime tripStart, int dayLimit = 183)
+    public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(string userId, string countryName, DateTime tripStart, int dayLimit = 183)
     {
-        var trips = await _context.Trips.ToListAsync();
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
 
         DateTime currentEnd = tripStart;
         int daysUsed = 0;
@@ -199,7 +219,7 @@ public class TripService
         while (minDate < maxDate)
         {
             DateTime midDate = minDate.AddDays((maxDate - minDate).Days / 2);
-            var (_, forecastDays) = await ForecastDaysWithTripAsync(countryName, tripStart, midDate);
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, countryName, tripStart, midDate);
 
             int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
 
@@ -218,7 +238,7 @@ public class TripService
         return (currentEnd, daysUsed);
     }
 
-    public async Task<List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)>> CalculateStandardDurationForecastsAsync(string countryName, DateTime tripStart, int dayLimit = 183, int[]? durations = null)
+    public async Task<List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)>> CalculateStandardDurationForecastsAsync(string userId, string countryName, DateTime tripStart, int dayLimit = 183, int[]? durations = null)
     {
         var results = new List<(int, DateTime, int, bool)>();
         int[] requestedDurations = durations is { Length: > 0 } ? durations : new[] { 7, 14, 21 };
@@ -226,7 +246,7 @@ public class TripService
         foreach (var duration in requestedDurations)
         {
             var endDate = tripStart.AddDays(duration);
-            var (_, forecastDays) = await ForecastDaysWithTripAsync(countryName, tripStart, endDate);
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, countryName, tripStart, endDate);
 
             int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
             bool exceedsLimit = totalDays > dayLimit;

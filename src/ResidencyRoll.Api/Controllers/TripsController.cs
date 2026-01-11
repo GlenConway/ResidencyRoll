@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using ResidencyRoll.Api.Mappings;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Trips;
+using System.Security.Claims;
 
 namespace ResidencyRoll.Api.Controllers;
 
@@ -20,11 +21,22 @@ public class TripsController : ControllerBase
         _tripService = tripService;
     }
 
+    private string GetUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            throw new UnauthorizedAccessException("Unable to determine user identity");
+        }
+        return userId;
+    }
+
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<TripDto>>> GetTrips()
     {
-        var trips = await _tripService.GetAllTripsAsync();
+        var userId = GetUserId();
+        var trips = await _tripService.GetAllTripsAsync(userId);
         return Ok(trips.Select(t => t.ToDto()));
     }
 
@@ -32,7 +44,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<TripDto>>> GetTimeline()
     {
-        var trips = await _tripService.GetTripsForTimelineAsync();
+        var userId = GetUserId();
+        var trips = await _tripService.GetTripsForTimelineAsync(userId);
         return Ok(trips.Select(t => t.ToDto()));
     }
 
@@ -40,7 +53,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetTotalDaysPerCountry()
     {
-        var totals = await _tripService.GetTotalDaysPerCountryAsync();
+        var userId = GetUserId();
+        var totals = await _tripService.GetTotalDaysPerCountryAsync(userId);
         var result = totals.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value });
         return Ok(result);
     }
@@ -49,7 +63,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetDaysPerCountryLast365()
     {
-        var totals = await _tripService.GetDaysPerCountryInLast365DaysAsync();
+        var userId = GetUserId();
+        var totals = await _tripService.GetDaysPerCountryInLast365DaysAsync(userId);
         var result = totals.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value });
         return Ok(result);
     }
@@ -58,7 +73,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<int>> GetTotalDaysAwayLast365()
     {
-        var total = await _tripService.GetTotalDaysAwayInLast365DaysAsync();
+        var userId = GetUserId();
+        var total = await _tripService.GetTotalDaysAwayInLast365DaysAsync(userId);
         return Ok(total);
     }
 
@@ -66,7 +82,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<int>> GetDaysAtHomeLast365()
     {
-        var total = await _tripService.GetDaysAtHomeInLast365DaysAsync();
+        var userId = GetUserId();
+        var total = await _tripService.GetDaysAtHomeInLast365DaysAsync(userId);
         return Ok(total);
     }
 
@@ -75,7 +92,8 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TripDto>> GetTrip(int id)
     {
-        var trip = await _tripService.GetTripByIdAsync(id);
+        var userId = GetUserId();
+        var trip = await _tripService.GetTripByIdAsync(id, userId);
         if (trip == null)
         {
             return NotFound();
@@ -93,7 +111,9 @@ public class TripsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
+        var userId = GetUserId();
         var entity = request.ToEntity();
+        entity.UserId = userId;
         var created = await _tripService.CreateTripAsync(entity);
         var dto = created.ToDto();
         return CreatedAtAction(nameof(GetTrip), new { id = dto.Id, version = "1.0" }, dto);
@@ -110,7 +130,8 @@ public class TripsController : ControllerBase
             return BadRequest("ID mismatch");
         }
 
-        var existing = await _tripService.GetTripByIdAsync(id);
+        var userId = GetUserId();
+        var existing = await _tripService.GetTripByIdAsync(id, userId);
         if (existing == null)
         {
             return NotFound();
@@ -120,7 +141,7 @@ public class TripsController : ControllerBase
         existing.StartDate = request.StartDate;
         existing.EndDate = request.EndDate;
 
-        await _tripService.UpdateTripAsync(existing);
+        await _tripService.UpdateTripAsync(existing, userId);
         return NoContent();
     }
 
@@ -129,13 +150,14 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTrip(int id)
     {
-        var existing = await _tripService.GetTripByIdAsync(id);
+        var userId = GetUserId();
+        var existing = await _tripService.GetTripByIdAsync(id, userId);
         if (existing == null)
         {
             return NotFound();
         }
 
-        await _tripService.DeleteTripAsync(id);
+        await _tripService.DeleteTripAsync(id, userId);
         return NoContent();
     }
 
@@ -149,7 +171,8 @@ public class TripsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(request.CountryName, request.TripStart, request.TripEnd);
+        var userId = GetUserId();
+        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(userId, request.CountryName, request.TripStart, request.TripEnd);
 
         var response = new ForecastResponseDto
         {
@@ -170,7 +193,8 @@ public class TripsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(request.CountryName, request.TripStart, request.DayLimit);
+        var userId = GetUserId();
+        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(userId, request.CountryName, request.TripStart, request.DayLimit);
         return Ok(new MaxTripEndDateResponseDto
         {
             MaxEndDate = maxEndDate,
@@ -188,7 +212,8 @@ public class TripsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var results = await _tripService.CalculateStandardDurationForecastsAsync(request.CountryName, request.TripStart, request.DayLimit, request.Durations);
+        var userId = GetUserId();
+        var results = await _tripService.CalculateStandardDurationForecastsAsync(userId, request.CountryName, request.TripStart, request.DayLimit, request.Durations);
 
         var response = results.Select(r => new StandardDurationForecastItemDto
         {
