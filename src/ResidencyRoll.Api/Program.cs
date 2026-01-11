@@ -54,57 +54,69 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.Authority = builder.Configuration["Jwt:Authority"];
-        options.Audience = builder.Configuration["Jwt:Audience"];
-        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool?>("Jwt:RequireHttpsMetadata") ?? true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true
-        };
+// Only require JWT authentication if Authority is configured
+var jwtAuthority = builder.Configuration["Jwt:Authority"];
+var jwtEnabled = !string.IsNullOrEmpty(jwtAuthority) && jwtAuthority != "https://your-identity-provider.com";
 
-        // Add diagnostic logging to understand 401 causes during development
-        options.Events = new JwtBearerEvents
+if (jwtEnabled)
+{
+    Log.Information("JWT authentication is ENABLED. Authority: {Authority}", jwtAuthority);
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            OnAuthenticationFailed = context =>
+            options.Authority = jwtAuthority;
+            options.Audience = builder.Configuration["Jwt:Audience"];
+            options.RequireHttpsMetadata = builder.Configuration.GetValue<bool?>("Jwt:RequireHttpsMetadata") ?? true;
+            options.TokenValidationParameters = new TokenValidationParameters
             {
-                Log.Error("[JWT] Authentication failed: {Message}", context.Exception.Message);
-                if (context.Exception.InnerException != null)
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true
+            };
+
+            // Add diagnostic logging to understand 401 causes during development
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
                 {
-                    Log.Error("[JWT] Inner: {Message}", context.Exception.InnerException.Message);
-                }
-                return Task.CompletedTask;
-            },
-            OnChallenge = context =>
-            {
-                Log.Warning("[JWT] Challenge issued. Error: {Error}, Description: {Description}", context.Error, context.ErrorDescription);
-                return Task.CompletedTask;
-            },
-            OnMessageReceived = context =>
-            {
-                // Log when Authorization header is missing or present
-                var hasAuth = context.Request.Headers.ContainsKey("Authorization");
-                Log.Information("[JWT] Authorization header present: {HasAuth}", hasAuth);
-                if (hasAuth)
+                    Log.Error("[JWT] Authentication failed: {Message}", context.Exception.Message);
+                    if (context.Exception.InnerException != null)
+                    {
+                        Log.Error("[JWT] Inner: {Message}", context.Exception.InnerException.Message);
+                    }
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
                 {
-                    var authHeader = context.Request.Headers["Authorization"].ToString();
-                    Log.Debug("[JWT] Authorization header value: {AuthHeader}", authHeader.Length > 30 ? authHeader.Substring(0, 30) + "..." : authHeader);
+                    Log.Warning("[JWT] Challenge issued. Error: {Error}, Description: {Description}", context.Error, context.ErrorDescription);
+                    return Task.CompletedTask;
+                },
+                OnMessageReceived = context =>
+                {
+                    // Log when Authorization header is missing or present
+                    var hasAuth = context.Request.Headers.ContainsKey("Authorization");
+                    Log.Information("[JWT] Authorization header present: {HasAuth}", hasAuth);
+                    if (hasAuth)
+                    {
+                        var authHeader = context.Request.Headers["Authorization"].ToString();
+                        Log.Debug("[JWT] Authorization header value: {AuthHeader}", authHeader.Length > 30 ? authHeader.Substring(0, 30) + "..." : authHeader);
+                    }
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = context =>
+                {
+                    var claims = string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}:{c.Value}") ?? Array.Empty<string>());
+                    Log.Information("[JWT] Token validated. Claims: {Claims}", claims);
+                    return Task.CompletedTask;
                 }
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                var claims = string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}:{c.Value}") ?? Array.Empty<string>());
-                Log.Information("[JWT] Token validated. Claims: {Claims}", claims);
-                return Task.CompletedTask;
-            }
-        };
-    });
+            };
+        });
+}
+else
+{
+    Log.Warning("JWT authentication is DISABLED. API endpoints are accessible without authentication.");
+}
 
 builder.Services.AddAuthorization();
 

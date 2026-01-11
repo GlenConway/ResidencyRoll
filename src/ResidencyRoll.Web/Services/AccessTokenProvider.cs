@@ -1,32 +1,27 @@
-using Microsoft.AspNetCore.Components.Authorization;
-
 namespace ResidencyRoll.Web.Services;
 
 /// <summary>
-/// Provides access tokens for API calls from Blazor Server circuits
+/// Stores access token in a scoped cache that can be accessed across the request/circuit
 /// </summary>
 public class AccessTokenProvider
 {
-    private readonly AuthenticationStateProvider _authenticationStateProvider;
+    private string? _cachedToken;
+    private readonly ILogger<AccessTokenProvider> _logger;
 
-    public AccessTokenProvider(AuthenticationStateProvider authenticationStateProvider)
+    public AccessTokenProvider(ILogger<AccessTokenProvider> logger)
     {
-        _authenticationStateProvider = authenticationStateProvider;
+        _logger = logger;
     }
 
-    public async Task<string?> GetAccessTokenAsync()
+    public void SetAccessToken(string? token)
     {
-        var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        _cachedToken = token;
+        _logger.LogDebug("[AccessTokenProvider] Token cached: {HasToken}", !string.IsNullOrEmpty(token));
+    }
 
-        if (user?.Identity?.IsAuthenticated != true)
-        {
-            return null;
-        }
-
-        // In Blazor Server, we need to get the token from the user's claims
-        // The token should have been stored as a claim during OIDC authentication
-        var accessTokenClaim = user.FindFirst("access_token");
-        return accessTokenClaim?.Value;
+    public string? GetAccessToken()
+    {
+        _logger.LogDebug("[AccessTokenProvider] Retrieving cached token: {HasToken}", !string.IsNullOrEmpty(_cachedToken));
+        return _cachedToken;
     }
 }

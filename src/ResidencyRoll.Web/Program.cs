@@ -146,6 +146,7 @@ builder.Services.AddRadzenComponents();
 
 // Add authentication state provider for Blazor components (uses server-side auth from middleware)
 // This enables @attribute [Authorize] and <AuthorizeView> in components
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddServerSideBlazor();
 
 // Configure SQLite database
@@ -159,23 +160,28 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Provide HttpClient with the app base address so relative API calls (e.g., import) work.
 // This HttpClient is used by Blazor components to call local proxy endpoints
-// We need to use HttpClientFactory with a delegating handler that preserves auth context
-builder.Services.AddHttpClient("LocalProxy", (sp, client) =>
+builder.Services.AddHttpClient("LocalProxy", client =>
 {
-    var navigation = sp.GetRequiredService<NavigationManager>();
-    client.BaseAddress = new Uri(navigation.BaseUri);
+    // Don't resolve NavigationManager here - it's scoped
+    // The base address will be set at runtime when the client is used
 });
 
 // Register a scoped HttpClient for components that uses the LocalProxy configuration
-builder.Services.AddScoped(sp =>
+builder.Services.AddScoped<HttpClient>(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
-    return factory.CreateClient("LocalProxy");
+    var client = factory.CreateClient("LocalProxy");
+    
+    // Set base address using NavigationManager (now in scoped context)
+    var navigation = sp.GetRequiredService<NavigationManager>();
+    client.BaseAddress = new Uri(navigation.BaseUri);
+    
+    return client;
 });
 
 // Add typed HTTP client for API with authentication
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5000";
-builder.Services.AddTransient<ApiAuthenticationHandler>();
+builder.Services.AddScoped<ApiAuthenticationHandler>();
 builder.Services.AddHttpClient<TripsApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);

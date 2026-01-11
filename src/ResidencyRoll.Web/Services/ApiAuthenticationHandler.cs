@@ -27,79 +27,40 @@ public class ApiAuthenticationHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        // Try to get token from the scoped cache first
+        var accessToken = _tokenProvider.GetAccessToken();
         
-        if (httpContext != null)
+        // If not cached, try to get from HttpContext (if available)
+        if (string.IsNullOrEmpty(accessToken))
         {
-            // Try multiple ways to get the access token
-            string? accessToken = null;
+            var httpContext = _httpContextAccessor.HttpContext;
             
-            // Method 1: Try getting from the default authentication scheme
-            accessToken = await httpContext.GetTokenAsync("access_token");
-            _logger.LogDebug("[ApiAuth] Method 1 (default scheme): {Result}", accessToken != null ? "Found" : "Not found");
-            
-            // Method 2: Try getting explicitly from Cookie authentication scheme
-            if (string.IsNullOrEmpty(accessToken))
+            if (httpContext != null)
             {
-                accessToken = await httpContext.GetTokenAsync(CookieAuthenticationDefaults.AuthenticationScheme, "access_token");
-                _logger.LogDebug("[ApiAuth] Method 2 (Cookie scheme): {Result}", accessToken != null ? "Found" : "Not found");
-            }
-            
-            // Method 3: Try getting from the authentication result
-            if (string.IsNullOrEmpty(accessToken))
-            {
-                var authenticateResult = await httpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                _logger.LogDebug("[ApiAuth] Method 3 - AuthenticateResult.Succeeded: {Succeeded}", authenticateResult.Succeeded);
+                // Try getting from the authentication token
+                accessToken = await httpContext.GetTokenAsync("access_token");
+                _logger.LogDebug("[ApiAuth] Retrieved token from HttpContext: {HasToken}", !string.IsNullOrEmpty(accessToken));
                 
-                if (authenticateResult.Succeeded)
+                // Cache it for subsequent requests in this circuit
+                if (!string.IsNullOrEmpty(accessToken))
                 {
-                    _logger.LogDebug("[ApiAuth] Method 3 - User: {User}, IsAuthenticated: {IsAuthenticated}",
-                        authenticateResult.Principal?.Identity?.Name,
-                        authenticateResult.Principal?.Identity?.IsAuthenticated);
-                    
-                    if (authenticateResult.Properties?.Items != null)
-                    {
-                        _logger.LogDebug("[ApiAuth] Method 3 - Properties.Items count: {Count}", authenticateResult.Properties.Items.Count);
-                        
-                        // Log all property keys for debugging
-                        var allKeys = authenticateResult.Properties.Items.Keys.ToList();
-                        _logger.LogDebug("[ApiAuth] Method 3 - All property keys: {Keys}", string.Join(", ", allKeys));
-                        
-                        authenticateResult.Properties.Items.TryGetValue(".Token.access_token", out accessToken);
-                        _logger.LogDebug("[ApiAuth] Method 3 (Properties): {Result}", accessToken != null ? "Found" : "Not found");
-                    }
-                    else
-                    {
-                        _logger.LogWarning("[ApiAuth] Method 3 - Properties or Items is null");
-                    }
+                    _tokenProvider.SetAccessToken(accessToken);
                 }
-                else
-                {
-                    _logger.LogWarning("[ApiAuth] Method 3 - Authentication failed: {Failure}", authenticateResult.Failure?.Message);
-                }
-            }
-            
-            // Method 4: Try getting from AccessTokenProvider (for Blazor Server circuits)
-            if (string.IsNullOrEmpty(accessToken))
-            {
-                accessToken = await _tokenProvider.GetAccessTokenAsync();
-                _logger.LogDebug("[ApiAuth] Method 4 (AccessTokenProvider): {Result}", accessToken != null ? "Found" : "Not found");
-            }
-            
-            if (!string.IsNullOrEmpty(accessToken))
-            {
-                _logger.LogInformation("[ApiAuth] Adding Bearer token to request: {Url}", request.RequestUri);
-                _logger.LogDebug("[ApiAuth] Token (first 20 chars): {TokenPrefix}...", accessToken.Substring(0, Math.Min(20, accessToken.Length)));
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             }
             else
             {
-                _logger.LogWarning("[ApiAuth] No access token found for request: {Url}", request.RequestUri);
+                _logger.LogDebug("[ApiAuth] HttpContext is null for request: {Url}", request.RequestUri);
             }
+        }
+        
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            _logger.LogDebug("[ApiAuth] Adding Bearer token to request: {Url}", request.RequestUri);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         }
         else
         {
-            _logger.LogWarning("[ApiAuth] HttpContext is null for request: {Url}", request.RequestUri);
+            _logger.LogWarning("[ApiAuth] No access token available for request: {Url}", request.RequestUri);
         }
 
         return await base.SendAsync(request, cancellationToken);
