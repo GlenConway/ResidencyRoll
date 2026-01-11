@@ -68,15 +68,15 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapGet("/api/trips/export", async (ApplicationDbContext db) =>
+app.MapGet("/api/trips/export", async (TripsApiClient apiClient) =>
 {
-    var trips = await db.Trips.OrderBy(t => t.StartDate).ToListAsync();
+    var trips = await apiClient.GetAllTripsAsync();
     var csvLines = new List<string> { "CountryName,StartDate,EndDate" };
 
-    foreach (var trip in trips)
+    foreach (var trip in trips.OrderBy(t => t.StartDate))
     {
         var line = string.Join(',',
-            EscapeCsv(trip.CountryName),
+            EscapeCsv(trip.CountryName ?? string.Empty),
             trip.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             trip.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         csvLines.Add(line);
@@ -84,9 +84,9 @@ app.MapGet("/api/trips/export", async (ApplicationDbContext db) =>
 
     var bytes = System.Text.Encoding.UTF8.GetBytes(string.Join('\n', csvLines));
     return Results.File(bytes, "text/csv", "trips.csv");
-});
+}).DisableAntiforgery();
 
-app.MapPost("/api/trips/import", async (HttpRequest request, ApplicationDbContext db) =>
+app.MapPost("/api/trips/import", async (HttpRequest request, TripsApiClient apiClient) =>
 {
     if (!request.HasFormContentType)
     {
@@ -105,7 +105,7 @@ app.MapPost("/api/trips/import", async (HttpRequest request, ApplicationDbContex
     var content = await reader.ReadToEndAsync();
     var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-    var newTrips = new List<ResidencyRoll.Web.Models.Trip>();
+    var newTrips = new List<ResidencyRoll.Shared.Trips.TripDto>();
     var isFirst = true;
 
     foreach (var rawLine in lines)
@@ -140,7 +140,7 @@ app.MapPost("/api/trips/import", async (HttpRequest request, ApplicationDbContex
             continue;
         }
 
-        newTrips.Add(new ResidencyRoll.Web.Models.Trip
+        newTrips.Add(new ResidencyRoll.Shared.Trips.TripDto
         {
             CountryName = parts[0],
             StartDate = start,
@@ -153,11 +153,13 @@ app.MapPost("/api/trips/import", async (HttpRequest request, ApplicationDbContex
         return Results.BadRequest("No valid trips found in file.");
     }
 
-    await db.Trips.AddRangeAsync(newTrips);
-    await db.SaveChangesAsync();
+    foreach (var trip in newTrips)
+    {
+        await apiClient.CreateTripAsync(trip);
+    }
 
     return Results.Ok(new { Imported = newTrips.Count });
-});
+}).DisableAntiforgery();
 
 static string EscapeCsv(string value)
 {
