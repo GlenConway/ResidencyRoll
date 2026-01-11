@@ -10,8 +10,22 @@ using System.Globalization;
 using ResidencyRoll.Web.Components;
 using ResidencyRoll.Web.Data;
 using ResidencyRoll.Web.Services;
+using ResidencyRoll.Shared.Trips;
+using Serilog;
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/web-.log", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+try
+{
+    Log.Information("Starting ResidencyRoll Web");
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -33,7 +47,10 @@ if (oidcEnabled)
     {
         options.Cookie.Name = "ResidencyRoll.Auth";
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        // Only require secure cookies in production
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
+            ? CookieSecurePolicy.SameAsRequest 
+            : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
     })
@@ -53,11 +70,55 @@ if (oidcEnabled)
         options.Scope.Add("profile");
         options.Scope.Add("email");
         
-        var apiScope = builder.Configuration["Authentication:OpenIdConnect:ApiScope"];
-        if (!string.IsNullOrEmpty(apiScope))
+        // No custom API scopes needed - Auth0 will issue access token based on audience alone
+        // If you need custom scopes in the future, add them here
+        
+        // Request an access token for the API by setting the Auth0 audience
+        var apiAudience = builder.Configuration["Authentication:OpenIdConnect:ApiAudience"];
+        options.Events = new OpenIdConnectEvents
         {
-            options.Scope.Add(apiScope);
-        }
+            OnRedirectToIdentityProvider = context =>
+            {
+                Log.Information("[OIDC] Redirecting to identity provider. Audience: {Audience}", apiAudience);
+                if (!string.IsNullOrEmpty(apiAudience))
+                {
+                    context.ProtocolMessage.SetParameter("audience", apiAudience);
+                    Log.Information("[OIDC] Added audience parameter: {Audience}", apiAudience);
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Log.Information("[OIDC] Token validated for user: {User}", context.Principal?.Identity?.Name);
+                
+                // Store the access token as a claim so it's available in the authentication ticket
+                if (context.Properties?.Items != null && context.TokenEndpointResponse != null)
+                {
+                    var accessToken = context.TokenEndpointResponse.AccessToken;
+                    if (!string.IsNullOrEmpty(accessToken) && context.Principal != null)
+                    {
+                        var identity = context.Principal.Identity as System.Security.Claims.ClaimsIdentity;
+                        identity?.AddClaim(new System.Security.Claims.Claim("access_token", accessToken));
+                        Log.Information("[OIDC] Stored access token as claim");
+                    }
+                }
+                
+                return Task.CompletedTask;
+            },
+            OnTokenResponseReceived = context =>
+            {
+                Log.Information("[OIDC] Token response received.");
+                Log.Information("[OIDC] - access_token present: {HasAccessToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken));
+                Log.Information("[OIDC] - id_token present: {HasIdToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.IdToken));
+                Log.Information("[OIDC] - refresh_token present: {HasRefreshToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
+                if (!string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken))
+                {
+                    var tokenPrefix = context.TokenEndpointResponse.AccessToken.Substring(0, Math.Min(30, context.TokenEndpointResponse.AccessToken.Length));
+                    Log.Information("[OIDC] - access_token (first 30 chars): {TokenPrefix}...", tokenPrefix);
+                }
+                return Task.CompletedTask;
+            }
+        };
         
         options.MapInboundClaims = false;
         options.TokenValidationParameters.NameClaimType = "name";
@@ -97,10 +158,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
 
 // Provide HttpClient with the app base address so relative API calls (e.g., import) work.
-builder.Services.AddScoped(sp =>
+// This HttpClient is used by Blazor components to call local proxy endpoints
+// We need to use HttpClientFactory with a delegating handler that preserves auth context
+builder.Services.AddHttpClient("LocalProxy", (sp, client) =>
 {
     var navigation = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient { BaseAddress = new Uri(navigation.BaseUri) };
+    client.BaseAddress = new Uri(navigation.BaseUri);
+});
+
+// Register a scoped HttpClient for components that uses the LocalProxy configuration
+builder.Services.AddScoped(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    return factory.CreateClient("LocalProxy");
 });
 
 // Add typed HTTP client for API with authentication
@@ -116,6 +186,9 @@ builder.Services.AddHttpClient<TripsApiClient>(client =>
 // Add application services (kept for now for import/export endpoints)
 // TODO: Move import/export to API and remove TripService completely
 builder.Services.AddScoped<TripService>();
+
+// Register AccessTokenProvider for Blazor circuits
+builder.Services.AddScoped<AccessTokenProvider>();
 
 var app = builder.Build();
 
@@ -281,6 +354,95 @@ app.MapPost("/api/trips/import", async (HttpRequest request, TripsApiClient apiC
     return Results.Ok(new { Imported = newTrips.Count });
 }).DisableAntiforgery();
 
+// Proxy endpoints to call the external API from within HTTP context (so tokens attach)
+var tripsProxy = app.MapGroup("/app/trips").WithTags("Trips Proxy");
+
+tripsProxy.MapGet("/", async (TripsApiClient apiClient) =>
+{
+    var trips = await apiClient.GetAllTripsAsync();
+    return Results.Ok(trips);
+}).DisableAntiforgery();
+
+tripsProxy.MapGet("/timeline", async (HttpContext httpContext, TripsApiClient apiClient) =>
+{
+    Log.Information("[Proxy] /timeline called. User authenticated: {IsAuthenticated}, User: {User}",
+        httpContext.User?.Identity?.IsAuthenticated,
+        httpContext.User?.Identity?.Name);
+    
+    // Check for authentication cookie
+    var hasCookie = httpContext.Request.Cookies.ContainsKey("ResidencyRoll.Auth");
+    Log.Information("[Proxy] ResidencyRoll.Auth cookie present: {HasCookie}", hasCookie);
+    
+    if (hasCookie)
+    {
+        var cookieValue = httpContext.Request.Cookies["ResidencyRoll.Auth"];
+        Log.Debug("[Proxy] Cookie value length: {Length}", cookieValue?.Length ?? 0);
+    }
+    
+    var result = await apiClient.GetTimelineAsync();
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
+tripsProxy.MapGet("/days-per-country/last365", async (TripsApiClient apiClient) =>
+{
+    var result = await apiClient.GetDaysPerCountryInLast365DaysAsync();
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
+tripsProxy.MapGet("/total-days-away/last365", async (TripsApiClient apiClient) =>
+{
+    var result = await apiClient.GetTotalDaysAwayInLast365DaysAsync();
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
+tripsProxy.MapGet("/days-at-home/last365", async (TripsApiClient apiClient) =>
+{
+    var result = await apiClient.GetDaysAtHomeInLast365DaysAsync();
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
+tripsProxy.MapGet("/{id:int}", async (int id, TripsApiClient apiClient) =>
+{
+    var trip = await apiClient.GetTripByIdAsync(id);
+    return trip is null ? Results.NotFound() : Results.Ok(trip);
+}).DisableAntiforgery();
+
+tripsProxy.MapPost("/", async (TripDto trip, TripsApiClient apiClient) =>
+{
+    var created = await apiClient.CreateTripAsync(trip);
+    return Results.Ok(created);
+}).DisableAntiforgery();
+
+tripsProxy.MapPut("/{id:int}", async (int id, TripDto trip, TripsApiClient apiClient) =>
+{
+    await apiClient.UpdateTripAsync(id, trip);
+    return Results.NoContent();
+}).DisableAntiforgery();
+
+tripsProxy.MapDelete("/{id:int}", async (int id, TripsApiClient apiClient) =>
+{
+    await apiClient.DeleteTripAsync(id);
+    return Results.NoContent();
+}).DisableAntiforgery();
+
+tripsProxy.MapPost("/forecast", async (ForecastRequestDto request, TripsApiClient apiClient) =>
+{
+    var response = await apiClient.ForecastDaysWithTripAsync(request.CountryName!, request.TripStart, request.TripEnd);
+    return Results.Ok(response);
+}).DisableAntiforgery();
+
+tripsProxy.MapPost("/forecast/max-end-date", async (MaxTripEndDateRequestDto request, TripsApiClient apiClient) =>
+{
+    var response = await apiClient.CalculateMaxTripEndDateAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    return Results.Ok(response);
+}).DisableAntiforgery();
+
+tripsProxy.MapPost("/forecast/standard-durations", async (StandardDurationForecastRequestDto request, TripsApiClient apiClient) =>
+{
+    var response = await apiClient.CalculateStandardDurationForecastsAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    return Results.Ok(response);
+}).DisableAntiforgery();
+
 static string EscapeCsv(string value)
 {
     if (value.Contains(',') || value.Contains('"'))
@@ -328,3 +490,12 @@ static string[] ParseCsvLine(string line)
 }
 
 app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

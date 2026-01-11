@@ -1,4 +1,5 @@
 @page "/forecast"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Radzen
 @using Radzen.Blazor
 @using System.Globalization
@@ -178,26 +179,18 @@
             return;
         }
 
-        var response = await ApiClient.ForecastDaysWithTripAsync(
-            forecastCountry,
-            forecastStartDate.Value,
-            forecastEndDate.Value
-        );
+        var forecastResponse = await ApiClient.ForecastDaysWithTripAsync(forecastCountry!, forecastStartDate.Value, forecastEndDate.Value);
 
-        currentDaysPerCountry = response.Current.ToDictionary(c => c.CountryName, c => c.Days);
-        forecastDaysPerCountry = response.Forecast.ToDictionary(c => c.CountryName, c => c.Days);
+        currentDaysPerCountry = forecastResponse.Current.ToDictionary(c => c.CountryName, c => c.Days);
+        forecastDaysPerCountry = forecastResponse.Forecast.ToDictionary(c => c.CountryName, c => c.Days);
         forecastCalculated = true;
 
         // Calculate 183-day limit planning if forecast exceeds 183 days
         var countryDays = forecastDaysPerCountry.ContainsKey(forecastCountry) ? forecastDaysPerCountry[forecastCountry] : 0;
         if (countryDays > 183)
         {
-            var maxEndResponse = await ApiClient.CalculateMaxTripEndDateAsync(
-                forecastCountry,
-                forecastStartDate.Value,
-                183
-            );
-            maxEndDateForLimit = maxEndResponse.MaxEndDate;
+            var maxEnd = await ApiClient.CalculateMaxTripEndDateAsync(forecastCountry!, forecastStartDate.Value, 183);
+            maxEndDateForLimit = maxEnd?.MaxEndDate;
         }
         else
         {
@@ -205,10 +198,6 @@
         }
 
         // Calculate standard duration forecasts
-        standardDurationForecasts = await ApiClient.CalculateStandardDurationForecastsAsync(
-            forecastCountry,
-            forecastStartDate.Value,
-            183
-        );
+        standardDurationForecasts = await ApiClient.CalculateStandardDurationForecastsAsync(forecastCountry!, forecastStartDate.Value, 183);
     }
 }

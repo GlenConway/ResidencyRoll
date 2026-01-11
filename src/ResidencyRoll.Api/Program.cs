@@ -6,8 +6,21 @@ using Microsoft.EntityFrameworkCore;
 using ResidencyRoll.Api.Configuration;
 using ResidencyRoll.Api.Data;
 using ResidencyRoll.Api.Services;
+using Serilog;
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/api-.log", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+try
+{
+    Log.Information("Starting ResidencyRoll API");
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 const string FrontendCorsPolicy = "Frontend";
 
@@ -54,6 +67,43 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true
         };
+
+        // Add diagnostic logging to understand 401 causes during development
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Log.Error("[JWT] Authentication failed: {Message}", context.Exception.Message);
+                if (context.Exception.InnerException != null)
+                {
+                    Log.Error("[JWT] Inner: {Message}", context.Exception.InnerException.Message);
+                }
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                Log.Warning("[JWT] Challenge issued. Error: {Error}, Description: {Description}", context.Error, context.ErrorDescription);
+                return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+                // Log when Authorization header is missing or present
+                var hasAuth = context.Request.Headers.ContainsKey("Authorization");
+                Log.Information("[JWT] Authorization header present: {HasAuth}", hasAuth);
+                if (hasAuth)
+                {
+                    var authHeader = context.Request.Headers["Authorization"].ToString();
+                    Log.Debug("[JWT] Authorization header value: {AuthHeader}", authHeader.Length > 30 ? authHeader.Substring(0, 30) + "..." : authHeader);
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var claims = string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}:{c.Value}") ?? Array.Empty<string>());
+                Log.Information("[JWT] Token validated. Claims: {Claims}", claims);
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -94,3 +144,12 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
