@@ -1,5 +1,10 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Radzen;
 using System.Globalization;
 using ResidencyRoll.Web.Components;
@@ -12,8 +17,75 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add HTTP context accessor for authentication handler
+builder.Services.AddHttpContextAccessor();
+
+// Configure authentication
+var oidcEnabled = builder.Configuration.GetValue<bool>("Authentication:OpenIdConnect:Enabled");
+if (oidcEnabled)
+{
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+    })
+    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+    {
+        options.Cookie.Name = "ResidencyRoll.Auth";
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromHours(1);
+        options.SlidingExpiration = true;
+    })
+    .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = builder.Configuration["Authentication:OpenIdConnect:Authority"];
+        options.ClientId = builder.Configuration["Authentication:OpenIdConnect:ClientId"];
+        options.ClientSecret = builder.Configuration["Authentication:OpenIdConnect:ClientSecret"];
+        options.ResponseType = OpenIdConnectResponseType.Code;
+        options.SaveTokens = true;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool?>("Authentication:OpenIdConnect:RequireHttpsMetadata") ?? true;
+        
+        // Request additional scopes for API access
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        
+        var apiScope = builder.Configuration["Authentication:OpenIdConnect:ApiScope"];
+        if (!string.IsNullOrEmpty(apiScope))
+        {
+            options.Scope.Add(apiScope);
+        }
+        
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.NameClaimType = "name";
+        options.TokenValidationParameters.RoleClaimType = "role";
+    });
+    
+    builder.Services.AddAuthorization();
+}
+else
+{
+    // For development without OIDC, use minimal cookie-based auth
+    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+        {
+            options.Cookie.Name = "ResidencyRoll.Auth";
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.LoginPath = "/login";
+        });
+    
+    builder.Services.AddAuthorization();
+}
+
 // Add Radzen services
 builder.Services.AddRadzenComponents();
+
+// Add authentication state provider for Blazor components (uses server-side auth from middleware)
+// This enables @attribute [Authorize] and <AuthorizeView> in components
+builder.Services.AddServerSideBlazor();
 
 // Configure SQLite database
 var dataDirectory = builder.Environment.IsDevelopment() 
@@ -31,13 +103,15 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(navigation.BaseUri) };
 });
 
-// Add typed HTTP client for API
+// Add typed HTTP client for API with authentication
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5000";
+builder.Services.AddTransient<ApiAuthenticationHandler>();
 builder.Services.AddHttpClient<TripsApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
     client.DefaultRequestHeaders.Add("Accept", "application/json");
-});
+})
+.AddHttpMessageHandler<ApiAuthenticationHandler>();
 
 // Add application services (kept for now for import/export endpoints)
 // TODO: Move import/export to API and remove TripService completely
@@ -62,11 +136,57 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Authentication endpoints
+app.MapPost("/login", async (HttpContext context) =>
+{
+    var oidcEnabled = context.RequestServices.GetRequiredService<IConfiguration>()
+        .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
+    
+    if (!oidcEnabled)
+    {
+        // For development without OIDC, redirect to home
+        context.Response.Redirect("/");
+        return;
+    }
+    
+    await context.ChallengeAsync(
+        Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
+        new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        {
+            RedirectUri = "/"
+        });
+});
+
+app.MapPost("/logout", async (HttpContext context) =>
+{
+    var oidcEnabled = context.RequestServices.GetRequiredService<IConfiguration>()
+        .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
+    
+    if (!oidcEnabled)
+    {
+        // For development without OIDC, redirect to home
+        context.Response.Redirect("/");
+        return;
+    }
+    
+    await context.SignOutAsync(
+        Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+    await context.SignOutAsync(
+        Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
+        new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        {
+            RedirectUri = "/"
+        });
+});
 
 app.MapGet("/api/trips/export", async (TripsApiClient apiClient) =>
 {

@@ -3,7 +3,27 @@
 [![Tests](https://github.com/GlenConway/ResidencyRoll/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/GlenConway/ResidencyRoll/actions/workflows/tests.yml)
 [![License](https://img.shields.io/github/license/GlenConway/ResidencyRoll.svg)](LICENSE)
 
-A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10) that helps you track international trips and calculate days spent in each country over a rolling 12-month (365-day) period for residency and tax purposes.
+A travel tracking web application built with ASP.NET Core that helps you track international trips and calculate days spent in each country over a rolling 12-month (365-day) period for residency and tax purposes.
+
+## Architecture
+
+ResidencyRoll uses a modern **API-first architecture** with separated concerns:
+
+- **API Backend** ([ResidencyRoll.Api](src/ResidencyRoll.Api/)): ASP.NET Core Web API with:
+  - RESTful endpoints with versioning (`/api/v1/trips`)
+  - JWT Bearer token authentication
+  - OpenAPI/Swagger documentation
+  - SQLite database with Entity Framework Core
+  
+- **Web Frontend** ([ResidencyRoll.Web](src/ResidencyRoll.Web/)): Blazor Server application with:
+  - Interactive UI using Radzen components
+  - OpenID Connect authentication
+  - Typed HTTP client for API communication
+  - Token forwarding to backend API
+
+- **Shared Models** ([ResidencyRoll.Shared](src/ResidencyRoll.Shared/)): Common DTOs used by both projects
+
+This separation allows the API to be consumed by multiple clients (web, mobile, third-party integrations) while maintaining a single source of truth for business logic.
 
 ## Features
 
@@ -13,15 +33,21 @@ A travel tracking web application built with ASP.NET Core Blazor Server (.NET 10
   - Donut Chart displaying country distribution
   - Interactive Timeline of all trips
 - **Trip Management**: Inline CRUD operations using Radzen DataGrid
+- **Forecast Tool**: Plan future trips and see projected day counts
+- **Authentication**: JWT/OAuth/OpenID Connect support for secure API access
+- **API-First Design**: RESTful API ready for mobile apps and integrations
 - **Persistent Storage**: SQLite database with Docker volume mapping
 - **Responsive UI**: Built with Radzen Blazor components
 
 ## Tech Stack
 
-- **Framework**: Blazor Server (.NET 10)
+- **Backend**: ASP.NET Core Web API (.NET 10)
+- **Frontend**: Blazor Server (.NET 10)
+- **Authentication**: OpenID Connect + JWT Bearer
 - **UI Library**: Radzen.Blazor (Free/Community components)
 - **Database**: SQLite with Entity Framework Core
-- **Deployment**: Docker with persistent volume
+- **API Documentation**: Swagger/OpenAPI
+- **Deployment**: Docker Compose with multi-container setup
 
 ## Getting Started
 
@@ -54,17 +80,67 @@ docker compose up -d --build
 
 ### Running Locally (Development)
 
-1. Navigate to the project directory:
+**Without Authentication (Quick Start):**
+
+1. Start the API:
+```bash
+cd src/ResidencyRoll.Api
+dotnet watch run
+```
+
+2. In a new terminal, start the Web app:
 ```bash
 cd src/ResidencyRoll.Web
+dotnet watch run
 ```
 
-2. Run the application:
-```bash
-dotnet run
-```
+3. Access the application at: `https://localhost:5001` (or the port shown in console)
 
-3. Access the application at: `https://localhost:5001` (or the port shown in the console)
+**With Authentication:**
+├── ResidencyRoll.Api/               # API Backend
+│   │   ├── Controllers/
+│   │   │   └── TripsController.cs       # REST endpoints
+│   │   ├── Services/
+│   │   │   └── TripService.cs           # Business logic
+│   │   ├── Data/
+│   │   │   └── ApplicationDbContext.cs  # EF Core DbContext
+│   │   ├── Models/
+│   │   │   └── Trip.cs                  # Entity model
+│   │   └── Program.cs                   # API configuration
+│   │
+│   ├── ResidencyRoll.Web/               # Blazor Frontend
+│   │   ├── Components/
+│   │   │   ├── Pages/
+│   │   │   │   ├── Home.razor           # Dashboard
+│   │   │   │   ├── ManageTrips.razor    # CRUD interface
+│   │   │   │   └── Forecast.razor       # Trip planning
+│   │   │   └── LoginDisplay.razor       # Auth UI
+│   │   ├── Services/
+│   │   │   ├── TripsApiClient.cs        # API client
+│   │   │   └── ApiAuthenticationHandler.cs
+│   │   └── Program.cs                   # Web app configuration
+│   │
+│   └── ResidencyRoll.Shared/            # Shared DTOs
+│       └── Trips/
+│           └── TripDto.cs               # Data transfer objects
+│
+├── tests/
+│   └── ResidencyRoll.Tests/             # Unit tests
+│
+├── Dockerfile                           # Web container
+├── Dockerfile.api                       # API container
+├── docker-compose.yml                   # Multi-container orchestration
+├── AUTHENTICATION.md                    # Auth setup guide
+├── AUTH_QUICK_REFERENCE.md             # Quick auth reference
+Authentication is **disabled by default** for local development. See [AUTHENTICATION.md](AUTHENTICATION.md) for production setup.
+
+## API Documentation
+
+When running the API in development mode, Swagger UI is available at:
+- `http://localhost:5003/swagger` (API running locally)
+- `http://localhost:8080/swagger` (API in Docker)
+
+The API supports versioning and includes comprehensive OpenAPI documentation.
 
 ## Project Structure
 

@@ -10,7 +10,7 @@ namespace ResidencyRoll.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-// [Authorize] // TODO: Re-enable after implementing JWT/OIDC client in Blazor
+[Authorize]
 public class TripsController : ControllerBase
 {
     private readonly TripService _tripService;

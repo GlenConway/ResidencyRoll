@@ -34,6 +34,12 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - Api__BaseUrl=http://residencyroll-api:80
+      - Authentication__OpenIdConnect__Enabled=${OIDC_ENABLED:-false}
+      - Authentication__OpenIdConnect__Authority=${OIDC_AUTHORITY:-https://your-identity-provider.com}
+      - Authentication__OpenIdConnect__ClientId=${OIDC_CLIENT_ID:-residencyroll-web}
+      - Authentication__OpenIdConnect__ClientSecret=${OIDC_CLIENT_SECRET}
+      - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS:-true}
+      - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE:-residencyroll-api}
     restart: unless-stopped
     depends_on:
       - residencyroll-api

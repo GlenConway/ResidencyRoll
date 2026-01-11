@@ -1,0 +1,28 @@
+@page "/login"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.OpenIdConnect
+
+<PageTitle>Login - ResidencyRoll</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <h2>Welcome to ResidencyRoll</h2>
+            <p class="text-muted mb-4">Please sign in to continue</p>
+            <div class="card">
+                <div class="card-body">
+                    <p>You need to be authenticated to access this application.</p>
+                    <form method="post" action="/login">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign In
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    // This page triggers the OIDC authentication flow
+}
