@@ -1,6 +1,4 @@
-using System;
-
-namespace ResidencyRoll.Web.Models;
+namespace ResidencyRoll.Api.Models;
 
 public class Trip
 {

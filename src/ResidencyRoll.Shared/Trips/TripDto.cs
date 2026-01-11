@@ -1,15 +1,10 @@
-using System;
+namespace ResidencyRoll.Shared.Trips;
 
-namespace ResidencyRoll.Web.Models;
-
-public class Trip
+public class TripDto
 {
     public int Id { get; set; }
-    public string UserId { get; set; } = string.Empty;
     public string CountryName { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-
-    // Counts midnights between arrival (inclusive) and departure (exclusive).
     public int DurationDays => Math.Max(0, (EndDate - StartDate).Days);
 }

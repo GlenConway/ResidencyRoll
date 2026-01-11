@@ -1,10 +1,11 @@
 @page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Radzen
 @using Radzen.Blazor
-@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Shared.Trips
 @using ResidencyRoll.Web.Services
 @using ResidencyRoll.Web.Components
-@inject TripService TripService
+@inject TripsApiClient ApiClient
 @rendermode InteractiveServer
 
 <PageTitle>Residency Roll - Travel Tracker</PageTitle>
@@ -27,7 +28,7 @@
 </RadzenRow>
 
 @code {
-    private List<Trip> timelineTrips = new();
+    private List<TripDto> timelineTrips = new();
     private List<TripTimeline.TimelineItem> timelineItems = new();
     private int daysAway;
     private int daysHome;
@@ -41,13 +42,13 @@
 
     private async Task LoadData()
     {
-        timelineTrips = await TripService.GetTripsForTimelineAsync();
-        daysAway = await TripService.GetTotalDaysAwayInLast365DaysAsync();
-        daysHome = await TripService.GetDaysAtHomeInLast365DaysAsync();
+        timelineTrips = await ApiClient.GetTimelineAsync();
+        daysAway = await ApiClient.GetTotalDaysAwayInLast365DaysAsync();
+        daysHome = await ApiClient.GetDaysAtHomeInLast365DaysAsync();
         
-        var daysPerCountry = await TripService.GetDaysPerCountryInLast365DaysAsync();
+        var daysPerCountry = await ApiClient.GetDaysPerCountryInLast365DaysAsync();
         chartData = daysPerCountry
-            .Select(kvp => new ChartData { Label = $"{kvp.Key} ({kvp.Value} days)", Days = kvp.Value })
+            .Select(dto => new ChartData { Label = $"{dto.CountryName} ({dto.Days} days)", Days = dto.Days })
             .ToList();
         
         distributionData = new List<DistributionData>

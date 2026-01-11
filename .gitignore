@@ -25,6 +25,12 @@ bld/
 *.db-wal
 db/
 
+# Configuration files that may contain secrets
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+!*.example.json
+
 # Visual Studio cache/options directory
 .vs/
 
@@ -132,3 +138,8 @@ $RECYCLE.BIN/
 
 # Mac crap
 .DS_Store
+
+# Environment variables with secrets
+.env
+*.env
+!.env.example

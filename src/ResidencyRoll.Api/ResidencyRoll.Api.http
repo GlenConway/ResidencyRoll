@@ -1,0 +1,6 @@
+@ResidencyRoll.Api_HostAddress = http://localhost:5003
+
+GET {{ResidencyRoll.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

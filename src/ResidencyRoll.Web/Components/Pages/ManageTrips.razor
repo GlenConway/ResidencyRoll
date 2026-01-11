@@ -1,12 +1,13 @@
 @page "/manage-trips"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Radzen
 @using Radzen.Blazor
 @using System.Globalization
 @using System.Net.Http.Headers
 @using Microsoft.AspNetCore.Components.Forms
-@using ResidencyRoll.Web.Models
+@using ResidencyRoll.Shared.Trips
 @using ResidencyRoll.Web.Services
-@inject TripService TripService
+@inject TripsApiClient ApiClient
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
@@ -30,12 +31,12 @@
 </RadzenRow>
 
 <RadzenCard class="rz-mt-3">
-    <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="Trip"
+    <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="TripDto"
                     AllowFiltering="true" AllowSorting="true"
                     EditMode="DataGridEditMode.Single"
                     RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
         <Columns>
-            <RadzenDataGridColumn TItem="Trip" Property="CountryName" Title="Country" Width="200px">
+            <RadzenDataGridColumn TItem="TripDto" Property="CountryName" Title="Country" Width="200px">
                 <EditTemplate Context="trip">
                     <RadzenDropDown @bind-Value="trip.CountryName"
                                     Data="@countryOptions"
@@ -45,7 +46,7 @@
                                     Style="width:100%; display: block" />
                 </EditTemplate>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="Trip" Property="StartDate" Title="Start Date" Width="150px">
+            <RadzenDataGridColumn TItem="TripDto" Property="StartDate" Title="Start Date" Width="150px">
                 <Template Context="trip">
                     @trip.StartDate.ToString("yyyy-MM-dd")
                 </Template>
@@ -53,7 +54,7 @@
                     <RadzenDatePicker @bind-Value="trip.StartDate" Style="width:100%; display: block" />
                 </EditTemplate>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="Trip" Property="EndDate" Title="End Date" Width="150px">
+            <RadzenDataGridColumn TItem="TripDto" Property="EndDate" Title="End Date" Width="150px">
                 <Template Context="trip">
                     @trip.EndDate.ToString("yyyy-MM-dd")
                 </Template>
@@ -61,12 +62,12 @@
                     <RadzenDatePicker @bind-Value="trip.EndDate" Style="width:100%; display: block" />
                 </EditTemplate>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="Trip" Property="DurationDays" Title="Duration (days)" Width="150px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
+            <RadzenDataGridColumn TItem="TripDto" Property="DurationDays" Title="Duration (days)" Width="150px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
                 <Template Context="trip">
                     @trip.DurationDays
                 </Template>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="Trip" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+            <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
                 <Template Context="trip">
                     <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" />
                     <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" />
@@ -82,8 +83,8 @@
 </RadzenCard>
 
 @code {
-    private List<Trip> trips = new();
-    private RadzenDataGrid<Trip>? tripsGrid;
+    private List<TripDto> trips = new();
+    private RadzenDataGrid<TripDto>? tripsGrid;
     private IBrowserFile? selectedFile;
     private bool importing;
     private string importMessage = string.Empty;
@@ -102,7 +103,7 @@
 
     private async Task LoadData()
     {
-        trips = await TripService.GetAllTripsAsync();
+        trips = await ApiClient.GetAllTripsAsync();
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs args)
@@ -156,15 +157,15 @@
             importing = false;
         }
     }
-    private async Task OnUpdateRow(Trip trip)
+    private async Task OnUpdateRow(TripDto trip)
     {
-        await TripService.UpdateTripAsync(trip);
+        await ApiClient.UpdateTripAsync(trip.Id, trip);
         await LoadData();
     }
 
-    private async Task OnCreateRow(Trip trip)
+    private async Task OnCreateRow(TripDto trip)
     {
-        await TripService.CreateTripAsync(trip);
+        await ApiClient.CreateTripAsync(trip);
         await LoadData();
     }
 
@@ -173,30 +174,30 @@
         Navigation.NavigateTo("/api/trips/export", forceLoad: true);
     }
 
-    private async Task EditRow(Trip trip)
+    private async Task EditRow(TripDto trip)
     {
         await tripsGrid!.EditRow(trip);
     }
 
-    private async Task SaveRow(Trip trip)
+    private async Task SaveRow(TripDto trip)
     {
         await tripsGrid!.UpdateRow(trip);
     }
 
-    private void CancelEdit(Trip trip)
+    private void CancelEdit(TripDto trip)
     {
         tripsGrid!.CancelEditRow(trip);
     }
 
-    private async Task DeleteRow(Trip trip)
+    private async Task DeleteRow(TripDto trip)
     {
-        await TripService.DeleteTripAsync(trip.Id);
+        await ApiClient.DeleteTripAsync(trip.Id);
         await LoadData();
     }
 
     private async Task InsertRow()
     {
-        var newTrip = new Trip { StartDate = DateTime.Today, EndDate = DateTime.Today };
+        var newTrip = new TripDto { StartDate = DateTime.Today, EndDate = DateTime.Today };
         await tripsGrid!.InsertRow(newTrip);
     }
 }

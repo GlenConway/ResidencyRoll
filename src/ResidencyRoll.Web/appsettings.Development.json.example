@@ -1,0 +1,21 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Api": {
+    "BaseUrl": "http://localhost:5003"
+  },
+  "Authentication": {
+    "OpenIdConnect": {
+      "Enabled": true,
+      "Authority": "https://YOUR-TENANT.auth0.com/",
+      "ClientId": "YOUR-AUTH0-CLIENT-ID",
+      "ClientSecret": "YOUR-AUTH0-CLIENT-SECRET",
+      "RequireHttpsMetadata": false,
+      "ApiScope": "openid profile email"
+    }
+  }
+}
