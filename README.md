@@ -80,6 +80,21 @@ docker compose up -d --build
 
 ### Running Locally (Development)
 
+**First Time Setup:**
+
+Before running the application, set up your configuration files:
+
+```bash
+# Copy example configuration files
+cp src/ResidencyRoll.Web/appsettings.Development.json.example src/ResidencyRoll.Web/appsettings.Development.json
+cp src/ResidencyRoll.Api/appsettings.Development.json.example src/ResidencyRoll.Api/appsettings.Development.json
+
+# For Auth0 authentication (optional), run the configuration script
+./configure-auth0.sh
+```
+
+See [CONFIGURATION.md](CONFIGURATION.md) for details.
+
 **Without Authentication (Quick Start):**
 
 1. Start the API:

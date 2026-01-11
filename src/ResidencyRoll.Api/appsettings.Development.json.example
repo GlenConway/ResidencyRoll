@@ -9,14 +9,14 @@
     "Default": "Data Source=residencyroll-dev.db"
   },
   "Jwt": {
-    "Authority": "https://dev-identity.example.com/",
-    "Audience": "residencyroll-api",
-    "RequireHttpsMetadata": true
+    "Authority": "https://YOUR-TENANT.auth0.com/",
+    "Audience": "YOUR-AUTH0-API-IDENTIFIER",
+    "RequireHttpsMetadata": false
   },
   "Cors": {
     "AllowedOrigins": [
       "https://localhost:5001",
-      "http://localhost:8081"
+      "http://localhost:5113"
     ]
   }
 }

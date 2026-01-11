@@ -10,12 +10,12 @@
   },
   "Authentication": {
     "OpenIdConnect": {
-      "Enabled": false,
-      "Authority": "https://localhost:5001",
-      "ClientId": "residencyroll-web-dev",
-      "ClientSecret": "dev-secret",
+      "Enabled": true,
+      "Authority": "https://YOUR-TENANT.auth0.com/",
+      "ClientId": "YOUR-AUTH0-CLIENT-ID",
+      "ClientSecret": "YOUR-AUTH0-CLIENT-SECRET",
       "RequireHttpsMetadata": false,
-      "ApiScope": "residencyroll-api"
+      "ApiScope": "openid profile email"
     }
   }
 }
