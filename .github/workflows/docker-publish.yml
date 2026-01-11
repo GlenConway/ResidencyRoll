@@ -17,6 +17,15 @@ env:
 
 jobs:
   build-and-push:
+    strategy:
+      matrix:
+        service:
+          - name: web
+            file: ./Dockerfile
+            image_suffix: web
+          - name: api
+            file: ./Dockerfile.api
+            image_suffix: api
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,7 +50,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service.image_suffix }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -55,7 +64,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ${{ matrix.service.file }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
