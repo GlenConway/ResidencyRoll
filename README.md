@@ -46,7 +46,7 @@ This separation allows the API to be consumed by multiple clients (web, mobile, 
 ## Features
 
 - **Rolling 365-Day Calculations**: Automatically calculates days spent in each country within the last 365 days from today
-- **Visual Dashboard**: 
+- **Visual Dashboard**:
   - Arc Gauge showing Days Away vs Days at Home
   - Donut Chart displaying country distribution
   - Interactive Timeline of all trips
@@ -84,6 +84,7 @@ docker compose up -d
 ```
 
 Access the application:
+
 - **Web UI**: `http://localhost:8081`
 - **API**: `http://localhost:8080`
 - **API Swagger**: `http://localhost:8080/swagger`
@@ -104,12 +105,14 @@ The SQLite database will be persisted in Docker volumes (`residencyroll-api-data
 #### Quick Start (No Authentication)
 
 1. **Start the API:**
+
    ```bash
    cd src/ResidencyRoll.Api
    dotnet watch run
    ```
 
 2. **Start the Web app** (in a new terminal):
+
    ```bash
    cd src/ResidencyRoll.Web
    dotnet watch run
@@ -130,6 +133,7 @@ cp src/ResidencyRoll.Api/appsettings.Development.json.example src/ResidencyRoll.
 ```
 
 See [Configuration](#configuration) section below for authentication setup.
+
 ## Configuration
 
 ### First-Time Setup
@@ -137,12 +141,14 @@ See [Configuration](#configuration) section below for authentication setup.
 Configuration files are excluded from source control to protect secrets.
 
 1. **Copy example files:**
+
    ```bash
    cp src/ResidencyRoll.Web/appsettings.Development.json.example src/ResidencyRoll.Web/appsettings.Development.json
    cp src/ResidencyRoll.Api/appsettings.Development.json.example src/ResidencyRoll.Api/appsettings.Development.json
    ```
 
 2. **Verify files are ignored:**
+
    ```bash
    git status --ignored | grep appsettings
    ```
@@ -163,19 +169,22 @@ Authentication is **disabled by default** for development. To enable:
 
 #### Auth0 Quick Setup (Recommended for Testing)
 
-**1. Create Auth0 Account**
+##### 1. Create Auth0 Account
+
 - Sign up at [auth0.com](https://auth0.com)
 - Create a tenant (e.g., `your-tenant-name`)
 - Your Authority URL: `https://your-tenant-name.auth0.com/`
 
-**2. Create API in Auth0**
+##### 2. Create API in Auth0
+
 - Dashboard → **Applications → APIs** → **Create API**
 - Name: `ResidencyRoll API`
 - Identifier: `https://api.residencyroll.com` (or any unique value)
 - Signing Algorithm: RS256
 - **Save the Identifier** - this is your **Audience**
 
-**3. Create Web Application**
+##### 3. Create Web Application
+
 - Dashboard → **Applications → Applications** → **Create Application**
 - Name: `ResidencyRoll Web`
 - Type: **Regular Web Application**
@@ -185,7 +194,7 @@ Authentication is **disabled by default** for development. To enable:
   - Allowed Web Origins: `https://localhost:5001`
 - **Copy**: Domain, Client ID, Client Secret
 
-**4. Configure Your Application**
+##### 4. Configure Your Application
 
 Choose one of these methods:
 
@@ -205,6 +214,7 @@ dotnet user-secrets set "Jwt:Audience" "YOUR-API-IDENTIFIER"
 ```
 
 Or use the automated configuration script:
+
 ```bash
 ./configure-auth0.sh
 ```
@@ -212,6 +222,7 @@ Or use the automated configuration script:
 ##### Option B: Edit Configuration Files
 
 **Web** (`src/ResidencyRoll.Web/appsettings.Development.json`):
+
 ```json
 {
   "Authentication": {
@@ -228,6 +239,7 @@ Or use the automated configuration script:
 ```
 
 **API** (`src/ResidencyRoll.Api/appsettings.Development.json`):
+
 ```json
 {
   "Jwt": {
@@ -240,7 +252,7 @@ Or use the automated configuration script:
 
 ⚠️ **Important**: Never commit secrets! Files are gitignored but run `git restore` if you edit them directly.
 
-**5. Test Authentication**
+##### 5. Test Authentication
 
 1. Start both services
 2. Open `https://localhost:5001`
@@ -250,10 +262,10 @@ Or use the automated configuration script:
 
 #### Other Identity Providers
 
-<details>
-<summary><b>Azure AD / Microsoft Entra ID</b></summary>
+##### Azure AD / Microsoft Entra ID
 
 **API configuration:**
+
 ```json
 {
   "Jwt": {
@@ -264,6 +276,7 @@ Or use the automated configuration script:
 ```
 
 **Web configuration:**
+
 ```json
 {
   "Authentication": {
@@ -277,12 +290,11 @@ Or use the automated configuration script:
   }
 }
 ```
-</details>
 
-<details>
-<summary><b>Keycloak</b></summary>
+##### Keycloak
 
 **API configuration:**
+
 ```json
 {
   "Jwt": {
@@ -293,6 +305,7 @@ Or use the automated configuration script:
 ```
 
 **Web configuration:**
+
 ```json
 {
   "Authentication": {
@@ -306,11 +319,11 @@ Or use the automated configuration script:
   }
 }
 ```
-</details>
 
 #### Production Deployment with Authentication
 
 1. **Create `.env` file** (see `.env.example`):
+
    ```bash
    # Identity Provider Configuration
    OIDC_ENABLED=true
@@ -327,6 +340,7 @@ Or use the automated configuration script:
    ```
 
 2. **Deploy**:
+
    ```bash
    docker compose up -d
    ```
@@ -342,6 +356,7 @@ Or use the automated configuration script:
 ## API Documentation
 
 When running the API, Swagger UI is available at:
+
 - `http://localhost:5003/swagger` (local development)
 - `http://localhost:8080/swagger` (Docker)
 
@@ -360,7 +375,7 @@ curl -X GET "http://localhost:8080/api/v1/trips" \
 
 ## Project Structure
 
-```
+```text
 ResidencyRoll/
 ├── src/
 │   ├── ResidencyRoll.Api/               # API Backend
@@ -404,6 +419,7 @@ ResidencyRoll/
 ### Rolling 365-Day Calculation
 
 The application implements smart overlap detection:
+
 - If a trip started 370 days ago and ended 350 days ago, only the 15 days within the 365-day window are counted
 - The calculation is relative to "Today" and updates automatically
 - Days are counted inclusively (both start and end dates included)
@@ -426,6 +442,7 @@ The application uses a named Docker volume (`residencyroll-data`) stored in `/va
 The project uses GitHub Actions to automatically build and push Docker images to GHCR on every push to `main`.
 
 **Using pre-built images:**
+
 ```yaml
 services:
   residencyroll-api:
@@ -440,12 +457,14 @@ services:
 ### Database Backup & Restore
 
 **Backup:**
+
 ```bash
 docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
   alpine tar czf /backup/api-backup.tar.gz -C /data .
 ```
 
 **Restore:**
+
 ```bash
 docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
   alpine tar xzf /backup/api-backup.tar.gz -C /data
@@ -456,12 +475,14 @@ docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
 All configuration can be set via environment variables:
 
 **API:**
+
 - `JWT_AUTHORITY` - Identity provider URL
 - `JWT_AUDIENCE` - API identifier
 - `JWT_REQUIRE_HTTPS` - HTTPS enforcement (true/false)
 - `ConnectionStrings__Default` - Database connection string
 
 **Web:**
+
 - `OIDC_ENABLED` - Enable authentication (true/false)
 - `OIDC_AUTHORITY` - Identity provider URL
 - `OIDC_CLIENT_ID` - Client identifier
@@ -506,7 +527,7 @@ dotnet --version
 ### Authentication Issues
 
 | Issue | Solution |
-|-------|----------|
+| ------- | ---------- |
 | 401 Unauthorized from API | Check JWT Authority and Audience match between API and identity provider |
 | Login redirect loop | Verify redirect URIs are registered in identity provider |
 | Token not forwarded | Check `ApiAuthenticationHandler` is registered; verify `SaveTokens: true` in OIDC options |
@@ -519,6 +540,7 @@ dotnet --version
 - **Local**: `./data/residencyroll.db` (created automatically)
 
 To reset the database, delete the file or remove the Docker volume:
+
 ```bash
 docker compose down -v
 ```
