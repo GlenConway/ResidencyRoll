@@ -2,7 +2,6 @@ using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Models.Security;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace ResidencyRoll.Api.Configuration;
