@@ -23,6 +23,9 @@ updates:
       include: "scope"
     pull-request-branch-name:
       separator: "/"
+    ignore:
+      - dependency-name: "Swashbuckle.AspNetCore"
+        update-types: ["version-update:semver-major"]
 
   # Check for GitHub Actions updates weekly
   - package-ecosystem: github-actions
