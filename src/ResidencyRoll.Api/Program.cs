@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using ResidencyRoll.Api.Configuration;
 using ResidencyRoll.Api.Data;
 using ResidencyRoll.Api.Services;
+using ResidencyRoll.Shared.Extensions;
 using Serilog;
-using Microsoft.AspNetCore.HttpOverrides;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -128,15 +128,7 @@ builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 var app = builder.Build();
 
 // Handle forwarded headers from reverse proxy
-var forwardedHeadersOptions = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-};
-
-// NOTE: Do not clear KnownIPNetworks/KnownProxies here. Configure specific trusted
-// proxies or networks (via KnownProxies/KnownNetworks) if required by deployment.
-
-app.UseForwardedHeaders(forwardedHeadersOptions);
+app.UseConfiguredForwardedHeaders();
 
 // Ensure database is created and migrations are applied
 using (var scope = app.Services.CreateScope())
