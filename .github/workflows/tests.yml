@@ -21,7 +21,7 @@ on:
       - '.github/workflows/tests.yml'
 
 jobs:
-  test:
+  build-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,5 +35,8 @@ jobs:
       - name: Restore
         run: dotnet restore ResidencyRoll.sln
 
+      - name: Build
+        run: dotnet build ResidencyRoll.sln --configuration Release --no-restore
+
       - name: Test
-        run: dotnet test ResidencyRoll.sln --configuration Release
+        run: dotnet test ResidencyRoll.sln --configuration Release --no-build
