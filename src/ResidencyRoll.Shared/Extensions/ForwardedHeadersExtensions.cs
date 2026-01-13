@@ -32,6 +32,12 @@ public static class ForwardedHeadersExtensions
         {
             foreach (var proxy in trustedProxies)
             {
+                // Skip empty or whitespace-only strings
+                if (string.IsNullOrWhiteSpace(proxy))
+                {
+                    continue;
+                }
+
                 if (IPAddress.TryParse(proxy, out var ipAddress))
                 {
                     forwardedHeadersOptions.KnownProxies.Add(ipAddress);
@@ -39,7 +45,7 @@ public static class ForwardedHeadersExtensions
                 }
                 else
                 {
-                    logger.LogWarning("Invalid proxy IP address in configuration for ForwardedHeaders:KnownProxies.");
+                    logger.LogWarning("Invalid proxy IP address in configuration for ForwardedHeaders:KnownProxies: {InvalidProxy}", proxy);
                 }
             }
         }
@@ -51,6 +57,13 @@ public static class ForwardedHeadersExtensions
             for (var index = 0; index < trustedNetworks.Length; index++)
             {
                 var network = trustedNetworks[index];
+                
+                // Skip empty or whitespace-only strings
+                if (string.IsNullOrWhiteSpace(network))
+                {
+                    continue;
+                }
+
                 // Parse CIDR notation (e.g., "10.0.0.0/8")
                 var parts = network.Split('/');
                 if (parts.Length == 2 &&
@@ -74,16 +87,16 @@ public static class ForwardedHeadersExtensions
                     if (isValidPrefix)
                     {
                         forwardedHeadersOptions.KnownIPNetworks.Add(new System.Net.IPNetwork(ipAddress, prefixLength));
-                        logger.LogInformation("Added trusted network at index {Index}.", index);
+                        logger.LogInformation("Added trusted network {Network} at index {Index}.", network, index);
                     }
                     else
                     {
-                        logger.LogWarning("Invalid network CIDR prefix length in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", index);
+                        logger.LogWarning("Invalid network CIDR prefix length {PrefixLength} for '{Network}' in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", prefixLength, network, index);
                     }
                 }
                 else
                 {
-                    logger.LogWarning("Invalid network CIDR notation in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", index);
+                    logger.LogWarning("Invalid network CIDR notation '{Network}' in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", network, index);
                 }
             }
         }
