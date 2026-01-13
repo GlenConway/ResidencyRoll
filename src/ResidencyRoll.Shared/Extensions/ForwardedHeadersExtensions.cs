@@ -39,7 +39,7 @@ public static class ForwardedHeadersExtensions
                 }
                 else
                 {
-                    logger.LogWarning("Invalid proxy IP address in configuration: {ProxyIP}", proxy);
+                    logger.LogWarning("Invalid proxy IP address in configuration for ForwardedHeaders:KnownProxies.");
                 }
             }
         }
