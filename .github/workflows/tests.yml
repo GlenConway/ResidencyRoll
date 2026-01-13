@@ -5,10 +5,20 @@ on:
     branches:
       - main
       - dev
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'ResidencyRoll.sln'
+      - '.github/workflows/tests.yml'
   pull_request:
     branches:
       - main
       - dev
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'ResidencyRoll.sln'
+      - '.github/workflows/tests.yml'
 
 jobs:
   test:

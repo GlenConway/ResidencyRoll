@@ -6,6 +6,13 @@ on:
       - main
     tags:
       - 'v*'
+    paths:
+      - 'src/ResidencyRoll.Api/**'
+      - 'src/ResidencyRoll.Web/**'
+      - 'src/ResidencyRoll.Shared/**'
+      - 'Dockerfile'
+      - 'Dockerfile.api'
+      - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
 
 env:

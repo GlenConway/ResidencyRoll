@@ -75,15 +75,51 @@ This separation allows the API to be consumed by multiple clients (web, mobile, 
 
 The fastest way to run the application with persistent data.
 
-#### Using Pre-built Image (Production)
+#### Using Pre-built Images (Production)
 
-```bash
-# Download the docker compose file
-curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
+1. **Download the required files:**
 
-# Start the services
-docker compose up -d
-```
+   ```bash
+   # Download docker-compose.yml and .env.example
+   curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/docker-compose.yml
+   curl -O https://raw.githubusercontent.com/GlenConway/ResidencyRoll/main/.env.example
+   ```
+
+2. **Configure environment variables:**
+
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env with your configuration
+   nano .env
+   ```
+
+   At minimum, configure these settings in `.env`:
+
+   ```bash
+   # Port Configuration (defaults are fine for most setups)
+   API_PORT=8080
+   WEB_PORT=8081
+   
+   # Enable authentication (optional - set to false for no auth)
+   OIDC_ENABLED=false
+   
+   # If OIDC_ENABLED=true, configure your identity provider:
+   OIDC_AUTHORITY=https://your-tenant.auth0.com/
+   OIDC_CLIENT_ID=your-client-id
+   OIDC_CLIENT_SECRET=your-client-secret
+   JWT_AUTHORITY=https://your-tenant.auth0.com/
+   JWT_AUDIENCE=your-api-identifier
+   ```
+
+   See `.env.example` for all available configuration options.
+
+3. **Start the services:**
+
+   ```bash
+   docker compose up -d
+   ```
 
 Access the application:
 
@@ -91,16 +127,64 @@ Access the application:
 - **API**: `http://localhost:8080`
 - **API Swagger**: `http://localhost:8080/swagger`
 
+#### Environment Variables
+
+The docker-compose.yml uses environment variables from the `.env` file for all configuration:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_PORT` | External port for API | `8080` |
+| `API_INTERNAL_PORT` | Internal container port for API | `80` |
+| `WEB_PORT` | External port for Web UI | `8081` |
+| `WEB_INTERNAL_PORT` | Internal container port for Web | `8080` |
+| `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Production` |
+| `DB_PATH` | SQLite database path | `/app/data/residencyroll.db` |
+| `OIDC_ENABLED` | Enable/disable authentication | `false` |
+| `OIDC_AUTHORITY` | Identity provider URL | - |
+| `OIDC_CLIENT_ID` | Web app client ID | - |
+| `OIDC_CLIENT_SECRET` | Web app client secret | - |
+| `JWT_AUTHORITY` | JWT issuer URL | - |
+| `JWT_AUDIENCE` | JWT audience identifier | - |
+| `CORS_ORIGIN_0` | Allowed CORS origin 1 | `http://localhost:8081` |
+| `CORS_ORIGIN_1` | Allowed CORS origin 2 | `http://residencyroll-web:80` |
+
+#### Data Persistence
+
+Docker volumes ensure data persists across container restarts:
+- `residencyroll-api-data` - SQLite database
+- `residencyroll-web-data` - Web application data
+
+To backup your data:
+
+```bash
+# Export the database
+docker compose exec residencyroll-api cat /app/data/residencyroll.db > backup.db
+
+# Restore from backup
+docker compose cp backup.db residencyroll-api:/app/data/residencyroll.db
+```
+
+To completely remove all data:
+
+```bash
+docker compose down -v  # The -v flag removes volumes
+```
+
 #### Building from Source
 
 ```bash
-# Clone and build
+# Clone and build locally
 git clone https://github.com/GlenConway/ResidencyRoll.git
 cd ResidencyRoll
+
+# Edit the docker-compose.yml to use local builds instead of GHCR images:
+# Replace 'image: ghcr.io/...' with:
+#   build:
+#     context: .
+#     dockerfile: Dockerfile.api  # (or Dockerfile for web)
+
 docker compose up -d --build
 ```
-
-The SQLite database will be persisted in Docker volumes (`residencyroll-api-data` and `residencyroll-web-data`).
 
 ### Local Development
 
@@ -324,36 +408,50 @@ Or use the automated configuration script:
 
 #### Production Deployment with Authentication
 
-1. **Create `.env` file** (see `.env.example`):
+1. **Create `.env` file** from the example:
 
    ```bash
-   # Identity Provider Configuration
+   cp .env.example .env
+   ```
+
+2. **Configure authentication** in `.env`:
+
+   ```bash
+   # Enable authentication
    OIDC_ENABLED=true
-   OIDC_AUTHORITY=https://your-identity-provider.com
+   
+   # Identity Provider Configuration
+   OIDC_AUTHORITY=https://your-tenant.auth0.com/
    OIDC_CLIENT_ID=residencyroll-web
    OIDC_CLIENT_SECRET=your-secret-here
    OIDC_REQUIRE_HTTPS=true
    OIDC_API_SCOPE=residencyroll-api
    
    # API JWT Configuration
-   JWT_AUTHORITY=https://your-identity-provider.com
+   JWT_AUTHORITY=https://your-tenant.auth0.com/
    JWT_AUDIENCE=residencyroll-api
    JWT_REQUIRE_HTTPS=true
+   
+   # Update CORS origins for your domain
+   CORS_ORIGIN_0=https://your-domain.com
+   CORS_ORIGIN_1=http://residencyroll-web:80
    ```
 
-2. **Deploy**:
+3. **Deploy with Docker Compose**:
 
    ```bash
    docker compose up -d
    ```
 
-3. **Security Checklist**:
-   - [ ] Set `RequireHttpsMetadata: true`
-   - [ ] Use HTTPS for all endpoints
-   - [ ] Store secrets in secure vault (Azure Key Vault, AWS Secrets, etc.)
+4. **Security Checklist**:
+   - [ ] Set `OIDC_ENABLED=true` in production
+   - [ ] Set `JWT_REQUIRE_HTTPS=true` and `OIDC_REQUIRE_HTTPS=true`
+   - [ ] Use HTTPS for all endpoints (configure reverse proxy like nginx or Caddy)
+   - [ ] Store `.env` file securely (never commit it to git)
    - [ ] Configure proper CORS origins (no wildcards)
-   - [ ] Set appropriate token expiration times
-   - [ ] Enable security headers (HSTS, CSP, etc.)
+   - [ ] Set appropriate token expiration times in your identity provider
+   - [ ] Enable security headers (HSTS, CSP, etc.) via reverse proxy
+   - [ ] Regularly update Docker images: `docker compose pull && docker compose up -d`
 
 ## API Documentation
 

@@ -1,45 +1,41 @@
 services:
   residencyroll-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    image: ghcr.io/glenconway/residencyroll/api:latest
     container_name: ResidencyRoll-Api
     ports:
-      - "8080:80"
+      - "${API_PORT}:${API_INTERNAL_PORT}"
     volumes:
       - residencyroll-api-data:/app/data
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__Default=Data Source=/app/data/residencyroll.db
-      - Jwt__Authority=${JWT_AUTHORITY:-https://identity.example.com/}
-      - Jwt__Audience=${JWT_AUDIENCE:-residencyroll-api}
-      - Jwt__RequireHttpsMetadata=${JWT_REQUIRE_HTTPS:-true}
-      - Cors__AllowedOrigins__0=http://localhost:8081
-      - Cors__AllowedOrigins__1=http://residencyroll-web:80
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=http://+:${API_INTERNAL_PORT}
+      - ConnectionStrings__Default=Data Source=${DB_PATH}
+      - Jwt__Authority=${JWT_AUTHORITY}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      - Jwt__RequireHttpsMetadata=${JWT_REQUIRE_HTTPS}
+      - Cors__AllowedOrigins__0=${CORS_ORIGIN_0}
+      - Cors__AllowedOrigins__1=${CORS_ORIGIN_1}
     restart: unless-stopped
     networks:
       - residencyroll-network
 
   residencyroll-web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/glenconway/residencyroll/web:latest
     container_name: ResidencyRoll-Web
     ports:
-      - "8081:8080"
+      - "${WEB_PORT}:${WEB_INTERNAL_PORT}"
     volumes:
       - residencyroll-web-data:/app/data
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-      - Api__BaseUrl=http://residencyroll-api:80
-      - Authentication__OpenIdConnect__Enabled=${OIDC_ENABLED:-false}
-      - Authentication__OpenIdConnect__Authority=${OIDC_AUTHORITY:-https://your-identity-provider.com}
-      - Authentication__OpenIdConnect__ClientId=${OIDC_CLIENT_ID:-residencyroll-web}
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=http://+:${WEB_INTERNAL_PORT}
+      - Api__BaseUrl=http://residencyroll-api:${API_INTERNAL_PORT}
+      - Authentication__OpenIdConnect__Enabled=${OIDC_ENABLED}
+      - Authentication__OpenIdConnect__Authority=${OIDC_AUTHORITY}
+      - Authentication__OpenIdConnect__ClientId=${OIDC_CLIENT_ID}
       - Authentication__OpenIdConnect__ClientSecret=${OIDC_CLIENT_SECRET}
-      - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS:-true}
-      - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE:-residencyroll-api}
+      - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS}
+      - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE}
     restart: unless-stopped
     depends_on:
       - residencyroll-api
