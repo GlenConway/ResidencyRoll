@@ -11,8 +11,8 @@ using ResidencyRoll.Web.Components;
 using ResidencyRoll.Web.Data;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Shared.Trips;
+using ResidencyRoll.Shared.Extensions;
 using Serilog;
-using Microsoft.AspNetCore.HttpOverrides;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -200,14 +200,7 @@ builder.Services.AddScoped<AccessTokenProvider>();
 var app = builder.Build();
 
 // Handle forwarded headers from reverse proxy
-var forwardedHeadersOptions = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-};
-
-// Rely on default KnownProxies/KnownNetworks or configure specific trusted proxies via KnownProxies/KnownNetworks as needed.
-
-app.UseForwardedHeaders(forwardedHeadersOptions);
+app.UseConfiguredForwardedHeaders();
 
 // Ensure database is created
 using (var scope = app.Services.CreateScope())
