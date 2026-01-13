@@ -12,6 +12,7 @@ using ResidencyRoll.Web.Data;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Shared.Trips;
 using Serilog;
+using Microsoft.AspNetCore.HttpOverrides;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -199,7 +200,16 @@ builder.Services.AddScoped<AccessTokenProvider>();
 var app = builder.Build();
 
 // Handle forwarded headers from reverse proxy
-app.UseForwardedHeaders();
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+
+// Clear security restrictions so it trusts headers from your NGINX proxy
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // Ensure database is created
 using (var scope = app.Services.CreateScope())
