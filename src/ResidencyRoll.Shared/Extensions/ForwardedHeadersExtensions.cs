@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Net;
 
 namespace ResidencyRoll.Shared.Extensions;
@@ -18,6 +19,7 @@ public static class ForwardedHeadersExtensions
     public static IApplicationBuilder UseConfiguredForwardedHeaders(this IApplicationBuilder app)
     {
         var configuration = app.ApplicationServices.GetRequiredService<IConfiguration>();
+        var logger = app.ApplicationServices.GetRequiredService<ILogger<ForwardedHeadersOptions>>();
         
         var forwardedHeadersOptions = new ForwardedHeadersOptions
         {
@@ -33,6 +35,11 @@ public static class ForwardedHeadersExtensions
                 if (IPAddress.TryParse(proxy, out var ipAddress))
                 {
                     forwardedHeadersOptions.KnownProxies.Add(ipAddress);
+                    logger.LogInformation("Added trusted proxy: {ProxyIP}", ipAddress);
+                }
+                else
+                {
+                    logger.LogWarning("Invalid proxy IP address in configuration: {ProxyIP}", proxy);
                 }
             }
         }
@@ -50,6 +57,11 @@ public static class ForwardedHeadersExtensions
                     int.TryParse(parts[1], out var prefixLength))
                 {
                     forwardedHeadersOptions.KnownIPNetworks.Add(new System.Net.IPNetwork(ipAddress, prefixLength));
+                    logger.LogInformation("Added trusted network: {Network}", network);
+                }
+                else
+                {
+                    logger.LogWarning("Invalid network CIDR notation in configuration: {Network}", network);
                 }
             }
         }
