@@ -57,7 +57,7 @@ public static class ForwardedHeadersExtensions
             for (var index = 0; index < trustedNetworks.Length; index++)
             {
                 var network = trustedNetworks[index];
-                
+
                 // Skip empty or whitespace-only strings
                 if (string.IsNullOrWhiteSpace(network))
                 {
@@ -91,12 +91,18 @@ public static class ForwardedHeadersExtensions
                     }
                     else
                     {
-                        logger.LogWarning("Invalid network CIDR prefix length {PrefixLength} for '{Network}' in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", prefixLength, network, index);
+                        logger.LogWarning(
+                            "Invalid network CIDR prefix length {PrefixLength} for '{Network}' " +
+                            "in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.",
+                            prefixLength, network, index);
                     }
                 }
                 else
                 {
-                    logger.LogWarning("Invalid network CIDR notation '{Network}' in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", network, index);
+                    logger.LogWarning(
+                        "Invalid network CIDR notation '{Network}' " +
+                        "in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.",
+                        network, index);
                 }
             }
         }
