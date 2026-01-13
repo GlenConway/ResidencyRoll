@@ -231,7 +231,8 @@ public class TripService
 
         while (minDate < maxDate)
         {
-            DateTime midDate = minDate.AddDays((maxDate - minDate).Days / 2);
+            double midDays = (maxDate - minDate).Days / 2.0;
+            DateTime midDate = minDate.AddDays(Math.Floor(midDays));
             var (_, forecastDays) = await ForecastDaysWithTripAsync(countryName, tripStart, midDate);
             
             int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
