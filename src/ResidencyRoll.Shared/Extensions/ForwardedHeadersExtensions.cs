@@ -52,12 +52,33 @@ public static class ForwardedHeadersExtensions
             {
                 // Parse CIDR notation (e.g., "10.0.0.0/8")
                 var parts = network.Split('/');
-                if (parts.Length == 2 && 
-                    IPAddress.TryParse(parts[0], out var ipAddress) && 
+                if (parts.Length == 2 &&
+                    IPAddress.TryParse(parts[0], out var ipAddress) &&
                     int.TryParse(parts[1], out var prefixLength))
                 {
-                    forwardedHeadersOptions.KnownIPNetworks.Add(new System.Net.IPNetwork(ipAddress, prefixLength));
-                    logger.LogInformation("Added trusted network: {Network}", network);
+                    var addressFamily = ipAddress.AddressFamily;
+                    var isValidPrefix = false;
+
+                    if (addressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    {
+                        // IPv4: prefix length must be between 0 and 32
+                        isValidPrefix = prefixLength >= 0 && prefixLength <= 32;
+                    }
+                    else if (addressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+                    {
+                        // IPv6: prefix length must be between 0 and 128
+                        isValidPrefix = prefixLength >= 0 && prefixLength <= 128;
+                    }
+
+                    if (isValidPrefix)
+                    {
+                        forwardedHeadersOptions.KnownIPNetworks.Add(new System.Net.IPNetwork(ipAddress, prefixLength));
+                        logger.LogInformation("Added trusted network: {Network}", network);
+                    }
+                    else
+                    {
+                        logger.LogWarning("Invalid network CIDR prefix length in configuration: {Network}", network);
+                    }
                 }
                 else
                 {
