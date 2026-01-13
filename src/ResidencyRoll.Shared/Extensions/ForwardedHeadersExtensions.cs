@@ -48,8 +48,9 @@ public static class ForwardedHeadersExtensions
         var trustedNetworks = configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>();
         if (trustedNetworks != null && trustedNetworks.Length > 0)
         {
-            foreach (var network in trustedNetworks)
+            for (var index = 0; index < trustedNetworks.Length; index++)
             {
+                var network = trustedNetworks[index];
                 // Parse CIDR notation (e.g., "10.0.0.0/8")
                 var parts = network.Split('/');
                 if (parts.Length == 2 &&
@@ -73,16 +74,16 @@ public static class ForwardedHeadersExtensions
                     if (isValidPrefix)
                     {
                         forwardedHeadersOptions.KnownIPNetworks.Add(new System.Net.IPNetwork(ipAddress, prefixLength));
-                        logger.LogInformation("Added trusted network: {Network}", network);
+                        logger.LogInformation("Added trusted network at index {Index}.", index);
                     }
                     else
                     {
-                        logger.LogWarning("Invalid network CIDR prefix length in configuration: {Network}", network);
+                        logger.LogWarning("Invalid network CIDR prefix length in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", index);
                     }
                 }
                 else
                 {
-                    logger.LogWarning("Invalid network CIDR notation in configuration: {Network}", network);
+                    logger.LogWarning("Invalid network CIDR notation in configuration section 'ForwardedHeaders:KnownNetworks' at index {Index}.", index);
                 }
             }
         }
