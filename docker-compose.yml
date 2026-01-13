@@ -15,6 +15,10 @@ services:
       - Jwt__RequireHttpsMetadata=${JWT_REQUIRE_HTTPS}
       - Cors__AllowedOrigins__0=${CORS_ORIGIN_0}
       - Cors__AllowedOrigins__1=${CORS_ORIGIN_1}
+      - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
+      - ForwardedHeaders__KnownProxies__1=${FORWARDED_HEADERS_KNOWN_PROXY_1}
+      - ForwardedHeaders__KnownNetworks__0=${FORWARDED_HEADERS_KNOWN_NETWORK_0}
+      - ForwardedHeaders__KnownNetworks__1=${FORWARDED_HEADERS_KNOWN_NETWORK_1}
     restart: unless-stopped
     networks:
       - residencyroll-network
@@ -36,6 +40,10 @@ services:
       - Authentication__OpenIdConnect__ClientSecret=${OIDC_CLIENT_SECRET}
       - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS}
       - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE}
+      - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
+      - ForwardedHeaders__KnownProxies__1=${FORWARDED_HEADERS_KNOWN_PROXY_1}
+      - ForwardedHeaders__KnownNetworks__0=${FORWARDED_HEADERS_KNOWN_NETWORK_0}
+      - ForwardedHeaders__KnownNetworks__1=${FORWARDED_HEADERS_KNOWN_NETWORK_1}
     restart: unless-stopped
     depends_on:
       - residencyroll-api

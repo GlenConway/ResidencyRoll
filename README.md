@@ -147,6 +147,72 @@ The docker-compose.yml uses environment variables from the `.env` file for all c
 | `JWT_AUDIENCE` | JWT audience identifier | - |
 | `CORS_ORIGIN_0` | Allowed CORS origin 1 | `http://localhost:8081` |
 | `CORS_ORIGIN_1` | Allowed CORS origin 2 | `http://residencyroll-web:80` |
+| `FORWARDED_HEADERS_KNOWN_PROXY_0` | Trusted reverse proxy IP address | - |
+| `FORWARDED_HEADERS_KNOWN_PROXY_1` | Additional trusted proxy IP | - |
+| `FORWARDED_HEADERS_KNOWN_NETWORK_0` | Trusted proxy network in CIDR notation | - |
+| `FORWARDED_HEADERS_KNOWN_NETWORK_1` | Additional trusted network | - |
+
+#### Reverse Proxy Configuration
+
+If you deploy ResidencyRoll behind a reverse proxy (nginx, Caddy, cloud load balancer), you must configure trusted proxies to ensure the application correctly processes `X-Forwarded-For` and `X-Forwarded-Proto` headers. This is critical for:
+
+- Correctly identifying client IP addresses in logs
+- Proper HTTPS redirect behavior
+- Security (preventing header spoofing attacks)
+
+**Default Behavior**: Without configuration, ASP.NET Core only trusts localhost/loopback addresses, which is secure for direct deployments.
+
+**When to Configure**:
+- ✅ Using nginx, Caddy, Traefik, or cloud load balancers
+- ✅ Containers behind Docker network or Kubernetes ingress
+- ✅ Any multi-tier deployment with a reverse proxy layer
+
+**Configuration Options**:
+
+1. **Known Proxies** (specific IP addresses):
+   ```bash
+   # Single nginx proxy
+   FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1
+   
+   # Multiple proxies
+   FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1
+   FORWARDED_HEADERS_KNOWN_PROXY_1=10.0.1.5
+   ```
+
+2. **Known Networks** (CIDR ranges for dynamic IPs):
+   ```bash
+   # Docker bridge network
+   FORWARDED_HEADERS_KNOWN_NETWORK_0=172.17.0.0/16
+   
+   # Cloud load balancer subnet
+   FORWARDED_HEADERS_KNOWN_NETWORK_0=10.240.0.0/16
+   
+   # Private network range
+   FORWARDED_HEADERS_KNOWN_NETWORK_0=10.0.0.0/8
+   ```
+
+**Example nginx Configuration**:
+
+```nginx
+server {
+    listen 80;
+    server_name residencyroll.example.com;
+    
+    location / {
+        proxy_pass http://localhost:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Then configure the proxy's IP in `.env`:
+```bash
+FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1  # nginx container IP
+```
+
+**Security Warning**: Only add IP addresses/networks you control. Misconfiguration can allow attackers to spoof headers and bypass security controls.
 
 #### Data Persistence
 
