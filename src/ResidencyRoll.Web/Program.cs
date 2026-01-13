@@ -198,6 +198,12 @@ builder.Services.AddScoped<AccessTokenProvider>();
 
 var app = builder.Build();
 
+// Handle forwarded headers from reverse proxy
+app.UseForwardedHeaders(new Microsoft.AspNetCore.HttpOverrides.ForwardedHeaderOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
 // Ensure database is created
 using (var scope = app.Services.CreateScope())
 {
@@ -225,7 +231,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 // Authentication endpoints
-app.MapPost("/login", async (HttpContext context) =>
+app.MapPost("/auth/login", async (HttpContext context) =>
 {
     var oidcEnabled = context.RequestServices.GetRequiredService<IConfiguration>()
         .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
