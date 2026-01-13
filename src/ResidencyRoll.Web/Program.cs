@@ -205,9 +205,7 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 };
 
-// Clear security restrictions so it trusts headers from your NGINX proxy
-forwardedHeadersOptions.KnownIPNetworks.Clear();
-forwardedHeadersOptions.KnownProxies.Clear();
+// Rely on default KnownProxies/KnownNetworks or configure specific trusted proxies via KnownProxies/KnownNetworks as needed.
 
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
