@@ -126,6 +126,12 @@ builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 
 var app = builder.Build();
 
+// Handle forwarded headers from reverse proxy
+app.UseForwardedHeaders(new Microsoft.AspNetCore.HttpOverrides.ForwardedHeaderOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
 // Ensure database is created and migrations are applied
 using (var scope = app.Services.CreateScope())
 {
