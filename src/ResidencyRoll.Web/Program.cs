@@ -11,6 +11,7 @@ using ResidencyRoll.Web.Components;
 using ResidencyRoll.Web.Data;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Shared.Trips;
+using ResidencyRoll.Shared.Extensions;
 using Serilog;
 
 // Configure Serilog
@@ -199,7 +200,7 @@ builder.Services.AddScoped<AccessTokenProvider>();
 var app = builder.Build();
 
 // Handle forwarded headers from reverse proxy
-app.UseForwardedHeaders();
+app.UseConfiguredForwardedHeaders();
 
 // Ensure database is created
 using (var scope = app.Services.CreateScope())
