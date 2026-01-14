@@ -75,6 +75,7 @@ fi
 
 dotnet user-secrets set "Jwt:Authority" "$AUTH0_AUTHORITY"
 dotnet user-secrets set "Jwt:Audience" "$API_AUDIENCE"
+dotnet user-secrets set "Jwt:ClientSecret" "$WEB_CLIENT_SECRET"
 
 echo "✓ API configured"
 
@@ -84,6 +85,11 @@ echo "Configuration Complete!"
 echo "======================================"
 echo ""
 echo "Your Auth0 credentials have been securely stored in .NET User Secrets."
+echo ""
+echo "⚠️  IMPORTANT: Client Secret Configured for JWE Token Decryption"
+echo "The API has been configured with the client secret to support Auth0's"
+echo "encrypted access tokens (JWE format). This is required if Auth0 issues"
+echo "encrypted tokens for your API."
 echo ""
 echo "Configuration Summary:"
 echo "  Authority: $AUTH0_AUTHORITY"
