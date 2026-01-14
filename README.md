@@ -695,6 +695,7 @@ dotnet --version
 | Issue | Solution |
 | ------- | ---------- |
 | 401 Unauthorized from API | Check JWT Authority and Audience match between API and identity provider |
+| "IDX10609: Decryption failed" | Auth0 is issuing encrypted tokens (JWE). Configure `JWT_CLIENT_SECRET` with the same value as `OIDC_CLIENT_SECRET`. See [JWT Token Encryption Guide](docs/JWT_TOKEN_ENCRYPTION.md) |
 | Login redirect loop | Verify redirect URIs are registered in identity provider |
 | Token not forwarded | Check `ApiAuthenticationHandler` is registered; verify `SaveTokens: true` in OIDC options |
 | CORS errors | Add Web URL to API CORS AllowedOrigins |
