@@ -8,6 +8,7 @@ using ResidencyRoll.Api.Data;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Extensions;
 using Serilog;
+using System.Reflection;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -18,7 +19,11 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    Log.Information("Starting ResidencyRoll API");
+    var version = System.Reflection.Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.
+        InformationalVersion ?? "unknown";
+    
+    Log.Information("Starting ResidencyRoll API - Version: {Version}", version);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
