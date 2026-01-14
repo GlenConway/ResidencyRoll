@@ -18,6 +18,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  VERSION: 1.0.${{ github.run_number }}
 
 jobs:
   build-and-push:
@@ -69,6 +70,8 @@ jobs:
         with:
           context: .
           file: ${{ matrix.service.file }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
