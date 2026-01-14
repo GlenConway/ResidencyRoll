@@ -68,13 +68,34 @@ if (jwtEnabled)
             options.Authority = jwtAuthority;
             options.Audience = builder.Configuration["Jwt:Audience"];
             options.RequireHttpsMetadata = builder.Configuration.GetValue<bool?>("Jwt:RequireHttpsMetadata") ?? true;
-            options.TokenValidationParameters = new TokenValidationParameters
+            
+            // Configure token decryption for JWE (encrypted JWT) tokens
+            // Auth0 can issue encrypted access tokens when using a confidential client
+            var clientSecret = builder.Configuration["Jwt:ClientSecret"];
+            if (!string.IsNullOrEmpty(clientSecret))
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true
-            };
+                Log.Information("JWT client secret configured - JWE token decryption enabled");
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    // Use client secret for decrypting JWE tokens
+                    TokenDecryptionKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(clientSecret))
+                };
+            }
+            else
+            {
+                Log.Information("JWT client secret NOT configured - only JWT (non-encrypted) tokens supported");
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true
+                };
+            }
 
             // Add diagnostic logging to understand 401 causes during development
             options.Events = new JwtBearerEvents

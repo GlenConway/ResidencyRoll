@@ -11,7 +11,8 @@
   "Jwt": {
     "Authority": "https://YOUR-TENANT.auth0.com/",
     "Audience": "YOUR-AUTH0-API-IDENTIFIER",
-    "RequireHttpsMetadata": false
+    "RequireHttpsMetadata": false,
+    "ClientSecret": "YOUR-CLIENT-SECRET-IF-USING-JWE"
   },
   "Cors": {
     "AllowedOrigins": [
