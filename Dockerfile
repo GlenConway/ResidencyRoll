@@ -15,12 +15,12 @@ RUN dotnet restore ./ResidencyRoll.Web/ResidencyRoll.Web.csproj
 COPY src/ResidencyRoll.Shared/ ./ResidencyRoll.Shared/
 COPY src/ResidencyRoll.Web/ ./ResidencyRoll.Web/
 WORKDIR /src/ResidencyRoll.Web
-RUN dotnet build -c Release -o /app/build -p:Version=${VERSION}
+RUN dotnet build -c Release -o /app/build -p:Version=$VERSION
 
 # Publish stage
 FROM build AS publish
 ARG VERSION=1.0.0
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false -p:Version=${VERSION}
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false -p:Version=$VERSION
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
