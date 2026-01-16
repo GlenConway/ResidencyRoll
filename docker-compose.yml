@@ -13,7 +13,6 @@ services:
       - Jwt__Authority=${JWT_AUTHORITY}
       - Jwt__Audience=${JWT_AUDIENCE}
       - Jwt__RequireHttpsMetadata=${JWT_REQUIRE_HTTPS}
-      - Jwt__ClientSecret=${OIDC_CLIENT_SECRET}
       - Cors__AllowedOrigins__0=${CORS_ORIGIN_0}
       - Cors__AllowedOrigins__1=${CORS_ORIGIN_1}
       - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
@@ -40,6 +39,7 @@ services:
       - Authentication__OpenIdConnect__ClientId=${OIDC_CLIENT_ID}
       - Authentication__OpenIdConnect__ClientSecret=${OIDC_CLIENT_SECRET}
       - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS}
+      - Authentication__OpenIdConnect__ApiAudience=${OIDC_API_AUDIENCE}
       - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE}
       - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
       - ForwardedHeaders__KnownProxies__1=${FORWARDED_HEADERS_KNOWN_PROXY_1}
