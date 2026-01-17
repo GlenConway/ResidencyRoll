@@ -264,15 +264,15 @@
             }
         }
         
-        dailyPresence = dailyPresence.OrderBy(d => d.Date).ToList();
+        dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
     }
 
     private Dictionary<string, List<DailyPresenceDto>> GetGroupedByMonth()
     {
         return dailyPresence
             .GroupBy(d => d.Date.ToString("MMMM yyyy"))
-            .OrderBy(g => dailyPresence.First(d => d.Date.ToString("MMMM yyyy") == g.Key).Date)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .OrderByDescending(g => dailyPresence.First(d => d.Date.ToString("MMMM yyyy") == g.Key).Date)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Date).ToList());
     }
 
     private string GetDayClass(DailyPresenceDto presence)

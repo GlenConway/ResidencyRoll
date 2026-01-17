@@ -40,25 +40,6 @@
                                 EditMode="DataGridEditMode.Single"
                                 RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
                     <Columns>
-                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCity" Title="Arrival" Width="180px">
-                            <Template Context="trip">
-                                <div style="display: flex; flex-direction: column;">
-                                    <span>@(!string.IsNullOrEmpty(trip.ArrivalIataCode) ? $"{trip.ArrivalIataCode} - " : "")@trip.ArrivalCity</span>
-                                    <span style="font-size: 0.75rem; color: #666;">@GetTimezoneOffset(trip.ArrivalTimezone)</span>
-                                </div>
-                            </Template>
-                            <EditTemplate Context="trip">
-                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCity</RadzenText>
-                            </EditTemplate>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalDateTime" Title="Arrival Time" Width="150px">
-                            <Template Context="trip">
-                                @trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")
-                            </Template>
-                            <EditTemplate Context="trip">
-                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")</RadzenText>
-                            </EditTemplate>
-                        </RadzenDataGridColumn>
                         <RadzenDataGridColumn TItem="TripDto" Property="DepartureCity" Title="Departure" Width="180px">
                             <Template Context="trip">
                                 <div style="display: flex; flex-direction: column;">
@@ -75,13 +56,35 @@
                                 @trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm")
                             </Template>
                             <EditTemplate Context="trip">
-                                <RadzenText TextStyle="TextStyle.Body2">@trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm")</RadzenText>
+                                <RadzenDatePicker @bind-Value="trip.DepartureDateTime" DateFormat="yyyy-MM-dd HH:mm" ShowTime="true" />
                             </EditTemplate>
                         </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="TripDto" Property="DurationDays" Title="Duration" Width="100px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCity" Title="Arrival" Width="180px">
                             <Template Context="trip">
-                                @trip.DurationDays days
+                                <div style="display: flex; flex-direction: column;">
+                                    <span>@(!string.IsNullOrEmpty(trip.ArrivalIataCode) ? $"{trip.ArrivalIataCode} - " : "")@trip.ArrivalCity</span>
+                                    <span style="font-size: 0.75rem; color: #666;">@GetTimezoneOffset(trip.ArrivalTimezone)</span>
+                                </div>
                             </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCity</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalDateTime" Title="Arrival Time" Width="150px">
+                            <Template Context="trip">
+                                @trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenDatePicker @bind-Value="trip.ArrivalDateTime" DateFormat="yyyy-MM-dd HH:mm" ShowTime="true" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="DurationHours" Title="Duration" Width="100px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
+                            <Template Context="trip">
+                                @trip.DurationHours hours
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2" TextAlign="TextAlign.Center">@trip.DurationHours hours</RadzenText>
+                            </EditTemplate>
                         </RadzenDataGridColumn>
                         <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
                             <Template Context="trip">
@@ -181,7 +184,7 @@
 
     private async Task LoadData()
     {
-        trips = await ApiClient.GetAllTripsAsync();
+        trips = (await ApiClient.GetAllTripsAsync()).OrderByDescending(t => t.DepartureDateTime).ToList();
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs args)
@@ -318,6 +321,8 @@
         editingTrip = false;
         currentEditTrip = null;
         await LoadData();
+        selectedTabIndex = 0; // Switch back to Trip List tab
+        StateHasChanged();
     }
 
     private void CancelDetailedEdit()

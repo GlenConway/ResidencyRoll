@@ -40,5 +40,41 @@ public class Trip
 
     // Legacy duration calculation - kept for backward compatibility but deprecated
     [Obsolete("Use ResidencyCalculationService for accurate residency calculations")]
-    public int DurationDays => Math.Max(0, (DepartureDateTime - ArrivalDateTime).Days);
+    public int DurationDays
+    {
+        get
+        {
+            var depUtc = ConvertToUtc(DepartureDateTime, DepartureTimezone);
+            var arrUtc = ConvertToUtc(ArrivalDateTime, ArrivalTimezone);
+            return Math.Max(0, (int)(arrUtc - depUtc).TotalDays);
+        }
+    }
+
+    // Duration in hours (timezone-aware)
+    public int DurationHours
+    {
+        get
+        {
+            var depUtc = ConvertToUtc(DepartureDateTime, DepartureTimezone);
+            var arrUtc = ConvertToUtc(ArrivalDateTime, ArrivalTimezone);
+            return Math.Max(0, (int)(arrUtc - depUtc).TotalHours);
+        }
+    }
+
+    private DateTime ConvertToUtc(DateTime localTime, string timezoneId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(timezoneId) || timezoneId == "UTC")
+                return localTime;
+
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            return TimeZoneInfo.ConvertTimeToUtc(localTime, tz);
+        }
+        catch
+        {
+            // If timezone conversion fails, return as-is
+            return localTime;
+        }
+    }
 }
