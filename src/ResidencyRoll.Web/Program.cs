@@ -230,8 +230,9 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+
+// IMPORTANT: API endpoints MUST be registered BEFORE MapRazorComponents
+// because Razor component routing acts as a catch-all for remaining routes.
 
 // Authentication endpoints
 app.MapPost("/auth/login", async (HttpContext context) =>
@@ -276,98 +277,9 @@ app.MapPost("/logout", async (HttpContext context) =>
         });
 });
 
-app.MapGet("/api/trips/export", async (TripsApiClient apiClient) =>
-{
-    var trips = await apiClient.GetAllTripsAsync();
-    var csvLines = new List<string> { "CountryName,StartDate,EndDate" };
-
-    foreach (var trip in trips.OrderBy(t => t.StartDate))
-    {
-        var line = string.Join(',',
-            EscapeCsv(trip.CountryName ?? string.Empty),
-            trip.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            trip.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-        csvLines.Add(line);
-    }
-
-    var bytes = System.Text.Encoding.UTF8.GetBytes(string.Join('\n', csvLines));
-    return Results.File(bytes, "text/csv", "trips.csv");
-}).DisableAntiforgery();
-
-app.MapPost("/api/trips/import", async (HttpRequest request, TripsApiClient apiClient) =>
-{
-    if (!request.HasFormContentType)
-    {
-        return Results.BadRequest("Form file is required.");
-    }
-
-    var form = await request.ReadFormAsync();
-    var file = form.Files.FirstOrDefault();
-
-    if (file == null || file.Length == 0)
-    {
-        return Results.BadRequest("File is empty.");
-    }
-
-    using var reader = new StreamReader(file.OpenReadStream());
-    var content = await reader.ReadToEndAsync();
-    var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-    var newTrips = new List<ResidencyRoll.Shared.Trips.TripDto>();
-    var isFirst = true;
-
-    foreach (var rawLine in lines)
-    {
-        var line = rawLine.Trim();
-        if (string.IsNullOrWhiteSpace(line))
-        {
-            continue;
-        }
-
-        if (isFirst && line.StartsWith("CountryName", StringComparison.OrdinalIgnoreCase))
-        {
-            isFirst = false;
-            continue;
-        }
-
-        isFirst = false;
-
-        var parts = ParseCsvLine(line);
-        if (parts.Length < 3)
-        {
-            continue;
-        }
-
-        if (!DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-        {
-            continue;
-        }
-
-        if (!DateTime.TryParse(parts[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-        {
-            continue;
-        }
-
-        newTrips.Add(new ResidencyRoll.Shared.Trips.TripDto
-        {
-            CountryName = parts[0],
-            StartDate = start,
-            EndDate = end
-        });
-    }
-
-    if (newTrips.Count == 0)
-    {
-        return Results.BadRequest("No valid trips found in file.");
-    }
-
-    foreach (var trip in newTrips)
-    {
-        await apiClient.CreateTripAsync(trip);
-    }
-
-    return Results.Ok(new { Imported = newTrips.Count });
-}).DisableAntiforgery();
+// NOW register Razor components
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 // Proxy endpoints to call the external API from within HTTP context (so tokens attach)
 var tripsProxy = app.MapGroup("/app/trips").WithTags("Trips Proxy");
@@ -457,52 +369,6 @@ tripsProxy.MapPost("/forecast/standard-durations", async (StandardDurationForeca
     var response = await apiClient.CalculateStandardDurationForecastsAsync(request.CountryName!, request.TripStart, request.DayLimit);
     return Results.Ok(response);
 }).DisableAntiforgery();
-
-static string EscapeCsv(string value)
-{
-    if (value.Contains(',') || value.Contains('"'))
-    {
-        return '"' + value.Replace("\"", "\"\"") + '"';
-    }
-    return value;
-}
-
-static string[] ParseCsvLine(string line)
-{
-    var values = new List<string>();
-    var current = new System.Text.StringBuilder();
-    var inQuotes = false;
-
-    for (int i = 0; i < line.Length; i++)
-    {
-        var c = line[i];
-
-        if (c == '"')
-        {
-            if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
-            {
-                current.Append('"');
-                i++;
-            }
-            else
-            {
-                inQuotes = !inQuotes;
-            }
-        }
-        else if (c == ',' && !inQuotes)
-        {
-            values.Add(current.ToString());
-            current.Clear();
-        }
-        else
-        {
-            current.Append(c);
-        }
-    }
-
-    values.Add(current.ToString());
-    return values.ToArray();
-}
 
 app.Run();
 }

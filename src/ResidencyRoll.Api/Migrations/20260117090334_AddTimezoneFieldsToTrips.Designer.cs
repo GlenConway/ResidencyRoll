@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidencyRoll.Api.Data;
 
@@ -10,9 +11,11 @@ using ResidencyRoll.Api.Data;
 namespace ResidencyRoll.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260117090334_AddTimezoneFieldsToTrips")]
+    partial class AddTimezoneFieldsToTrips
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.1");
@@ -34,9 +37,6 @@ namespace ResidencyRoll.Api.Migrations
                     b.Property<DateTime>("ArrivalDateTime")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ArrivalIataCode")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("ArrivalTimezone")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -55,9 +55,6 @@ namespace ResidencyRoll.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DepartureDateTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DepartureIataCode")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DepartureTimezone")

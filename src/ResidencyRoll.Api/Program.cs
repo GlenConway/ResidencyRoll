@@ -36,6 +36,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=residencyroll.db"));
 
 builder.Services.AddScoped<TripService>();
+builder.Services.AddSingleton<ResidencyCalculationService>();
 
 builder.Services.AddApiVersioning(options =>
 {

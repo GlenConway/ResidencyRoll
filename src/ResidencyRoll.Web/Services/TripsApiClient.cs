@@ -113,4 +113,71 @@ public class TripsApiClient
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<List<StandardDurationForecastItemDto>>())!;
     }
+
+    public async Task<List<DailyPresenceDto>> GetDailyPresenceAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var query = string.Empty;
+        if (startDate.HasValue || endDate.HasValue)
+        {
+            var queryParams = new List<string>();
+            if (startDate.HasValue)
+                queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+            if (endDate.HasValue)
+                queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+            query = "?" + string.Join("&", queryParams);
+        }
+        
+        var result = await _httpClient.GetFromJsonAsync<List<DailyPresenceDto>>($"{BaseRoute}/daily-presence{query}");
+        return result ?? new List<DailyPresenceDto>();
+    }
+
+    public async Task<List<ResidencySummaryDto>> GetResidencySummaryAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var query = string.Empty;
+        if (startDate.HasValue || endDate.HasValue)
+        {
+            var queryParams = new List<string>();
+            if (startDate.HasValue)
+                queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+            if (endDate.HasValue)
+                queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+            query = "?" + string.Join("&", queryParams);
+        }
+        
+        var result = await _httpClient.GetFromJsonAsync<List<ResidencySummaryDto>>($"{BaseRoute}/residency-summary{query}");
+        return result ?? new List<ResidencySummaryDto>();
+    }
+
+    public async Task<byte[]> ExportTripsAsync()
+    {
+        var response = await _httpClient.GetAsync($"{BaseRoute}/export");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync();
+    }
+
+    public async Task<(int Imported, string Message, int Errors)> ImportTripsAsync(Stream fileStream, string fileName)
+    {
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(fileStream);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv");
+        content.Add(streamContent, "file", fileName);
+
+        var response = await _httpClient.PostAsync($"{BaseRoute}/import", content);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Import failed: {errorBody}");
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<ImportResultDto>();
+        return (result?.Imported ?? 0, result?.Message ?? string.Empty, result?.Errors ?? 0);
+    }
+
+    private class ImportResultDto
+    {
+        public int Imported { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public int Errors { get; set; }
+    }
 }
