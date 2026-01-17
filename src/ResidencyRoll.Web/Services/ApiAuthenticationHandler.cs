@@ -41,6 +41,26 @@ public class ApiAuthenticationHandler : DelegatingHandler
                 accessToken = await httpContext.GetTokenAsync("access_token");
                 _logger.LogDebug("[ApiAuth] Retrieved token from HttpContext: {HasToken}", !string.IsNullOrEmpty(accessToken));
                 
+                // Log token header for debugging
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    var tokenParts = accessToken.Split('.');
+                    if (tokenParts.Length >= 1)
+                    {
+                        var header = tokenParts[0];
+                        _logger.LogInformation("[ApiAuth] Token header (base64): {Header}", header);
+                        try
+                        {
+                            var headerJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(header.PadRight(header.Length + (4 - header.Length % 4) % 4, '=')));
+                            _logger.LogInformation("[ApiAuth] Token header (decoded): {HeaderJson}", headerJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning("[ApiAuth] Could not decode token header: {Error}", ex.Message);
+                        }
+                    }
+                }
+                
                 // Cache it for subsequent requests in this circuit
                 if (!string.IsNullOrEmpty(accessToken))
                 {
