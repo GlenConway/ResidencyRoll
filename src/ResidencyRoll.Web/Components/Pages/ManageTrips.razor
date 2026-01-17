@@ -9,8 +9,8 @@
 @using ResidencyRoll.Web.Services
 @using ResidencyRoll.Web.Components
 @inject TripsApiClient ApiClient
-@inject HttpClient Http
 @inject NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>Manage Trips</PageTitle>
@@ -205,25 +205,11 @@
 
         try
         {
-            using var content = new MultipartFormDataContent();
-            var stream = selectedFile.OpenReadStream(long.MaxValue);
-            var streamContent = new StreamContent(stream);
-            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType ?? "text/csv");
-            content.Add(streamContent, "file", selectedFile.Name);
-
-            var response = await Http.PostAsync("/api/trips/import", content);
-
-            if (response.IsSuccessStatusCode)
-            {
-                importMessage = "Import completed";
-                await LoadData();
-            }
-            else
-            {
-                var body = await response.Content.ReadAsStringAsync();
-                importMessage = string.IsNullOrWhiteSpace(body) ? "Import failed" : body;
-                importError = true;
-            }
+            using var stream = selectedFile.OpenReadStream(long.MaxValue);
+            var (imported, message, errors) = await ApiClient.ImportTripsAsync(stream, selectedFile.Name);
+            importMessage = message;
+            importError = errors > 0 && imported == 0;
+            await LoadData();
         }
         catch (Exception ex)
         {
@@ -248,9 +234,19 @@
         await LoadData();
     }
 
-    private void ExportTrips()
+    private async Task ExportTrips()
     {
-        Navigation.NavigateTo("/api/trips/export", forceLoad: true);
+        try
+        {
+            var csvBytes = await ApiClient.ExportTripsAsync();
+            var base64 = Convert.ToBase64String(csvBytes);
+            await JS.InvokeVoidAsync("downloadFile", "trips.csv", "text/csv", base64);
+        }
+        catch (Exception ex)
+        {
+            // Could show error message to user
+            Console.WriteLine($"Export failed: {ex.Message}");
+        }
     }
 
     private void EditRow(TripDto trip)
