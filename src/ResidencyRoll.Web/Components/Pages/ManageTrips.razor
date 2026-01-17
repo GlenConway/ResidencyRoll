@@ -155,7 +155,8 @@
                         </RadzenStack>
 
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
-                            <RadzenButton Icon="check" Text="Save Trip" Click="@SaveDetailedTrip" ButtonStyle="ButtonStyle.Success" />
+                            <RadzenButton Icon="check" Text="Save Trip" Click="@(() => SaveDetailedTrip())" ButtonStyle="ButtonStyle.Success" />
+                            <RadzenButton Icon="playlist_add" Text="Save and Add Leg" Click="@(() => SaveDetailedTrip(addLegAfterSave: true))" ButtonStyle="ButtonStyle.Info" />
                             <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
                         </RadzenStack>
                     </RadzenStack>
@@ -333,7 +334,7 @@
         selectedTabIndex = 1;
     }
 
-    private async Task SaveDetailedTrip()
+    private async Task SaveDetailedTrip(bool addLegAfterSave = false)
     {
         if (currentEditTrip == null || departureDate == null || departureTime == null || 
             arrivalDate == null || arrivalTime == null)
@@ -345,18 +346,27 @@
         currentEditTrip.DepartureDateTime = departureDate.Value.Date.Add(departureTime.Value.TimeOfDay);
         currentEditTrip.ArrivalDateTime = arrivalDate.Value.Date.Add(arrivalTime.Value.TimeOfDay);
 
+        TripDto savedTrip = currentEditTrip;
         if (currentEditTrip.Id > 0)
         {
             await ApiClient.UpdateTripAsync(currentEditTrip.Id, currentEditTrip);
         }
         else
         {
-            await ApiClient.CreateTripAsync(currentEditTrip);
+            savedTrip = await ApiClient.CreateTripAsync(currentEditTrip);
+            currentEditTrip.Id = savedTrip.Id;
+        }
+
+        await LoadData();
+
+        if (addLegAfterSave)
+        {
+            AddLeg(savedTrip);
+            return;
         }
 
         editingTrip = false;
         currentEditTrip = null;
-        await LoadData();
         selectedTabIndex = 0; // Switch back to Trip List tab
         StateHasChanged();
     }
