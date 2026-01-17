@@ -3,12 +3,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Radzen;
 using System.Globalization;
 using ResidencyRoll.Web.Components;
-using ResidencyRoll.Web.Data;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Shared.Extensions;
@@ -155,15 +153,6 @@ builder.Services.AddRadzenComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddServerSideBlazor();
 
-// Configure SQLite database
-var dataDirectory = builder.Environment.IsDevelopment() 
-    ? Path.Combine(builder.Environment.ContentRootPath, "data")
-    : Path.Combine("/app", "data");
-Directory.CreateDirectory(dataDirectory);
-var connectionString = $"Data Source={Path.Combine(dataDirectory, "residencyroll.db")}";
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
-
 // Provide HttpClient with the app base address so relative API calls (e.g., import) work.
 // This HttpClient is used by Blazor components to call local proxy endpoints
 builder.Services.AddHttpClient("LocalProxy", client =>
@@ -195,10 +184,6 @@ builder.Services.AddHttpClient<TripsApiClient>(client =>
 })
 .AddHttpMessageHandler<ApiAuthenticationHandler>();
 
-// Add application services (kept for now for import/export endpoints)
-// TODO: Move import/export to API and remove TripService completely
-builder.Services.AddScoped<TripService>();
-
 // Register AccessTokenProvider for Blazor circuits
 builder.Services.AddScoped<AccessTokenProvider>();
 
@@ -206,13 +191,6 @@ var app = builder.Build();
 
 // Handle forwarded headers from reverse proxy
 app.UseConfiguredForwardedHeaders();
-
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.EnsureCreated();
-}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
