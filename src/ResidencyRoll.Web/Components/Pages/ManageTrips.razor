@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using ResidencyRoll.Shared.Trips
 @using ResidencyRoll.Web.Services
+@using ResidencyRoll.Web.Helpers
 @using ResidencyRoll.Web.Components
 @inject TripsApiClient ApiClient
 @inject NavigationManager Navigation
@@ -123,6 +124,7 @@
                             <RadzenDatePicker @bind-Value="departureDate"
                                              Placeholder="Departure Date"
                                              DateFormat="yyyy-MM-dd"
+                                             Change="OnDepartureDateChanged"
                                              Style="flex: 1" />
                             <RadzenDatePicker @bind-Value="departureTime"
                                              TimeOnly="true"
@@ -296,6 +298,14 @@
         arrivalTime = DateTime.Today.AddHours(12);
         editingTrip = true;
         selectedTabIndex = 1;
+    }
+
+    private void OnDepartureDateChanged(DateTime? newDate)
+    {
+        departureDate = newDate;
+
+        var isExistingTrip = currentEditTrip?.Id > 0;
+        arrivalDate = TripDateHelper.GetSyncedArrivalDate(newDate, arrivalDate, isExistingTrip);
     }
 
     private void AddLeg(TripDto baseTrip)
