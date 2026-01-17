@@ -9,12 +9,12 @@
             <RadzenAutoComplete @bind-Value="@searchText" 
                                 Data="@filteredAirports" 
                                 TextProperty="DisplayName"
-                                Placeholder="Search by IATA code or city (e.g., YHZ or Halifax)"
+                                Placeholder="Search by IATA code or city (e.g., LHR or London)"
                                 Change="@OnAirportSelected"
-                                Input="@OnSearchInput"
+                                LoadData="@OnLoadData"
                                 Style="width: 100%;"
-                                AllowFiltering="false"
-                                FilterDelay="100" />
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                FilterDelay="300" />
             @if (!string.IsNullOrEmpty(City))
             {
                 <RadzenText TextStyle="TextStyle.Caption" Style="color: #666;">
@@ -75,7 +75,8 @@
     protected override void OnInitialized()
     {
         LoadTimezones();
-        filteredAirports = AirportDatabase.GetAllAirports().Take(10).ToList();
+        // Show first 20 airports initially (includes international airports)
+        filteredAirports = AirportDatabase.GetAllAirports().Take(20).ToList();
         
         // If IataCode is provided, initialize with that airport
         if (!string.IsNullOrEmpty(IataCode))
@@ -152,18 +153,23 @@
         };
     }
 
-    private void OnSearchInput(ChangeEventArgs args)
+    private void OnLoadData(LoadDataArgs args)
     {
-        var input = args.Value?.ToString() ?? string.Empty;
+        var searchTerm = args.Filter;
         
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(searchTerm))
         {
-            filteredAirports = AirportDatabase.GetAllAirports().Take(10).ToList();
+            // Show popular airports when no search term
+            filteredAirports = AirportDatabase.GetAllAirports().Take(20).ToList();
         }
         else
         {
-            filteredAirports = AirportDatabase.SearchAirports(input).Take(20).ToList();
+            // Search and return up to 50 results
+            filteredAirports = AirportDatabase.SearchAirports(searchTerm).Take(50).ToList();
         }
+        
+        // Force UI update
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task OnAirportSelected(object value)
