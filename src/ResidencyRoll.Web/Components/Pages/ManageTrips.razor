@@ -89,6 +89,7 @@
                         <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
                             <Template Context="trip">
                                 <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" Size="ButtonSize.Small" />
+                                <RadzenButton Icon="flight_takeoff" Text="Add Leg" ButtonStyle="ButtonStyle.Info" Click="@(args => AddLeg(trip))" Size="ButtonSize.Small" class="rz-ml-1" />
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" Size="ButtonSize.Small" />
                             </Template>
                             <EditTemplate Context="trip">
@@ -293,6 +294,31 @@
         departureTime = DateTime.Today.AddHours(12);
         arrivalDate = DateTime.Today;
         arrivalTime = DateTime.Today.AddHours(12);
+        editingTrip = true;
+        selectedTabIndex = 1;
+    }
+
+    private void AddLeg(TripDto baseTrip)
+    {
+        var newDepartureTime = baseTrip.ArrivalDateTime.AddHours(2);
+        var fallbackTz = string.IsNullOrWhiteSpace(baseTrip.ArrivalTimezone) ? "UTC" : baseTrip.ArrivalTimezone;
+
+        currentEditTrip = new TripDto
+        {
+            DepartureCountry = baseTrip.ArrivalCountry,
+            DepartureCity = baseTrip.ArrivalCity,
+            DepartureTimezone = fallbackTz,
+            DepartureIataCode = baseTrip.ArrivalIataCode,
+            ArrivalTimezone = fallbackTz,
+            DepartureDateTime = newDepartureTime,
+            ArrivalDateTime = newDepartureTime.AddHours(2)
+        };
+
+        departureDate = newDepartureTime.Date;
+        departureTime = newDepartureTime;
+        arrivalDate = newDepartureTime.AddHours(2).Date;
+        arrivalTime = newDepartureTime.AddHours(2);
+
         editingTrip = true;
         selectedTabIndex = 1;
     }
