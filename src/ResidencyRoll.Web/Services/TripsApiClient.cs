@@ -113,4 +113,38 @@ public class TripsApiClient
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<List<StandardDurationForecastItemDto>>())!;
     }
+
+    public async Task<List<DailyPresenceDto>> GetDailyPresenceAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var query = string.Empty;
+        if (startDate.HasValue || endDate.HasValue)
+        {
+            var queryParams = new List<string>();
+            if (startDate.HasValue)
+                queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+            if (endDate.HasValue)
+                queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+            query = "?" + string.Join("&", queryParams);
+        }
+        
+        var result = await _httpClient.GetFromJsonAsync<List<DailyPresenceDto>>($"{BaseRoute}/daily-presence{query}");
+        return result ?? new List<DailyPresenceDto>();
+    }
+
+    public async Task<List<ResidencySummaryDto>> GetResidencySummaryAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var query = string.Empty;
+        if (startDate.HasValue || endDate.HasValue)
+        {
+            var queryParams = new List<string>();
+            if (startDate.HasValue)
+                queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+            if (endDate.HasValue)
+                queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+            query = "?" + string.Join("&", queryParams);
+        }
+        
+        var result = await _httpClient.GetFromJsonAsync<List<ResidencySummaryDto>>($"{BaseRoute}/residency-summary{query}");
+        return result ?? new List<ResidencySummaryDto>();
+    }
 }

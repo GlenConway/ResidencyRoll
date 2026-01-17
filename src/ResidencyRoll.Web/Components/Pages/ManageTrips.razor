@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using ResidencyRoll.Shared.Trips
 @using ResidencyRoll.Web.Services
+@using ResidencyRoll.Web.Components
 @inject TripsApiClient ApiClient
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -16,71 +17,115 @@
 
 <h1>Manage Trips</h1>
 
-<RadzenRow Gap="1rem" class="rz-mt-3">
-    <RadzenColumn Size="12" SizeMD="6">
-        <RadzenButton Icon="download" Text="Export Trips (CSV)" ButtonStyle="ButtonStyle.Secondary" Click="@ExportTrips" />
-    </RadzenColumn>
-    <RadzenColumn Size="12" SizeMD="6" Style="display: flex; gap: 0.5rem; align-items: center;">
-        <InputFile OnChange="@OnFileSelected" style="flex: 1" />
-        <RadzenButton Icon="upload" Text="Import" Click="OnImport" Disabled="@(importing || selectedFile is null)" />
-        @if (!string.IsNullOrEmpty(importMessage))
-        {
-            <span style="color: @(importError ? "#dc3545" : "#198754"); font-size: 0.9rem;">@importMessage</span>
-        }
-    </RadzenColumn>
-</RadzenRow>
+<RadzenTabs>
+    <Tabs>
+        <RadzenTabsItem Text="Trip List">
+            <RadzenRow Gap="1rem" class="rz-mt-3">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenButton Icon="download" Text="Export Trips (CSV)" ButtonStyle="ButtonStyle.Secondary" Click="@ExportTrips" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6" Style="display: flex; gap: 0.5rem; align-items: center;">
+                    <InputFile OnChange="@OnFileSelected" style="flex: 1" />
+                    <RadzenButton Icon="upload" Text="Import" Click="OnImport" Disabled="@(importing || selectedFile is null)" />
+                    @if (!string.IsNullOrEmpty(importMessage))
+                    {
+                        <span style="color: @(importError ? "#dc3545" : "#198754"); font-size: 0.9rem;">@importMessage</span>
+                    }
+                </RadzenColumn>
+            </RadzenRow>
 
-<RadzenCard class="rz-mt-3">
-    <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="TripDto"
-                    AllowFiltering="true" AllowSorting="true"
-                    EditMode="DataGridEditMode.Single"
-                    RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
-        <Columns>
-            <RadzenDataGridColumn TItem="TripDto" Property="CountryName" Title="Country" Width="200px">
-                <EditTemplate Context="trip">
-                    <RadzenDropDown @bind-Value="trip.CountryName"
-                                    Data="@countryOptions"
-                                    AllowClear="true"
-                                    AllowFiltering="true"
-                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                    Style="width:100%; display: block" />
-                </EditTemplate>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="TripDto" Property="StartDate" Title="Start Date" Width="150px">
-                <Template Context="trip">
-                    @trip.StartDate.ToString("yyyy-MM-dd")
-                </Template>
-                <EditTemplate Context="trip">
-                    <RadzenDatePicker @bind-Value="trip.StartDate" Style="width:100%; display: block" />
-                </EditTemplate>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="TripDto" Property="EndDate" Title="End Date" Width="150px">
-                <Template Context="trip">
-                    @trip.EndDate.ToString("yyyy-MM-dd")
-                </Template>
-                <EditTemplate Context="trip">
-                    <RadzenDatePicker @bind-Value="trip.EndDate" Style="width:100%; display: block" />
-                </EditTemplate>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="TripDto" Property="DurationDays" Title="Duration (days)" Width="150px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
-                <Template Context="trip">
-                    @trip.DurationDays
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
-                <Template Context="trip">
-                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" />
-                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" />
-                </Template>
-                <EditTemplate Context="trip">
-                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(args => SaveRow(trip))" />
-                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(args => CancelEdit(trip))" />
-                </EditTemplate>
-            </RadzenDataGridColumn>
-        </Columns>
-    </RadzenDataGrid>
-    <RadzenButton Icon="add_circle_outline" Text="Add Trip" Click="@InsertRow" ButtonStyle="ButtonStyle.Primary" class="rz-mt-2" />
-</RadzenCard>
+            <RadzenCard class="rz-mt-3">
+                <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="TripDto"
+                                AllowFiltering="true" AllowSorting="true"
+                                EditMode="DataGridEditMode.Single"
+                                RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCountry" Title="Arrival Country" Width="150px">
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCountry</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCity" Title="Arrival City" Width="150px">
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCity</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalDateTime" Title="Arrival" Width="150px">
+                            <Template Context="trip">
+                                @trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="DepartureDateTime" Title="Departure" Width="150px">
+                            <Template Context="trip">
+                                @trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm")
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm")</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="DurationDays" Title="Duration" Width="100px" Filterable="false" Sortable="true" TextAlign="TextAlign.Center">
+                            <Template Context="trip">
+                                @trip.DurationDays days
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
+                            <Template Context="trip">
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" Size="ButtonSize.Small" />
+                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" Size="ButtonSize.Small" />
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(args => SaveRow(trip))" Size="ButtonSize.Small" />
+                                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(args => CancelEdit(trip))" Size="ButtonSize.Small" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+                <RadzenButton Icon="add_circle_outline" Text="Add Trip" Click="@InsertRow" ButtonStyle="ButtonStyle.Success" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenTabsItem>
+
+        <RadzenTabsItem Text="Trip Editor" Visible="@editingTrip">
+            <RadzenCard class="rz-mt-3">
+                <RadzenText TextStyle="TextStyle.H6">@(currentEditTrip?.Id > 0 ? "Edit Trip" : "Add New Trip")</RadzenText>
+                
+                @if (currentEditTrip != null)
+                {
+                    <RadzenStack Gap="1rem" class="rz-mt-3">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">Departure Information</RadzenText>
+                        <TimezoneSelector Label="Departure Location" 
+                                        @bind-City="currentEditTrip.DepartureCity"
+                                        @bind-Country="currentEditTrip.DepartureCountry"
+                                        @bind-SelectedTimezone="currentEditTrip.DepartureTimezone" />
+                        
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenDatePicker @bind-Value="departureDate" Placeholder="Departure Date" Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="departureTime" TimeOnly="true" Placeholder="Departure Time" Style="flex: 1" />
+                        </RadzenStack>
+
+                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mt-2">Arrival Information</RadzenText>
+                        <TimezoneSelector Label="Arrival Location" 
+                                        @bind-City="currentEditTrip.ArrivalCity"
+                                        @bind-Country="currentEditTrip.ArrivalCountry"
+                                        @bind-SelectedTimezone="currentEditTrip.ArrivalTimezone" />
+                        
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenDatePicker @bind-Value="arrivalDate" Placeholder="Arrival Date" Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="arrivalTime" TimeOnly="true" Placeholder="Arrival Time" Style="flex: 1" />
+                        </RadzenStack>
+
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
+                            <RadzenButton Icon="check" Text="Save Trip" Click="@SaveDetailedTrip" ButtonStyle="ButtonStyle.Success" />
+                            <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
+                        </RadzenStack>
+                    </RadzenStack>
+                }
+            </RadzenCard>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
 
 @code {
     private List<TripDto> trips = new();
@@ -89,12 +134,12 @@
     private bool importing;
     private string importMessage = string.Empty;
     private bool importError;
-    private static readonly List<string> countryOptions = CultureInfo
-        .GetCultures(CultureTypes.SpecificCultures)
-        .Select(c => new RegionInfo(c.Name).EnglishName)
-        .Distinct()
-        .OrderBy(name => name)
-        .ToList();
+    private bool editingTrip = false;
+    private TripDto? currentEditTrip;
+    private DateTime? departureDate;
+    private DateTime? departureTime;
+    private DateTime? arrivalDate;
+    private DateTime? arrivalTime;
 
     protected override async Task OnInitializedAsync()
     {
@@ -157,6 +202,7 @@
             importing = false;
         }
     }
+    
     private async Task OnUpdateRow(TripDto trip)
     {
         await ApiClient.UpdateTripAsync(trip.Id, trip);
@@ -174,9 +220,16 @@
         Navigation.NavigateTo("/api/trips/export", forceLoad: true);
     }
 
-    private async Task EditRow(TripDto trip)
+    private void EditRow(TripDto trip)
     {
-        await tripsGrid!.EditRow(trip);
+        currentEditTrip = trip;
+        editingTrip = true;
+        
+        // Initialize date/time fields
+        departureDate = trip.DepartureDateTime.Date;
+        departureTime = trip.DepartureDateTime;
+        arrivalDate = trip.ArrivalDateTime.Date;
+        arrivalTime = trip.ArrivalDateTime;
     }
 
     private async Task SaveRow(TripDto trip)
@@ -187,6 +240,7 @@
     private void CancelEdit(TripDto trip)
     {
         tripsGrid!.CancelEditRow(trip);
+        editingTrip = false;
     }
 
     private async Task DeleteRow(TripDto trip)
@@ -195,9 +249,49 @@
         await LoadData();
     }
 
-    private async Task InsertRow()
+    private void InsertRow()
     {
-        var newTrip = new TripDto { StartDate = DateTime.Today, EndDate = DateTime.Today };
-        await tripsGrid!.InsertRow(newTrip);
+        currentEditTrip = new TripDto 
+        { 
+            DepartureTimezone = "UTC",
+            ArrivalTimezone = "UTC"
+        };
+        departureDate = DateTime.Today;
+        departureTime = DateTime.Today.AddHours(12);
+        arrivalDate = DateTime.Today;
+        arrivalTime = DateTime.Today.AddHours(12);
+        editingTrip = true;
+    }
+
+    private async Task SaveDetailedTrip()
+    {
+        if (currentEditTrip == null || departureDate == null || departureTime == null || 
+            arrivalDate == null || arrivalTime == null)
+        {
+            return;
+        }
+
+        // Combine date and time
+        currentEditTrip.DepartureDateTime = departureDate.Value.Date.Add(departureTime.Value.TimeOfDay);
+        currentEditTrip.ArrivalDateTime = arrivalDate.Value.Date.Add(arrivalTime.Value.TimeOfDay);
+
+        if (currentEditTrip.Id > 0)
+        {
+            await ApiClient.UpdateTripAsync(currentEditTrip.Id, currentEditTrip);
+        }
+        else
+        {
+            await ApiClient.CreateTripAsync(currentEditTrip);
+        }
+
+        editingTrip = false;
+        currentEditTrip = null;
+        await LoadData();
+    }
+
+    private void CancelDetailedEdit()
+    {
+        editingTrip = false;
+        currentEditTrip = null;
     }
 }

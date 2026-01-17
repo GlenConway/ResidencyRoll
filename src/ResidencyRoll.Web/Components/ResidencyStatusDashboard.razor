@@ -1,0 +1,202 @@
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Shared.Trips
+
+<RadzenCard>
+    <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Residency Status Dashboard</RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">
+        Last 365 days residency calculation based on midnight and partial-day rules
+    </RadzenText>
+
+    @if (loading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="rz-mt-4" />
+    }
+    else if (summaries.Count == 0)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" class="rz-mt-4">
+            No residency data available. Add trips to see your residency status.
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenRow Gap="1rem" class="rz-mt-4">
+            @foreach (var summary in summaries)
+            {
+                <RadzenColumn Size="12" SizeMD="6" SizeLG="4">
+                    <RadzenCard Style="@GetCardStyle(summary)" class="country-card">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenRow AlignItems="AlignItems.Center">
+                                <RadzenColumn Size="8">
+                                    <RadzenText TextStyle="TextStyle.H6" Style="margin: 0;">
+                                        @summary.CountryName
+                                    </RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="4" Style="text-align: right;">
+                                    <RadzenBadge BadgeStyle="@GetBadgeStyle(summary.RuleType)" 
+                                                Text="@summary.RuleType" 
+                                                Style="font-size: 0.75rem;" />
+                                </RadzenColumn>
+                            </RadzenRow>
+
+                            <div class="days-display">
+                                <span class="days-number">@summary.TotalDays</span>
+                                <span class="days-label">
+                                    @(summary.RuleType == "Midnight" ? "Midnights" : "Partial Days")
+                                </span>
+                            </div>
+
+                            <RadzenProgressBar Value="@GetProgressPercentage(summary)" 
+                                             ShowValue="false" 
+                                             Style="height: 8px; margin: 0.5rem 0;" 
+                                             ProgressBarStyle="@GetProgressBarStyle(summary)" />
+
+                            <RadzenRow>
+                                <RadzenColumn Size="6">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Threshold: @summary.ThresholdDays days
+                                    </RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" Style="text-align: right;">
+                                    @if (summary.IsApproachingThreshold)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" 
+                                                    Text="@($"⚠️ {summary.DaysUntilThreshold} days left")" 
+                                                    Style="font-size: 0.7rem;" />
+                                    }
+                                    else if (summary.TotalDays >= summary.ThresholdDays)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" 
+                                                    Text="⛔ Over Threshold" 
+                                                    Style="font-size: 0.7rem;" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-success">
+                                            ✓ @summary.DaysUntilThreshold days remaining
+                                        </RadzenText>
+                                    }
+                                </RadzenColumn>
+                            </RadzenRow>
+
+                            @if (summary.RuleType == "Midnight")
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: #666; font-style: italic;">
+                                    Counts days where present at midnight local time
+                                </RadzenText>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Style="color: #666; font-style: italic;">
+                                    Counts any day with presence (partial day rule)
+                                </RadzenText>
+                            }
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+            }
+        </RadzenRow>
+    }
+</RadzenCard>
+
+<style>
+    .country-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .country-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+
+    .days-display {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+    }
+
+    .days-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .days-label {
+        font-size: 0.875rem;
+        color: #666;
+        font-weight: 500;
+    }
+</style>
+
+@code {
+    private List<ResidencySummaryDto> summaries = new();
+    private bool loading = false;
+
+    [Inject] private ResidencyRoll.Web.Services.TripsApiClient ApiClient { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Get last 365 days
+            var endDate = DateOnly.FromDateTime(DateTime.Today);
+            var startDate = endDate.AddDays(-365);
+            
+            summaries = await ApiClient.GetResidencySummaryAsync(startDate, endDate);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading residency summary: {ex.Message}");
+            summaries = new();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCardStyle(ResidencySummaryDto summary)
+    {
+        if (summary.TotalDays >= summary.ThresholdDays)
+        {
+            return "border-left: 4px solid #f44336;"; // Red for over threshold
+        }
+        else if (summary.IsApproachingThreshold)
+        {
+            return "border-left: 4px solid #ff9800;"; // Orange for approaching
+        }
+        else
+        {
+            return "border-left: 4px solid #4caf50;"; // Green for safe
+        }
+    }
+
+    private BadgeStyle GetBadgeStyle(string ruleType)
+    {
+        return ruleType == "Midnight" ? BadgeStyle.Info : BadgeStyle.Secondary;
+    }
+
+    private double GetProgressPercentage(ResidencySummaryDto summary)
+    {
+        return Math.Min(100, (double)summary.TotalDays / summary.ThresholdDays * 100);
+    }
+
+    private ProgressBarStyle GetProgressBarStyle(ResidencySummaryDto summary)
+    {
+        if (summary.TotalDays >= summary.ThresholdDays)
+            return ProgressBarStyle.Danger;
+        if (summary.IsApproachingThreshold)
+            return ProgressBarStyle.Warning;
+        return ProgressBarStyle.Success;
+    }
+}

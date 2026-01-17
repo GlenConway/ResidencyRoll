@@ -279,14 +279,22 @@ app.MapPost("/logout", async (HttpContext context) =>
 app.MapGet("/api/trips/export", async (TripsApiClient apiClient) =>
 {
     var trips = await apiClient.GetAllTripsAsync();
-    var csvLines = new List<string> { "CountryName,StartDate,EndDate" };
+    var csvLines = new List<string> 
+    { 
+        "DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone" 
+    };
 
-    foreach (var trip in trips.OrderBy(t => t.StartDate))
+    foreach (var trip in trips.OrderBy(t => t.ArrivalDateTime))
     {
         var line = string.Join(',',
-            EscapeCsv(trip.CountryName ?? string.Empty),
-            trip.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            trip.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            EscapeCsv(trip.DepartureCountry ?? string.Empty),
+            EscapeCsv(trip.DepartureCity ?? string.Empty),
+            trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+            EscapeCsv(trip.DepartureTimezone ?? "UTC"),
+            EscapeCsv(trip.ArrivalCountry ?? string.Empty),
+            EscapeCsv(trip.ArrivalCity ?? string.Empty),
+            trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+            EscapeCsv(trip.ArrivalTimezone ?? "UTC"));
         csvLines.Add(line);
     }
 
@@ -324,7 +332,8 @@ app.MapPost("/api/trips/import", async (HttpRequest request, TripsApiClient apiC
             continue;
         }
 
-        if (isFirst && line.StartsWith("CountryName", StringComparison.OrdinalIgnoreCase))
+        if (isFirst && (line.StartsWith("DepartureCountry", StringComparison.OrdinalIgnoreCase) || 
+                        line.StartsWith("CountryName", StringComparison.OrdinalIgnoreCase)))
         {
             isFirst = false;
             continue;
@@ -333,27 +342,61 @@ app.MapPost("/api/trips/import", async (HttpRequest request, TripsApiClient apiC
         isFirst = false;
 
         var parts = ParseCsvLine(line);
-        if (parts.Length < 3)
+        
+        // Support new format: DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone
+        if (parts.Length >= 8)
+        {
+            if (!DateTime.TryParse(parts[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out var departureDateTime) ||
+                !DateTime.TryParse(parts[6], CultureInfo.InvariantCulture, DateTimeStyles.None, out var arrivalDateTime))
+            {
+                continue;
+            }
+
+            newTrips.Add(new ResidencyRoll.Shared.Trips.TripDto
+            {
+                DepartureCountry = parts[0],
+                DepartureCity = parts[1],
+                DepartureDateTime = departureDateTime,
+                DepartureTimezone = parts[3],
+                ArrivalCountry = parts[4],
+                ArrivalCity = parts[5],
+                ArrivalDateTime = arrivalDateTime,
+                ArrivalTimezone = parts[7],
+                // Set legacy fields for compatibility
+                CountryName = parts[4],
+                StartDate = arrivalDateTime,
+                EndDate = departureDateTime
+            });
+        }
+        // Legacy format support (for migration): CountryName,StartDate,EndDate
+        else if (parts.Length >= 3)
+        {
+            if (!DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) ||
+                !DateTime.TryParse(parts[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
+            {
+                continue;
+            }
+
+            // Convert legacy format to new format with UTC
+            newTrips.Add(new ResidencyRoll.Shared.Trips.TripDto
+            {
+                DepartureCountry = parts[0],
+                DepartureCity = string.Empty,
+                DepartureDateTime = end,
+                DepartureTimezone = "UTC",
+                ArrivalCountry = parts[0],
+                ArrivalCity = string.Empty,
+                ArrivalDateTime = start,
+                ArrivalTimezone = "UTC",
+                CountryName = parts[0],
+                StartDate = start,
+                EndDate = end
+            });
+        }
+        else
         {
             continue;
         }
-
-        if (!DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-        {
-            continue;
-        }
-
-        if (!DateTime.TryParse(parts[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-        {
-            continue;
-        }
-
-        newTrips.Add(new ResidencyRoll.Shared.Trips.TripDto
-        {
-            CountryName = parts[0],
-            StartDate = start,
-            EndDate = end
-        });
     }
 
     if (newTrips.Count == 0)

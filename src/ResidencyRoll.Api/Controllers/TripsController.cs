@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResidencyRoll.Api.Mappings;
+using ResidencyRoll.Api.Models;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Trips;
 using System.Security.Claims;
@@ -15,10 +16,12 @@ namespace ResidencyRoll.Api.Controllers;
 public class TripsController : ControllerBase
 {
     private readonly TripService _tripService;
+    private readonly ResidencyCalculationService _residencyService;
 
-    public TripsController(TripService tripService)
+    public TripsController(TripService tripService, ResidencyCalculationService residencyService)
     {
         _tripService = tripService;
+        _residencyService = residencyService;
     }
 
     private string GetUserId()
@@ -137,9 +140,20 @@ public class TripsController : ControllerBase
             return NotFound();
         }
 
+        // Update legacy fields
         existing.CountryName = request.CountryName;
         existing.StartDate = request.StartDate;
         existing.EndDate = request.EndDate;
+        
+        // Update timezone-aware fields
+        existing.DepartureCountry = request.DepartureCountry;
+        existing.DepartureCity = request.DepartureCity;
+        existing.DepartureDateTime = request.DepartureDateTime;
+        existing.DepartureTimezone = request.DepartureTimezone;
+        existing.ArrivalCountry = request.ArrivalCountry;
+        existing.ArrivalCity = request.ArrivalCity;
+        existing.ArrivalDateTime = request.ArrivalDateTime;
+        existing.ArrivalTimezone = request.ArrivalTimezone;
 
         await _tripService.UpdateTripAsync(existing, userId);
         return NoContent();
@@ -224,5 +238,69 @@ public class TripsController : ControllerBase
         });
 
         return Ok(response);
+    }
+
+    [HttpGet("daily-presence")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<DailyPresenceDto>>> GetDailyPresence(
+        [FromQuery] DateOnly? startDate = null,
+        [FromQuery] DateOnly? endDate = null)
+    {
+        var userId = GetUserId();
+        var trips = await _tripService.GetAllTripsAsync(userId);
+        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
+        
+        // Filter by date range if provided
+        var filteredPresence = dailyPresence.AsEnumerable();
+        if (startDate.HasValue)
+        {
+            filteredPresence = filteredPresence.Where(dp => dp.Date >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            filteredPresence = filteredPresence.Where(dp => dp.Date <= endDate.Value);
+        }
+        
+        var result = filteredPresence.Select(dp => new DailyPresenceDto
+        {
+            Date = dp.Date,
+            LocationAtMidnight = dp.LocationAtMidnight,
+            LocationsDuringDay = dp.LocationsDuringDay.ToList(),
+            IsInTransitAtMidnight = dp.IsInTransitAtMidnight
+        });
+        
+        return Ok(result);
+    }
+
+    [HttpGet("residency-summary")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<ResidencySummaryDto>>> GetResidencySummary(
+        [FromQuery] DateOnly? startDate = null,
+        [FromQuery] DateOnly? endDate = null)
+    {
+        var userId = GetUserId();
+        var trips = await _tripService.GetAllTripsAsync(userId);
+        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
+        var residencyDays = _residencyService.CalculateResidencyDays(dailyPresence, startDate, endDate);
+        
+        var summary = new List<ResidencySummaryDto>();
+        foreach (var kvp in residencyDays.OrderByDescending(x => x.Value))
+        {
+            var rule = _residencyService.GetCountryRule(kvp.Key);
+            var thresholdDays = rule.ResidencyThresholdDays ?? 183;
+            var daysUntilThreshold = thresholdDays - kvp.Value;
+            
+            summary.Add(new ResidencySummaryDto
+            {
+                CountryName = kvp.Key,
+                TotalDays = kvp.Value,
+                RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+                ThresholdDays = thresholdDays,
+                IsApproachingThreshold = daysUntilThreshold <= 30 && daysUntilThreshold > 0,
+                DaysUntilThreshold = Math.Max(0, daysUntilThreshold)
+            });
+        }
+        
+        return Ok(summary);
     }
 }
