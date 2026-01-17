@@ -11,8 +11,8 @@ using ResidencyRoll.Api.Data;
 namespace ResidencyRoll.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260117090334_AddTimezoneFieldsToTrips")]
-    partial class AddTimezoneFieldsToTrips
+    [Migration("20260117122214_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,6 +37,9 @@ namespace ResidencyRoll.Api.Migrations
                     b.Property<DateTime>("ArrivalDateTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ArrivalIataCode")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ArrivalTimezone")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -55,6 +58,9 @@ namespace ResidencyRoll.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DepartureDateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DepartureIataCode")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DepartureTimezone")
