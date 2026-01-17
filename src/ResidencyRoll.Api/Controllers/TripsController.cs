@@ -152,10 +152,12 @@ public class TripsController : ControllerBase
         existing.DepartureCity = request.DepartureCity;
         existing.DepartureDateTime = request.DepartureDateTime;
         existing.DepartureTimezone = request.DepartureTimezone;
+        existing.DepartureIataCode = request.DepartureIataCode;
         existing.ArrivalCountry = request.ArrivalCountry;
         existing.ArrivalCity = request.ArrivalCity;
         existing.ArrivalDateTime = request.ArrivalDateTime;
         existing.ArrivalTimezone = request.ArrivalTimezone;
+        existing.ArrivalIataCode = request.ArrivalIataCode;
 
         await _tripService.UpdateTripAsync(existing, userId);
         return NoContent();

@@ -3,7 +3,7 @@ using ResidencyRoll.Shared.Trips;
 
 namespace ResidencyRoll.Api.Mappings;
 
-internal static class TripMapping
+public static class TripMapping
 {
     public static TripDto ToDto(this Trip trip) => new()
     {
@@ -35,8 +35,8 @@ internal static class TripMapping
         ArrivalIataCode = dto.ArrivalIataCode,
         // Legacy fields - computed properties will handle these
         CountryName = dto.ArrivalCountry,
-        StartDate = dto.ArrivalDateTime.Date,
-        EndDate = dto.DepartureDateTime.Date
+        StartDate = dto.ArrivalDateTime,
+        EndDate = dto.DepartureDateTime
     };
 }
 

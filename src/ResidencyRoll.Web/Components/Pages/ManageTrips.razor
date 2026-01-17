@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using ResidencyRoll.Shared.Trips
 @using ResidencyRoll.Web.Services
+@using ResidencyRoll.Web.Helpers
 @using ResidencyRoll.Web.Components
 @inject TripsApiClient ApiClient
 @inject NavigationManager Navigation
@@ -89,6 +90,7 @@
                         <RadzenDataGridColumn TItem="TripDto" Context="trip" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="150px">
                             <Template Context="trip">
                                 <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Click="@(args => EditRow(trip))" Size="ButtonSize.Small" />
+                                <RadzenButton Icon="flight_takeoff" Text="Add Leg" ButtonStyle="ButtonStyle.Info" Click="@(args => AddLeg(trip))" Size="ButtonSize.Small" class="rz-ml-1" />
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@(args => DeleteRow(trip))" Size="ButtonSize.Small" />
                             </Template>
                             <EditTemplate Context="trip">
@@ -122,6 +124,7 @@
                             <RadzenDatePicker @bind-Value="departureDate"
                                              Placeholder="Departure Date"
                                              DateFormat="yyyy-MM-dd"
+                                             Change="OnDepartureDateChanged"
                                              Style="flex: 1" />
                             <RadzenDatePicker @bind-Value="departureTime"
                                              TimeOnly="true"
@@ -152,7 +155,8 @@
                         </RadzenStack>
 
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
-                            <RadzenButton Icon="check" Text="Save Trip" Click="@SaveDetailedTrip" ButtonStyle="ButtonStyle.Success" />
+                            <RadzenButton Icon="check" Text="Save Trip" Click="@(() => SaveDetailedTrip())" ButtonStyle="ButtonStyle.Success" />
+                            <RadzenButton Icon="playlist_add" Text="Save and Add Leg" Click="@(() => SaveDetailedTrip(addLegAfterSave: true))" ButtonStyle="ButtonStyle.Info" />
                             <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
                         </RadzenStack>
                     </RadzenStack>
@@ -297,7 +301,29 @@
         selectedTabIndex = 1;
     }
 
-    private async Task SaveDetailedTrip()
+    private void OnDepartureDateChanged(DateTime? newDate)
+    {
+        departureDate = newDate;
+
+        var isExistingTrip = currentEditTrip?.Id > 0;
+        arrivalDate = TripDateHelper.GetSyncedArrivalDate(newDate, arrivalDate, isExistingTrip);
+    }
+
+    private void AddLeg(TripDto baseTrip)
+    {
+        var nextLeg = TripLegFactory.CreateNextLeg(baseTrip);
+
+        currentEditTrip = nextLeg;
+        departureDate = nextLeg.DepartureDateTime.Date;
+        departureTime = nextLeg.DepartureDateTime;
+        arrivalDate = nextLeg.ArrivalDateTime.Date;
+        arrivalTime = nextLeg.ArrivalDateTime;
+
+        editingTrip = true;
+        selectedTabIndex = 1;
+    }
+
+    private async Task SaveDetailedTrip(bool addLegAfterSave = false)
     {
         if (currentEditTrip == null || departureDate == null || departureTime == null || 
             arrivalDate == null || arrivalTime == null)
@@ -309,18 +335,27 @@
         currentEditTrip.DepartureDateTime = departureDate.Value.Date.Add(departureTime.Value.TimeOfDay);
         currentEditTrip.ArrivalDateTime = arrivalDate.Value.Date.Add(arrivalTime.Value.TimeOfDay);
 
+        TripDto savedTrip = currentEditTrip;
         if (currentEditTrip.Id > 0)
         {
             await ApiClient.UpdateTripAsync(currentEditTrip.Id, currentEditTrip);
         }
         else
         {
-            await ApiClient.CreateTripAsync(currentEditTrip);
+            savedTrip = await ApiClient.CreateTripAsync(currentEditTrip);
+            currentEditTrip.Id = savedTrip.Id;
+        }
+
+        await LoadData();
+
+        if (addLegAfterSave)
+        {
+            AddLeg(savedTrip);
+            return;
         }
 
         editingTrip = false;
         currentEditTrip = null;
-        await LoadData();
         selectedTabIndex = 0; // Switch back to Trip List tab
         StateHasChanged();
     }
