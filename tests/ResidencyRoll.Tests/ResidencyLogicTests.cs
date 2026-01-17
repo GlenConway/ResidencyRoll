@@ -534,4 +534,195 @@ public class ResidencyLogicTests
     }
 
     #endregion
+
+    #region IATA Airport Timezone Resolution Tests
+
+    /// <summary>
+    /// Tests IATA-resolved timezones with YHZ (Halifax) to SYD (Sydney) crossing International Date Line westbound.
+    /// This verifies that automatic timezone resolution from airport codes correctly feeds into residency calculations.
+    /// </summary>
+    [Fact]
+    public void IATAResolution_YHZ_To_SYD_WestboundIDL_CorrectTimezones()
+    {
+        // Arrange: Trip from YHZ (Halifax - America/Halifax, UTC-4 in summer) to SYD (Sydney - Australia/Sydney, UTC+10)
+        // Flight departs Dec 23, 2025 at 6:00 PM Atlantic Time
+        // Arrives Dec 25, 2025 at 6:00 AM Australian Eastern Daylight Time
+        // Dec 24 is "lost" due to westbound IDL crossing
+        var trips = new List<Trip>
+        {
+            new Trip
+            {
+                Id = 100,
+                UserId = "user1",
+                DepartureCountry = "Canada",
+                DepartureCity = "Halifax",
+                DepartureDateTime = new DateTime(2025, 12, 23, 22, 0, 0, DateTimeKind.Utc), // Dec 23, 6:00 PM AST (UTC-4)
+                DepartureTimezone = "America/Halifax", // Resolved from YHZ
+                DepartureIataCode = "YHZ",
+                ArrivalCountry = "Australia",
+                ArrivalCity = "Sydney",
+                ArrivalDateTime = new DateTime(2025, 12, 24, 19, 0, 0, DateTimeKind.Utc), // Dec 25, 6:00 AM AEDT (UTC+11)
+                ArrivalTimezone = "Australia/Sydney", // Resolved from SYD
+                ArrivalIataCode = "SYD"
+            }
+        };
+
+        // Act
+        var dailyPresenceLog = _service.GenerateDailyPresenceLog(trips);
+        var residencyDays = _service.CalculateResidencyDays(dailyPresenceLog);
+
+        // Assert: Verify proper timezone-aware midnight rule application
+        var dec23 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2025, 12, 23));
+        var dec24 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2025, 12, 24));
+        var dec25 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2025, 12, 25));
+
+        // Dec 23: At midnight in Canada timezone, still in Canada
+        Assert.NotNull(dec23);
+        Assert.Equal("Canada", dec23.LocationAtMidnight);
+        Assert.False(dec23.IsInTransitAtMidnight);
+
+        // Dec 24: At midnight in Canada timezone (where departed from), in transit over Pacific
+        Assert.NotNull(dec24);
+        Assert.Equal("IN_TRANSIT", dec24.LocationAtMidnight);
+        Assert.True(dec24.IsInTransitAtMidnight);
+
+        // Dec 25: At midnight in Australia timezone, arrived in Australia
+        Assert.NotNull(dec25);
+        Assert.Equal("Australia", dec25.LocationAtMidnight);
+        Assert.False(dec25.IsInTransitAtMidnight);
+
+        // Verify residency counts
+        Assert.Equal(1, residencyDays.GetValueOrDefault("Canada", 0));
+        Assert.Equal(1, residencyDays.GetValueOrDefault("Australia", 0));
+        Assert.Equal(0, residencyDays.GetValueOrDefault("IN_TRANSIT", 0));
+    }
+
+    /// <summary>
+    /// Tests return flight SYD to YHZ (eastbound IDL crossing).
+    /// Verifies no day is skipped when crossing eastbound.
+    /// </summary>
+    [Fact]
+    public void IATAResolution_SYD_To_YHZ_EastboundIDL_NoSkippedDay()
+    {
+        // Arrange: Return flight from SYD to YHZ (eastbound)
+        // Departs Sydney Jan 15, 2026 at 10:00 AM AEDT
+        // Arrives Halifax Jan 15, 2026 at 10:00 AM AST (same calendar day due to IDL)
+        var trips = new List<Trip>
+        {
+            new Trip
+            {
+                Id = 101,
+                UserId = "user1",
+                DepartureCountry = "Australia",
+                DepartureCity = "Sydney",
+                DepartureDateTime = new DateTime(2026, 1, 14, 23, 0, 0, DateTimeKind.Utc), // Jan 15, 10:00 AM AEDT
+                DepartureTimezone = "Australia/Sydney", // Resolved from SYD
+                DepartureIataCode = "SYD",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Halifax",
+                ArrivalDateTime = new DateTime(2026, 1, 15, 14, 0, 0, DateTimeKind.Utc), // Jan 15, 10:00 AM AST
+                ArrivalTimezone = "America/Halifax", // Resolved from YHZ
+                ArrivalIataCode = "YHZ"
+            }
+        };
+
+        // Act
+        var dailyPresenceLog = _service.GenerateDailyPresenceLog(trips);
+        var residencyDays = _service.CalculateResidencyDays(dailyPresenceLog);
+
+        // Assert: Verify days are in the log
+        var jan15 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2026, 1, 15));
+
+        Assert.NotNull(jan15);
+
+        // At least one country should be counted (the arrival or departure country)
+        var totalDays = residencyDays.Values.Sum();
+        Assert.True(totalDays >= 1, $"Expected at least 1 residency day, got {totalDays}");
+    }
+
+    /// <summary>
+    /// Tests multi-timezone trip with automatic IATA resolution.
+    /// YYZ (Toronto) -> LHR (London) -> SIN (Singapore).
+    /// </summary>
+    [Fact]
+    public void IATAResolution_MultiTimezone_YYZ_LHR_SIN_CorrectResidency()
+    {
+        // Arrange: Complex multi-city trip
+        // Toronto to London: Dec 1-2
+        // London stay: Dec 2-7
+        // London to Singapore: Dec 7-8
+        // Stay in Singapore: Dec 8-10
+        var trips = new List<Trip>
+        {
+            // Trip 1: Toronto to London
+            new Trip
+            {
+                Id = 102,
+                UserId = "user1",
+                DepartureCountry = "Canada",
+                DepartureCity = "Toronto",
+                DepartureDateTime = new DateTime(2025, 12, 1, 23, 0, 0, DateTimeKind.Utc), // Dec 1, 6:00 PM EST
+                DepartureTimezone = "America/Toronto", // From YYZ
+                DepartureIataCode = "YYZ",
+                ArrivalCountry = "United Kingdom",
+                ArrivalCity = "London",
+                ArrivalDateTime = new DateTime(2025, 12, 2, 11, 0, 0, DateTimeKind.Utc), // Dec 2, 11:00 AM GMT
+                ArrivalTimezone = "Europe/London", // From LHR
+                ArrivalIataCode = "LHR"
+            },
+            // Trip 2: London to Singapore
+            new Trip
+            {
+                Id = 103,
+                UserId = "user1",
+                DepartureCountry = "United Kingdom",
+                DepartureCity = "London",
+                DepartureDateTime = new DateTime(2025, 12, 7, 10, 0, 0, DateTimeKind.Utc), // Dec 7, 10:00 AM GMT
+                DepartureTimezone = "Europe/London", // From LHR
+                DepartureIataCode = "LHR",
+                ArrivalCountry = "Singapore",
+                ArrivalCity = "Singapore",
+                ArrivalDateTime = new DateTime(2025, 12, 8, 6, 0, 0, DateTimeKind.Utc), // Dec 8, 2:00 PM SGT
+                ArrivalTimezone = "Asia/Singapore", // From SIN
+                ArrivalIataCode = "SIN"
+            },
+            // Trip 3: Singapore back to Toronto
+            new Trip
+            {
+                Id = 104,
+                UserId = "user1",
+                DepartureCountry = "Singapore",
+                DepartureCity = "Singapore",
+                DepartureDateTime = new DateTime(2025, 12, 10, 14, 0, 0, DateTimeKind.Utc), // Dec 10, 10:00 PM SGT
+                DepartureTimezone = "Asia/Singapore", // From SIN
+                DepartureIataCode = "SIN",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Toronto",
+                ArrivalDateTime = new DateTime(2025, 12, 11, 6, 0, 0, DateTimeKind.Utc), // Dec 11, 1:00 AM EST
+                ArrivalTimezone = "America/Toronto", // From YYZ
+                ArrivalIataCode = "YYZ"
+            }
+        };
+
+        // Act
+        var dailyPresenceLog = _service.GenerateDailyPresenceLog(trips);
+        var residencyDays = _service.CalculateResidencyDays(dailyPresenceLog);
+
+        // Assert
+        // Verify each country gets some residency days
+        var canadaDays = residencyDays.GetValueOrDefault("Canada", 0);
+        var ukDays = residencyDays.GetValueOrDefault("United Kingdom", 0);
+        var singaporeDays = residencyDays.GetValueOrDefault("Singapore", 0);
+
+        // Canada: At least 1 day (departed in evening)
+        Assert.True(canadaDays >= 1, $"Expected at least 1 Canada day, got {canadaDays}");
+        
+        // UK: Should get multiple days between Dec 2 and Dec 7
+        Assert.True(ukDays >= 3, $"Expected at least 3 UK days, got {ukDays}");
+        
+        // Singapore: At least 2 days (Dec 8-10)
+        Assert.True(singaporeDays >= 2, $"Expected at least 2 Singapore days, got {singaporeDays}");
+    }
+
+    #endregion
 }

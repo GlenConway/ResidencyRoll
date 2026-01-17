@@ -9,11 +9,13 @@ public class TripDto
     public string DepartureCity { get; set; } = string.Empty;
     public DateTime DepartureDateTime { get; set; }
     public string DepartureTimezone { get; set; } = "UTC";
+    public string? DepartureIataCode { get; set; }
     
     public string ArrivalCountry { get; set; } = string.Empty;
     public string ArrivalCity { get; set; } = string.Empty;
     public DateTime ArrivalDateTime { get; set; }
     public string ArrivalTimezone { get; set; } = "UTC";
+    public string? ArrivalIataCode { get; set; }
     
     // Legacy fields (computed for backward compatibility)
     public string CountryName 

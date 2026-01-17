@@ -10,12 +10,14 @@ public class Trip
     public string DepartureCity { get; set; } = string.Empty;
     public DateTime DepartureDateTime { get; set; }
     public string DepartureTimezone { get; set; } = string.Empty; // IANA timezone (e.g., "America/Toronto")
+    public string? DepartureIataCode { get; set; } // IATA airport code (e.g., "YYZ")
     
     // Arrival information
     public string ArrivalCountry { get; set; } = string.Empty;
     public string ArrivalCity { get; set; } = string.Empty;
     public DateTime ArrivalDateTime { get; set; }
     public string ArrivalTimezone { get; set; } = string.Empty; // IANA timezone (e.g., "Australia/Sydney")
+    public string? ArrivalIataCode { get; set; } // IATA airport code (e.g., "SYD")
     
     // Legacy fields for backward compatibility - map to arrival
     public string CountryName

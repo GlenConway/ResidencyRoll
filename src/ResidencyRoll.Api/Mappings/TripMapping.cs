@@ -12,10 +12,12 @@ internal static class TripMapping
         DepartureCity = trip.DepartureCity,
         DepartureDateTime = trip.DepartureDateTime,
         DepartureTimezone = trip.DepartureTimezone,
+        DepartureIataCode = trip.DepartureIataCode,
         ArrivalCountry = trip.ArrivalCountry,
         ArrivalCity = trip.ArrivalCity,
         ArrivalDateTime = trip.ArrivalDateTime,
-        ArrivalTimezone = trip.ArrivalTimezone
+        ArrivalTimezone = trip.ArrivalTimezone,
+        ArrivalIataCode = trip.ArrivalIataCode
     };
 
     public static Trip ToEntity(this TripDto dto) => new()
@@ -25,10 +27,12 @@ internal static class TripMapping
         DepartureCity = dto.DepartureCity,
         DepartureDateTime = dto.DepartureDateTime,
         DepartureTimezone = dto.DepartureTimezone,
+        DepartureIataCode = dto.DepartureIataCode,
         ArrivalCountry = dto.ArrivalCountry,
         ArrivalCity = dto.ArrivalCity,
         ArrivalDateTime = dto.ArrivalDateTime,
         ArrivalTimezone = dto.ArrivalTimezone,
+        ArrivalIataCode = dto.ArrivalIataCode,
         // Legacy fields - computed properties will handle these
         CountryName = dto.ArrivalCountry,
         StartDate = dto.ArrivalDateTime.Date,

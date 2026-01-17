@@ -40,17 +40,18 @@
                                 EditMode="DataGridEditMode.Single"
                                 RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
                     <Columns>
-                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCountry" Title="Arrival Country" Width="150px">
-                            <EditTemplate Context="trip">
-                                <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCountry</RadzenText>
-                            </EditTemplate>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCity" Title="Arrival City" Width="150px">
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalCity" Title="Arrival" Width="180px">
+                            <Template Context="trip">
+                                <div style="display: flex; flex-direction: column;">
+                                    <span>@(!string.IsNullOrEmpty(trip.ArrivalIataCode) ? $"{trip.ArrivalIataCode} - " : "")@trip.ArrivalCity</span>
+                                    <span style="font-size: 0.75rem; color: #666;">@GetTimezoneOffset(trip.ArrivalTimezone)</span>
+                                </div>
+                            </Template>
                             <EditTemplate Context="trip">
                                 <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalCity</RadzenText>
                             </EditTemplate>
                         </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalDateTime" Title="Arrival" Width="150px">
+                        <RadzenDataGridColumn TItem="TripDto" Property="ArrivalDateTime" Title="Arrival Time" Width="150px">
                             <Template Context="trip">
                                 @trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")
                             </Template>
@@ -58,7 +59,18 @@
                                 <RadzenText TextStyle="TextStyle.Body2">@trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm")</RadzenText>
                             </EditTemplate>
                         </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="TripDto" Property="DepartureDateTime" Title="Departure" Width="150px">
+                        <RadzenDataGridColumn TItem="TripDto" Property="DepartureCity" Title="Departure" Width="180px">
+                            <Template Context="trip">
+                                <div style="display: flex; flex-direction: column;">
+                                    <span>@(!string.IsNullOrEmpty(trip.DepartureIataCode) ? $"{trip.DepartureIataCode} - " : "")@trip.DepartureCity</span>
+                                    <span style="font-size: 0.75rem; color: #666;">@GetTimezoneOffset(trip.DepartureTimezone)</span>
+                                </div>
+                            </Template>
+                            <EditTemplate Context="trip">
+                                <RadzenText TextStyle="TextStyle.Body2">@trip.DepartureCity</RadzenText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="TripDto" Property="DepartureDateTime" Title="Departure Time" Width="150px">
                             <Template Context="trip">
                                 @trip.DepartureDateTime.ToString("yyyy-MM-dd HH:mm")
                             </Template>
@@ -95,10 +107,13 @@
                 {
                     <RadzenStack Gap="1rem" class="rz-mt-3">
                         <RadzenText TextStyle="TextStyle.Subtitle1">Departure Information</RadzenText>
-                        <TimezoneSelector Label="Departure Location" 
+                        <AirportSelector Label="Departure Airport" 
                                         @bind-City="currentEditTrip.DepartureCity"
                                         @bind-Country="currentEditTrip.DepartureCountry"
-                                        @bind-SelectedTimezone="currentEditTrip.DepartureTimezone" />
+                                        @bind-SelectedTimezone="currentEditTrip.DepartureTimezone"
+                                        @bind-IataCode="currentEditTrip.DepartureIataCode"
+                                        ShowTimezoneOffset="true"
+                                        ShowManualOverride="true" />
                         
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenDatePicker @bind-Value="departureDate" Placeholder="Departure Date" Style="flex: 1" />
@@ -106,10 +121,13 @@
                         </RadzenStack>
 
                         <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mt-2">Arrival Information</RadzenText>
-                        <TimezoneSelector Label="Arrival Location" 
+                        <AirportSelector Label="Arrival Airport" 
                                         @bind-City="currentEditTrip.ArrivalCity"
                                         @bind-Country="currentEditTrip.ArrivalCountry"
-                                        @bind-SelectedTimezone="currentEditTrip.ArrivalTimezone" />
+                                        @bind-SelectedTimezone="currentEditTrip.ArrivalTimezone"
+                                        @bind-IataCode="currentEditTrip.ArrivalIataCode"
+                                        ShowTimezoneOffset="true"
+                                        ShowManualOverride="true" />
                         
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenDatePicker @bind-Value="arrivalDate" Placeholder="Arrival Date" Style="flex: 1" />
@@ -293,5 +311,23 @@
     {
         editingTrip = false;
         currentEditTrip = null;
+    }
+
+    private string GetTimezoneOffset(string timezoneId)
+    {
+        if (string.IsNullOrEmpty(timezoneId))
+            return string.Empty;
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            var offset = tz.GetUtcOffset(DateTime.UtcNow);
+            var sign = offset < TimeSpan.Zero ? "-" : "+";
+            return $"UTC{sign}{Math.Abs(offset.Hours):D2}:{Math.Abs(offset.Minutes):D2}";
+        }
+        catch
+        {
+            return timezoneId;
+        }
     }
 }
