@@ -163,6 +163,7 @@ If you deploy ResidencyRoll behind a reverse proxy (nginx, Caddy, cloud load bal
 **Default Behavior**: Without configuration, ASP.NET Core only trusts localhost/loopback addresses, which is secure for direct deployments.
 
 **When to Configure**:
+
 - ✅ Using nginx, Caddy, Traefik, or cloud load balancers
 - ✅ Containers behind Docker network or Kubernetes ingress
 - ✅ Any multi-tier deployment with a reverse proxy layer
@@ -170,6 +171,7 @@ If you deploy ResidencyRoll behind a reverse proxy (nginx, Caddy, cloud load bal
 **Configuration Options**:
 
 1. **Known Proxies** (specific IP addresses):
+
    ```bash
    # Single nginx proxy
    FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1
@@ -180,6 +182,7 @@ If you deploy ResidencyRoll behind a reverse proxy (nginx, Caddy, cloud load bal
    ```
 
 2. **Known Networks** (CIDR ranges for dynamic IPs):
+
    ```bash
    # Docker bridge network
    FORWARDED_HEADERS_KNOWN_NETWORK_0=172.17.0.0/16
@@ -208,6 +211,7 @@ server {
 ```
 
 Then configure the proxy's IP in `.env`:
+
 ```bash
 FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1  # nginx container IP
 ```
@@ -217,6 +221,7 @@ FORWARDED_HEADERS_KNOWN_PROXY_0=172.17.0.1  # nginx container IP
 #### Data Persistence
 
 Docker volumes ensure data persists across container restarts:
+
 - `residencyroll-api-data` - SQLite database
 - `residencyroll-web-data` - Web application data
 
@@ -620,6 +625,25 @@ services:
     # ... configuration
 ```
 
+### Versioning
+
+Both API and Web containers support versioning:
+
+```bash
+# Build with specific version
+docker build -f Dockerfile.api --build-arg VERSION=1.2.3 -t residencyroll-api:1.2.3 .
+
+# Using git tags in CI/CD
+git tag v1.2.3
+git push origin v1.2.3  # Triggers versioned build
+```
+
+The version is logged on startup:
+
+```text
+[INF] Starting ResidencyRoll API - Version: 1.2.3
+```
+
 ### Database Backup & Restore
 
 **Backup:**
@@ -636,7 +660,7 @@ docker run --rm -v residencyroll-api-data:/data -v $(pwd):/backup \
   alpine tar xzf /backup/api-backup.tar.gz -C /data
 ```
 
-### Environment Variables
+### Deployment Environment Variables
 
 All configuration can be set via environment variables:
 
@@ -693,7 +717,7 @@ dotnet --version
 ### Authentication Issues
 
 | Issue | Solution |
-| ------- | ---------- |
+|-------|----------|
 | 401 Unauthorized from API | Check JWT Authority and Audience match between API and identity provider |
 | "IDX10609: Decryption failed" | Auth0 is issuing encrypted tokens (JWE). Configure `JWT_CLIENT_SECRET` with the same value as `OIDC_CLIENT_SECRET`. See [JWT Token Encryption Guide](docs/JWT_TOKEN_ENCRYPTION.md) |
 | Login redirect loop | Verify redirect URIs are registered in identity provider |
