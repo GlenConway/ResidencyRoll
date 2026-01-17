@@ -174,6 +174,9 @@ if (app.Environment.IsDevelopment())
             options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"ResidencyRoll API {description.GroupName.ToUpperInvariant()}");
         }
     });
+    
+    // Redirect root to Swagger UI in development
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 }
 
 app.UseHttpsRedirection();
