@@ -620,6 +620,24 @@ services:
     # ... configuration
 ```
 
+### Versioning
+
+Both API and Web containers support versioning:
+
+```bash
+# Build with specific version
+docker build -f Dockerfile.api --build-arg VERSION=1.2.3 -t residencyroll-api:1.2.3 .
+
+# Using git tags in CI/CD
+git tag v1.2.3
+git push origin v1.2.3  # Triggers versioned build
+```
+
+The version is logged on startup:
+```
+[INF] Starting ResidencyRoll API - Version: 1.2.3
+```
+
 ### Database Backup & Restore
 
 **Backup:**
