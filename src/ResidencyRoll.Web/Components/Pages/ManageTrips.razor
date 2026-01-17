@@ -17,7 +17,7 @@
 
 <h1>Manage Trips</h1>
 
-<RadzenTabs>
+<RadzenTabs @bind-SelectedIndex="selectedTabIndex">
     <Tabs>
         <RadzenTabsItem Text="Trip List">
             <RadzenRow Gap="1rem" class="rz-mt-3">
@@ -116,8 +116,15 @@
                                         ShowManualOverride="true" />
                         
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenDatePicker @bind-Value="departureDate" Placeholder="Departure Date" Style="flex: 1" />
-                            <RadzenDatePicker @bind-Value="departureTime" TimeOnly="true" Placeholder="Departure Time" Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="departureDate"
+                                             Placeholder="Departure Date"
+                                             DateFormat="yyyy-MM-dd"
+                                             Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="departureTime"
+                                             TimeOnly="true"
+                                             DateFormat="HH:mm"
+                                             Placeholder="Departure Time"
+                                             Style="flex: 1" />
                         </RadzenStack>
 
                         <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mt-2">Arrival Information</RadzenText>
@@ -130,8 +137,15 @@
                                         ShowManualOverride="true" />
                         
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenDatePicker @bind-Value="arrivalDate" Placeholder="Arrival Date" Style="flex: 1" />
-                            <RadzenDatePicker @bind-Value="arrivalTime" TimeOnly="true" Placeholder="Arrival Time" Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="arrivalDate"
+                                             Placeholder="Arrival Date"
+                                             DateFormat="yyyy-MM-dd"
+                                             Style="flex: 1" />
+                            <RadzenDatePicker @bind-Value="arrivalTime"
+                                             TimeOnly="true"
+                                             DateFormat="HH:mm"
+                                             Placeholder="Arrival Time"
+                                             Style="flex: 1" />
                         </RadzenStack>
 
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
@@ -158,6 +172,7 @@
     private DateTime? departureTime;
     private DateTime? arrivalDate;
     private DateTime? arrivalTime;
+    private int selectedTabIndex = 0; // 0 = Trip List, 1 = Trip Editor
 
     protected override async Task OnInitializedAsync()
     {
@@ -242,6 +257,7 @@
     {
         currentEditTrip = trip;
         editingTrip = true;
+        selectedTabIndex = 1;
         
         // Initialize date/time fields
         departureDate = trip.DepartureDateTime.Date;
@@ -279,6 +295,7 @@
         arrivalDate = DateTime.Today;
         arrivalTime = DateTime.Today.AddHours(12);
         editingTrip = true;
+        selectedTabIndex = 1;
     }
 
     private async Task SaveDetailedTrip()
@@ -311,6 +328,7 @@
     {
         editingTrip = false;
         currentEditTrip = null;
+        selectedTabIndex = 0;
     }
 
     private string GetTimezoneOffset(string timezoneId)
