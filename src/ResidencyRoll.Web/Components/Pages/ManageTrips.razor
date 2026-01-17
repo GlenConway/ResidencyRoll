@@ -311,24 +311,13 @@
 
     private void AddLeg(TripDto baseTrip)
     {
-        var newDepartureTime = baseTrip.ArrivalDateTime.AddHours(2);
-        var fallbackTz = string.IsNullOrWhiteSpace(baseTrip.ArrivalTimezone) ? "UTC" : baseTrip.ArrivalTimezone;
+        var nextLeg = TripLegFactory.CreateNextLeg(baseTrip);
 
-        currentEditTrip = new TripDto
-        {
-            DepartureCountry = baseTrip.ArrivalCountry,
-            DepartureCity = baseTrip.ArrivalCity,
-            DepartureTimezone = fallbackTz,
-            DepartureIataCode = baseTrip.ArrivalIataCode,
-            ArrivalTimezone = fallbackTz,
-            DepartureDateTime = newDepartureTime,
-            ArrivalDateTime = newDepartureTime.AddHours(2)
-        };
-
-        departureDate = newDepartureTime.Date;
-        departureTime = newDepartureTime;
-        arrivalDate = newDepartureTime.AddHours(2).Date;
-        arrivalTime = newDepartureTime.AddHours(2);
+        currentEditTrip = nextLeg;
+        departureDate = nextLeg.DepartureDateTime.Date;
+        departureTime = nextLeg.DepartureDateTime;
+        arrivalDate = nextLeg.ArrivalDateTime.Date;
+        arrivalTime = nextLeg.ArrivalDateTime;
 
         editingTrip = true;
         selectedTabIndex = 1;
