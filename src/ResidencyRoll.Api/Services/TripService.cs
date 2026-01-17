@@ -88,25 +88,72 @@ public class TripService
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
+
+        return CalculateDaysPerCountryWithOverlapHandling(trips, windowStart, today);
+    }
+
+    /// <summary>
+    /// Calculates days per country within a time window, accounting for overlapping trips.
+    /// When trips overlap, days are only counted in the trip where they actually occurred.
+    /// </summary>
+    private Dictionary<string, int> CalculateDaysPerCountryWithOverlapHandling(
+        List<Trip> trips, DateTime windowStart, DateTime windowEnd)
+    {
         var daysPerCountry = new Dictionary<string, int>();
 
-        foreach (var trip in trips)
+        // Sort trips by start date to process them chronologically
+        var sortedTrips = trips
+            .OrderBy(t => t.StartDate)
+            .ToList();
+
+        // Build a list of date ranges for each trip within the window
+        var tripRanges = new List<(string Country, DateTime Start, DateTime End)>();
+
+        foreach (var trip in sortedTrips)
         {
             var overlapStart = trip.StartDate > windowStart ? trip.StartDate : windowStart;
-            var overlapEndExclusive = trip.EndDate < today ? trip.EndDate : today;
+            var overlapEnd = trip.EndDate < windowEnd ? trip.EndDate : windowEnd;
 
-            if (overlapStart < overlapEndExclusive)
+            if (overlapStart < overlapEnd)
             {
-                var days = (overlapEndExclusive - overlapStart).Days;
+                tripRanges.Add((trip.CountryName, overlapStart, overlapEnd));
+            }
+        }
 
-                if (daysPerCountry.ContainsKey(trip.CountryName))
+        // For each trip range, calculate actual days excluding overlaps with later trips
+        for (int i = 0; i < tripRanges.Count; i++)
+        {
+            var (country, start, end) = tripRanges[i];
+            var currentDate = start;
+
+            // Count each day in the current trip
+            while (currentDate < end)
+            {
+                var nextDate = currentDate.AddDays(1);
+                
+                // Check if this day is covered by any later trip (which takes precedence)
+                bool coveredByLaterTrip = false;
+                for (int j = i + 1; j < tripRanges.Count; j++)
                 {
-                    daysPerCountry[trip.CountryName] += days;
+                    var (_, laterStart, laterEnd) = tripRanges[j];
+                    if (currentDate >= laterStart && currentDate < laterEnd)
+                    {
+                        coveredByLaterTrip = true;
+                        break;
+                    }
                 }
-                else
+
+                // Only count the day if it's not covered by a later trip
+                if (!coveredByLaterTrip)
                 {
-                    daysPerCountry[trip.CountryName] = days;
+                    if (!daysPerCountry.ContainsKey(country))
+                    {
+                        daysPerCountry[country] = 0;
+                    }
+                    daysPerCountry[country]++;
                 }
+
+                currentDate = nextDate;
             }
         }
 
@@ -144,62 +191,23 @@ public class TripService
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
-        var currentDaysPerCountry = new Dictionary<string, int>();
-        var forecastDaysPerCountry = new Dictionary<string, int>();
 
-        foreach (var trip in trips)
+        // Calculate current window (last 365 days from today)
+        var currentDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(trips, currentWindowStart, today);
+
+        // For forecast, include the hypothetical trip
+        var tripsWithHypothetical = new List<Trip>(trips)
         {
-            var overlapStart = trip.StartDate > currentWindowStart ? trip.StartDate : currentWindowStart;
-            var overlapEndExclusive = trip.EndDate < today ? trip.EndDate : today;
-
-            if (overlapStart < overlapEndExclusive)
+            new Trip
             {
-                var days = (overlapEndExclusive - overlapStart).Days;
-                if (currentDaysPerCountry.ContainsKey(trip.CountryName))
-                {
-                    currentDaysPerCountry[trip.CountryName] += days;
-                }
-                else
-                {
-                    currentDaysPerCountry[trip.CountryName] = days;
-                }
+                CountryName = countryName,
+                StartDate = tripStart,
+                EndDate = tripEnd,
+                UserId = userId
             }
-        }
+        };
 
-        foreach (var trip in trips)
-        {
-            var overlapStart = trip.StartDate > forecastWindowStart ? trip.StartDate : forecastWindowStart;
-            var overlapEndExclusive = trip.EndDate < forecastWindowEnd ? trip.EndDate : forecastWindowEnd;
-
-            if (overlapStart < overlapEndExclusive)
-            {
-                var days = (overlapEndExclusive - overlapStart).Days;
-                if (forecastDaysPerCountry.ContainsKey(trip.CountryName))
-                {
-                    forecastDaysPerCountry[trip.CountryName] += days;
-                }
-                else
-                {
-                    forecastDaysPerCountry[trip.CountryName] = days;
-                }
-            }
-        }
-
-        var hypotheticalStart = tripStart > forecastWindowStart ? tripStart : forecastWindowStart;
-        var hypotheticalEndExclusive = tripEnd < forecastWindowEnd ? tripEnd : forecastWindowEnd;
-
-        if (hypotheticalStart < hypotheticalEndExclusive)
-        {
-            var days = (hypotheticalEndExclusive - hypotheticalStart).Days;
-            if (forecastDaysPerCountry.ContainsKey(countryName))
-            {
-                forecastDaysPerCountry[countryName] += days;
-            }
-            else
-            {
-                forecastDaysPerCountry[countryName] = days;
-            }
-        }
+        var forecastDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
     }
