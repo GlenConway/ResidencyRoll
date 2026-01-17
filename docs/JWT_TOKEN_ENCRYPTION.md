@@ -34,7 +34,8 @@ When Auth0 issues JWE tokens, the .NET JWT Bearer authentication middleware need
 2. **Validate** the decrypted token's signature and claims
 
 Without the decryption key configured, the API will fail with:
-```
+
+```text
 IDX10609: Decryption failed. No Keys tried: ...
 ```
 

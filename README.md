@@ -634,7 +634,8 @@ git push origin v1.2.3  # Triggers versioned build
 ```
 
 The version is logged on startup:
-```
+
+```text
 [INF] Starting ResidencyRoll API - Version: 1.2.3
 ```
 
