@@ -8,8 +8,3 @@
         <RadzenDonutSeries Data="@ChartData" CategoryProperty="Label" ValueProperty="Days" />
     </RadzenChart>
 </RadzenCard>
-
-@code {
-    [Parameter]
-    public List<ChartData> ChartData { get; set; } = new();
-}

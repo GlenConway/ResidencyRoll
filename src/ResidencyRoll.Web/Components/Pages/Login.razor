@@ -1,8 +1,6 @@
 @page "/login"
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.OpenIdConnect
-@inject IConfiguration Configuration
-@inject NavigationManager Navigation
 
 <PageTitle>Login - ResidencyRoll</PageTitle>
 
@@ -31,18 +29,3 @@
         </div>
     </div>
 </div>
-
-@code {
-    private bool oidcEnabled = false;
-
-    protected override async Task OnInitializedAsync()
-    {
-        oidcEnabled = Configuration.GetValue<bool>("Authentication:OpenIdConnect:Enabled");
-        
-        if (oidcEnabled)
-        {
-            // Automatically redirect to the auth endpoint to trigger OIDC challenge
-            Navigation.NavigateTo("/auth/login", forceLoad: true);
-        }
-    }
-}
