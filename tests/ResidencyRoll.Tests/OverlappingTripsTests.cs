@@ -257,45 +257,47 @@ public class OverlappingTripsTests : IDisposable
     [Fact]
     public async Task ForecastDaysWithTrip_WithHypotheticalTripInsideExisting_CountsCorrectly()
     {
-        // Arrange: Long trip to Thailand from Dec 20, 2025 to Jan 31, 2026
-        // Forecast a trip to Vietnam from Jan 20 to Jan 25, 2026 (5 days)
-        // The forecast window ends at the end of the Vietnam trip (Jan 25)
-        // so we need to calculate how many Thailand days fall in that window
-        // Window: Dec 21, 2025 to Jan 25, 2026 (365 days ending at Jan 25)
-        // Thailand: Dec 20 to Jan 31, overlaps Dec 21-Jan 25
-        // Dec 21 to Jan 20 = 31 days, then Jan 25-31 = 6 days = 37 days total in forecast window
-        // Vietnam overlaps Jan 20-25 = 5 days
-        // So Thailand should be 37 - 5 = 32 days
+        // Arrange: Long trip to Thailand starting 29 days ago and ending 14 days in the future
+        // Forecast a trip to Vietnam from 3 days in the future to 8 days in the future (5 days)
+        var today = DateTime.Today;
+        var thailandStart = today.AddDays(-29);
+        var thailandEnd = today.AddDays(14);
+        var vietnamStart = today.AddDays(3);
+        var vietnamEnd = today.AddDays(8);
+        
         var thailandTrip = new Trip
         {
             UserId = _testUserId,
             CountryName = "Thailand",
-            StartDate = new DateTime(2025, 12, 20),
-            EndDate = new DateTime(2026, 1, 31)
+            StartDate = thailandStart,
+            EndDate = thailandEnd
         };
 
         await _context.Trips.AddAsync(thailandTrip);
         await _context.SaveChangesAsync();
 
-        // Act - forecast window is 365 days ending at Jan 25
+        // Act - forecast window is 365 days ending at vietnamEnd
         var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(
             _testUserId,
             "Vietnam",
-            new DateTime(2026, 1, 20),
-            new DateTime(2026, 1, 25)
+            vietnamStart,
+            vietnamEnd
         );
 
-        // Assert - Current window (last 365 from today Jan 17)
-        // Thailand from Dec 20, 2025 to Jan 17, 2026 = 28 days
+        // Assert - Current window (last 365 from today)
+        // Thailand from 29 days ago to today = 29 days
         Assert.Single(current);
-        Assert.Equal(28, current["Thailand"]);
+        Assert.Equal(29, current["Thailand"]);
 
         // Assert - Forecast should have reduced Thailand and new Vietnam
-        // Forecast window: Dec 21, 2025 to Jan 25, 2026
-        // Thailand in window: Dec 21 to Jan 20 (31 days) + Jan 25-31 clipped to Jan 25 (0 days) = 31 days
-        // But Vietnam takes Jan 20-25 (5 days), so Thailand = 31 - 5 = 26 days
+        // Forecast window: vietnamEnd - 365 days to vietnamEnd = (today+8) - 365 to (today+8) = today-357 to today+8
+        // Thailand: starts at today-29, ends at today+14
+        // Thailand in forecast window: from today-29 to today+8 = 37 days total
+        // Vietnam: starts at today+3, ends at today+8 = 5 days
+        // Vietnam overlaps Thailand from today+3 to today+8, so Thailand loses those 5 days
+        // Thailand counts: 37 - 5 = 32 days (from today-29 to today+3)
         Assert.Equal(2, forecast.Count);
-        Assert.Equal(31, forecast["Thailand"]); // Dec 21-Jan 20 (31 days) + Jan 25-Jan 25 (0 days, but clipped to window end)
+        Assert.Equal(32, forecast["Thailand"]);
         Assert.Equal(5, forecast["Vietnam"]);
     }
 
