@@ -8,6 +8,7 @@ using ResidencyRoll.Api.Data;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Extensions;
 using Serilog;
+using System.Reflection;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -18,7 +19,11 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    Log.Information("Starting ResidencyRoll API");
+    var version = System.Reflection.Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.
+        InformationalVersion ?? "unknown";
+    
+    Log.Information("Starting ResidencyRoll API - Version: {Version}", version);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
@@ -31,6 +36,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=residencyroll.db"));
 
 builder.Services.AddScoped<TripService>();
+builder.Services.AddSingleton<ResidencyCalculationService>();
 
 builder.Services.AddApiVersioning(options =>
 {
@@ -169,6 +175,9 @@ if (app.Environment.IsDevelopment())
             options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"ResidencyRoll API {description.GroupName.ToUpperInvariant()}");
         }
     });
+    
+    // Redirect root to Swagger UI in development
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 }
 
 app.UseHttpsRedirection();

@@ -13,60 +13,13 @@
 <h1>Residency Roll - Travel Tracking Dashboard</h1>
 
 <RadzenRow Gap="1rem" class="rz-mt-4">
-    <RadzenColumn Size="12" SizeMD="6">
-        <DaysDistributionChart DistributionData="@distributionData" />
-    </RadzenColumn>
-    <RadzenColumn Size="12" SizeMD="6">
-        <DaysPerCountryChart ChartData="@chartData" />
+    <RadzenColumn Size="12">
+        <ResidencyStatusDashboard />
     </RadzenColumn>
 </RadzenRow>
 
 <RadzenRow Gap="1rem" class="rz-mt-4">
     <RadzenColumn Size="12">
-        <TripTimeline TimelineItems="@timelineItems" />
+        <ResidencyTimeline />
     </RadzenColumn>
 </RadzenRow>
-
-@code {
-    private List<TripDto> timelineTrips = new();
-    private List<TripTimeline.TimelineItem> timelineItems = new();
-    private int daysAway;
-    private int daysHome;
-    private List<ChartData> chartData = new();
-    private List<DistributionData> distributionData = new();
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadData();
-    }
-
-    private async Task LoadData()
-    {
-        timelineTrips = await ApiClient.GetTimelineAsync();
-        daysAway = await ApiClient.GetTotalDaysAwayInLast365DaysAsync();
-        daysHome = await ApiClient.GetDaysAtHomeInLast365DaysAsync();
-        
-        var daysPerCountry = await ApiClient.GetDaysPerCountryInLast365DaysAsync();
-        chartData = daysPerCountry
-            .Select(dto => new ChartData { Label = $"{dto.CountryName} ({dto.Days} days)", Days = dto.Days })
-            .ToList();
-        
-        distributionData = new List<DistributionData>
-        {
-            new DistributionData { Label = "Days Away", Value = daysAway },
-            new DistributionData { Label = "Days Home", Value = daysHome }
-        };
-
-        timelineItems = timelineTrips
-            .OrderByDescending(t => t.StartDate)
-            .Select(t => new TripTimeline.TimelineItem
-            {
-                Title = t.CountryName,
-                Subtitle = $"{t.StartDate:MMM dd, yyyy} – {t.EndDate:MMM dd, yyyy}",
-                DurationText = $"{t.DurationDays} days"
-            })
-            .ToList();
-        
-        StateHasChanged();
-    }
-}

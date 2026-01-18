@@ -23,9 +23,45 @@ namespace ResidencyRoll.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ArrivalCity")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ArrivalCountry")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ArrivalDateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ArrivalIataCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ArrivalTimezone")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CountryName")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DepartureCity")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DepartureCountry")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DepartureDateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DepartureIataCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DepartureTimezone")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndDate")

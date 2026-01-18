@@ -117,7 +117,7 @@ The middleware includes comprehensive logging to help troubleshoot issues. Monit
 
 At startup, you should see:
 
-```
+```text
 === Configuring ForwardedHeaders Middleware ===
 Enabled forwarded headers: XForwardedFor, XForwardedProto, XForwardedHost
 Processing 1 configured trusted proxies
@@ -131,7 +131,7 @@ Configuration summary: 1 proxies, 1 networks configured
 
 For each request with forwarded headers, you'll see:
 
-```
+```text
 [ForwardedHeaders] Received forwarded headers: 
   X-Forwarded-Proto=https, 
   X-Forwarded-Host=residencyroll.kinsac.com, 
@@ -145,7 +145,7 @@ For each request with forwarded headers, you'll see:
 
 If proxies aren't configured, you'll see:
 
-```
+```text
 ⚠ No trusted proxies or networks configured. 
 The default behavior will trust only localhost (127.0.0.1, ::1). 
 This may cause forwarded headers to be ignored if your reverse proxy 

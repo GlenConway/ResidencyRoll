@@ -1,0 +1,328 @@
+@using Radzen
+@using Radzen.Blazor
+@using ResidencyRoll.Shared.Trips
+
+<RadzenCard>
+    <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Daily Presence Timeline</RadzenText>
+    
+    <RadzenRow Gap="1rem" class="rz-mt-3">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenDatePicker @bind-Value="@startDate" Placeholder="Start Date" 
+                            DateFormat="yyyy-MM-dd" Change="@LoadData" />
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenDatePicker @bind-Value="@endDate" Placeholder="End Date" 
+                            DateFormat="yyyy-MM-dd" Change="@LoadData" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    @if (loading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="rz-mt-4" />
+    }
+    else if (dailyPresence.Count == 0)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" class="rz-mt-4">
+            No daily presence data available for the selected date range.
+        </RadzenAlert>
+    }
+    else
+    {
+        <div class="timeline-container rz-mt-4">
+            <div class="timeline-legend">
+                <span class="legend-item"><span class="legend-box" style="background-color: #4CAF50;"></span> Location</span>
+                <span class="legend-item"><span class="legend-box" style="background-color: #FF9800;"></span> Transit</span>
+                <span class="legend-item"><span class="legend-box" style="background-color: #f0f0f0; border: 1px solid #ccc;"></span> IDL Skip</span>
+            </div>
+            
+            <div class="timeline-grid">
+                @foreach (var group in GetGroupedByMonth())
+                {
+                    <div class="month-group">
+                        <div class="month-header">@group.Key</div>
+                        <div class="days-container">
+                            @foreach (var presence in group.Value)
+                            {
+                                <div class="day-cell @GetDayClass(presence)" 
+                                     title="@GetDayTooltip(presence)"
+                                     @onclick="() => ShowDayDetails(presence)">
+                                    <div class="day-number">@presence.Date.Day</div>
+                                    @if (presence.IsInTransitAtMidnight)
+                                    {
+                                        <div class="day-label">Transit</div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight))
+                                    {
+                                        <div class="day-label">@GetCountryCode(presence.LocationAtMidnight)</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (selectedDay != null)
+        {
+            <RadzenCard class="rz-mt-3" Style="background-color: #f8f9fa;">
+                <RadzenText TextStyle="TextStyle.H6">
+                    Details for @selectedDay.Date.ToString("MMMM dd, yyyy")
+                </RadzenText>
+                <RadzenStack Gap="0.5rem" class="rz-mt-2">
+                    @if (selectedDay.IsInTransitAtMidnight)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="In Transit at Midnight" />
+                        <RadzenText>No country residency claimed for this day.</RadzenText>
+                    }
+                    else
+                    {
+                        <RadzenText>
+                            <strong>Location at Midnight:</strong> @selectedDay.LocationAtMidnight
+                        </RadzenText>
+                    }
+                    
+                    @if (selectedDay.LocationsDuringDay.Count > 0)
+                    {
+                        <RadzenText>
+                            <strong>Countries visited during day:</strong> @string.Join(", ", selectedDay.LocationsDuringDay)
+                        </RadzenText>
+                    }
+                </RadzenStack>
+            </RadzenCard>
+        }
+    }
+</RadzenCard>
+
+<style>
+    .timeline-container {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .timeline-legend {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .legend-box {
+        width: 20px;
+        height: 20px;
+        border-radius: 2px;
+    }
+
+    .timeline-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .month-group {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .month-header {
+        background-color: #f5f5f5;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .days-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+
+    .day-cell {
+        aspect-ratio: 1;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .day-cell:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .day-cell.location {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .day-cell.transit {
+        background-color: #FF9800;
+        color: white;
+    }
+
+    .day-cell.idl-skip {
+        background-color: #f0f0f0;
+        border: 1px dashed #999;
+        color: #666;
+    }
+
+    .day-number {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .day-label {
+        font-size: 0.625rem;
+        font-weight: 500;
+        margin-top: 0.125rem;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+</style>
+
+@code {
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private List<DailyPresenceDto> dailyPresence = new();
+    private DailyPresenceDto? selectedDay;
+    private bool loading = false;
+
+    [Inject] private ResidencyRoll.Web.Services.TripsApiClient ApiClient { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Default to last 365 days
+        endDate = DateTime.Today;
+        startDate = DateTime.Today.AddDays(-365);
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : (DateOnly?)null;
+            var end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : (DateOnly?)null;
+            
+            dailyPresence = await ApiClient.GetDailyPresenceAsync(start, end);
+            
+            // Fill in IDL skipped days (westbound crossings)
+            FillIdlSkippedDays();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void FillIdlSkippedDays()
+    {
+        // Identify date gaps that represent IDL westbound crossings
+        var allDates = dailyPresence.OrderBy(d => d.Date).ToList();
+        for (int i = 0; i < allDates.Count - 1; i++)
+        {
+            var current = allDates[i];
+            var next = allDates[i + 1];
+            var daysBetween = (next.Date.DayNumber - current.Date.DayNumber);
+            
+            if (daysBetween > 1)
+            {
+                // Fill the gap with "IDL skip" markers
+                for (int j = 1; j < daysBetween; j++)
+                {
+                    var skippedDate = current.Date.AddDays(j);
+                    dailyPresence.Add(new DailyPresenceDto
+                    {
+                        Date = skippedDate,
+                        LocationAtMidnight = "IDL_SKIP",
+                        IsInTransitAtMidnight = false
+                    });
+                }
+            }
+        }
+        
+        dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
+    }
+
+    private Dictionary<string, List<DailyPresenceDto>> GetGroupedByMonth()
+    {
+        return dailyPresence
+            .GroupBy(d => d.Date.ToString("MMMM yyyy"))
+            .OrderByDescending(g => dailyPresence.First(d => d.Date.ToString("MMMM yyyy") == g.Key).Date)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Date).ToList());
+    }
+
+    private string GetDayClass(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return "idl-skip";
+        if (presence.IsInTransitAtMidnight)
+            return "transit";
+        return "location";
+    }
+
+    private string GetDayTooltip(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
+        if (presence.IsInTransitAtMidnight)
+            return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
+        return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
+    }
+
+    private string GetCountryCode(string countryName)
+    {
+        // Return 2-3 letter country codes for display
+        var codes = new Dictionary<string, string>
+        {
+            {"Canada", "CA"},
+            {"United States", "US"},
+            {"USA", "US"},
+            {"United Kingdom", "UK"},
+            {"Australia", "AU"},
+            {"New Zealand", "NZ"},
+            {"France", "FR"},
+            {"Germany", "DE"},
+            {"Japan", "JP"},
+            {"China", "CN"},
+            {"India", "IN"},
+            {"Brazil", "BR"},
+            {"Mexico", "MX"},
+            {"Spain", "ES"},
+            {"Italy", "IT"},
+        };
+
+        return codes.TryGetValue(countryName, out var code) ? code : countryName.Substring(0, Math.Min(3, countryName.Length)).ToUpper();
+    }
+
+    private void ShowDayDetails(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return;
+            
+        selectedDay = presence;
+    }
+}
