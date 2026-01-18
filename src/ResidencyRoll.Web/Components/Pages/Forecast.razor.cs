@@ -18,6 +18,7 @@ public partial class Forecast
     private Dictionary<string, int> currentDaysPerCountry = new();
     private Dictionary<string, int> forecastDaysPerCountry = new();
     private List<StandardDurationForecastItemDto> standardDurationForecasts = new();
+    private List<string> validationIssues = new();
     
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
@@ -92,14 +93,15 @@ public partial class Forecast
             
             if (invalidLegs.Any())
             {
+                validationIssues = BuildValidationIssues(invalidLegs);
+                forecastCalculated = false;
                 Logger.LogWarning("Validation failed. Invalid legs: {Count}. Missing data: {Issues}", 
                     invalidLegs.Count,
-                    string.Join(", ", invalidLegs.Select((leg, idx) => 
-                        $"Leg {idx}: ArrivalCountry={string.IsNullOrWhiteSpace(leg.ArrivalCountry)}, " +
-                        $"ArrivalDate={!leg.ArrivalDate.HasValue}, ArrivalTime={!leg.ArrivalTime.HasValue}, " +
-                        $"DepartureDate={!leg.DepartureDate.HasValue}, DepartureTime={!leg.DepartureTime.HasValue}")));
+                    string.Join("; ", validationIssues));
                 return;
             }
+
+            validationIssues.Clear();
 
             Logger.LogInformation("Calculating forecast with {LegCount} legs", legs.Count);
 
@@ -147,6 +149,27 @@ public partial class Forecast
             Logger.LogError(ex, "Error calculating forecast with legs: {LegCount}", legs.Count);
             throw;
         }
+    }
+
+    private List<string> BuildValidationIssues(List<TripLegEditModel> invalidLegs)
+    {
+        var issues = new List<string>();
+        foreach (var item in invalidLegs.Select((leg, idx) => (leg, idx)))
+        {
+            var missingFields = new List<string>();
+            if (string.IsNullOrWhiteSpace(item.leg.ArrivalCountry)) missingFields.Add("arrival country");
+            if (!item.leg.ArrivalDate.HasValue) missingFields.Add("arrival date");
+            if (!item.leg.ArrivalTime.HasValue) missingFields.Add("arrival time");
+            if (!item.leg.DepartureDate.HasValue) missingFields.Add("departure date");
+            if (!item.leg.DepartureTime.HasValue) missingFields.Add("departure time");
+
+            if (missingFields.Count > 0)
+            {
+                issues.Add($"Leg {item.idx + 1}: missing {string.Join(", ", missingFields)}");
+            }
+        }
+
+        return issues;
     }
 
     private DateTime CombineDateAndTime(DateTime date, DateTime time)

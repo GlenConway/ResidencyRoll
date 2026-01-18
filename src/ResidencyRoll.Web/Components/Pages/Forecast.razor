@@ -21,6 +21,19 @@
             </div>
             <RadzenButton Icon="add_circle" Text="Add Leg" Click="@AddLeg" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" />
         </div>
+
+            @if (validationIssues.Count > 0)
+            {
+                <RadzenAlert Severity="AlertSeverity.Warning" Style="margin-top: 0.5rem;">
+                    <strong>Missing information:</strong>
+                    <ul style="margin: 0.5rem 0 0 1rem;">
+                        @foreach (var issue in validationIssues)
+                        {
+                            <li>@issue</li>
+                        }
+                    </ul>
+                </RadzenAlert>
+            }
         
         @foreach (var leg in legs)
         {
