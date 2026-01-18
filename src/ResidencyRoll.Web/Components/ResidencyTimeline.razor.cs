@@ -17,12 +17,17 @@ public partial class ResidencyTimeline
 
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private CountryColorService ColorService { get; set; } = default!;
+    [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
         // Default to last 365 days
         endDate = DateTime.Today;
         startDate = DateTime.Today.AddDays(-365);
+        
+        // Load saved home country from localStorage
+        homeCountry = await LocalStorage.GetItemAsync("residencyroll_home_country");
+        
         await LoadData();
     }
 
@@ -33,6 +38,13 @@ public partial class ResidencyTimeline
         {
             _previousHomeCountry = homeCountry;
             ColorService.HomeCountry = homeCountry;
+            
+            // Save to localStorage
+            if (!string.IsNullOrEmpty(homeCountry))
+            {
+                await LocalStorage.SetItemAsync("residencyroll_home_country", homeCountry);
+            }
+            
             StateHasChanged();
         }
         await base.OnAfterRenderAsync(firstRender);
@@ -55,7 +67,9 @@ public partial class ResidencyTimeline
 
             // Build list of available countries and register them with the color service
             availableCountries = dailyPresence
-                .Where(d => !string.IsNullOrEmpty(d.LocationAtMidnight) && d.LocationAtMidnight != "IDL_SKIP")
+                .Where(d => !string.IsNullOrEmpty(d.LocationAtMidnight) 
+                    && d.LocationAtMidnight != "IDL_SKIP" 
+                    && d.LocationAtMidnight != "IN_TRANSIT")
                 .Select(d => d.LocationAtMidnight)
                 .Distinct()
                 .OrderBy(c => c)
@@ -63,10 +77,15 @@ public partial class ResidencyTimeline
 
             ColorService.RegisterCountries(availableCountries);
             
-            // Set home country if not already set
-            if (string.IsNullOrEmpty(homeCountry) && availableCountries.Count > 0)
+            // Set home country if not already set or if saved country is not in the list
+            if ((string.IsNullOrEmpty(homeCountry) || !availableCountries.Contains(homeCountry)) 
+                && availableCountries.Count > 0)
             {
                 homeCountry = availableCountries[0];
+                ColorService.HomeCountry = homeCountry;
+            }
+            else if (!string.IsNullOrEmpty(homeCountry))
+            {
                 ColorService.HomeCountry = homeCountry;
             }
         }
@@ -125,7 +144,9 @@ public partial class ResidencyTimeline
 
     private string GetDayStyle(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP" || presence.IsInTransitAtMidnight)
+        if (presence.LocationAtMidnight == "IDL_SKIP" 
+            || presence.LocationAtMidnight == "IN_TRANSIT" 
+            || presence.IsInTransitAtMidnight)
             return string.Empty;
 
         var isHome = presence.LocationAtMidnight == homeCountry;
@@ -145,7 +166,7 @@ public partial class ResidencyTimeline
     {
         if (presence.LocationAtMidnight == "IDL_SKIP")
             return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
-        if (presence.IsInTransitAtMidnight)
+        if (presence.IsInTransitAtMidnight || presence.LocationAtMidnight == "IN_TRANSIT")
             return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
         return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
     }

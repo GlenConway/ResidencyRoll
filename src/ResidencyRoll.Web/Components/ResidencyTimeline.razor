@@ -69,11 +69,11 @@
                                      title="@GetDayTooltip(presence)"
                                      @onclick="@((MouseEventArgs _) => ShowDayDetails(presence))">
                                     <div class="day-number">@presence.Date.Day</div>
-                                    @if (presence.IsInTransitAtMidnight)
+                                    @if (presence.IsInTransitAtMidnight || presence.LocationAtMidnight == "IN_TRANSIT")
                                     {
                                         <div class="day-label">Transit</div>
                                     }
-                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight))
+                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight) && presence.LocationAtMidnight != "IDL_SKIP")
                                     {
                                         <div class="day-label">@GetCountryCode(presence.LocationAtMidnight)</div>
                                     }
