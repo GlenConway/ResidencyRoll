@@ -19,7 +19,8 @@ public class ForecastWithTimezonesTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
-        _tripService = new TripService(_context);
+        var residencyService = new ResidencyCalculationService();
+        _tripService = new TripService(_context, residencyService);
     }
 
     public void Dispose()

@@ -15,14 +15,17 @@
 <RadzenCard class="rz-mt-4">
     <div style="display: flex; gap: 2rem; flex-direction: column;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <RadzenText TextStyle="TextStyle.H6">Plan a Future Trip (Multi-leg Supported)</RadzenText>
+            <div>
+                <RadzenText TextStyle="TextStyle.H6">Plan a Future Trip (Multi-leg Supported)</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="color: #666;">Total legs: @legs.Count</RadzenText>
+            </div>
             <RadzenButton Icon="add_circle" Text="Add Leg" Click="@AddLeg" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" />
         </div>
         
         @foreach (var leg in legs)
         {
             var legIndex = legs.IndexOf(leg);
-            <RadzenCard class="rz-mt-2" Style="background-color: #f8f9fa;">
+            <RadzenCard class="rz-mt-2" Style="background-color: #f8f9fa;" @key="leg.Id">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: bold;">
                         Leg @(legIndex + 1) @(legIndex == 0 ? "(Outbound)" : legIndex == legs.Count - 1 ? "(Return)" : "(Connecting)")
@@ -48,6 +51,7 @@
                             <RadzenDatePicker @bind-Value="leg.DepartureDate"
                                              Placeholder="Departure Date"
                                              DateFormat="yyyy-MM-dd"
+                                             Change="@(args => OnDepartureDateChanged(leg, args))"
                                              Style="flex: 1" />
                             <RadzenDatePicker @bind-Value="leg.DepartureTime"
                                              TimeOnly="true"

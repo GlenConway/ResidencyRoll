@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Web.Helpers;
@@ -9,7 +10,8 @@ public partial class Forecast
 {
     // List of trip legs
     private List<TripLegEditModel> legs = new();
-    private int nextLegId = 1;
+    private int nextLegId = 0;
+    private bool hasInitialized = false;
     
     // State
     private bool forecastCalculated = false;
@@ -18,31 +20,56 @@ public partial class Forecast
     private List<StandardDurationForecastItemDto> standardDurationForecasts = new();
     
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
+    [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Start with one outbound leg
-        AddLeg();
+        if (!hasInitialized && legs.Count == 0)
+        {
+            hasInitialized = true;
+            var newLeg = new TripLegEditModel
+            {
+                Id = nextLegId++,
+                DepartureCity = string.Empty,
+                DepartureCountry = string.Empty,
+                DepartureTimezone = "UTC",
+                DepartureDate = DateTime.Today.AddMonths(1),
+                DepartureTime = new DateTime(1, 1, 1, 12, 0, 0),
+                ArrivalDate = DateTime.Today.AddMonths(1),
+                ArrivalTime = new DateTime(1, 1, 1, 12, 0, 0)
+            };
+            legs.Add(newLeg);
+        }
+        await Task.CompletedTask;
     }
 
     private void AddLeg()
     {
-        var lastLeg = legs.LastOrDefault();
-        
-        var newLeg = new TripLegEditModel
+        try
         {
-            Id = nextLegId++,
-            DepartureCity = lastLeg?.ArrivalCity ?? string.Empty,
-            DepartureCountry = lastLeg?.ArrivalCountry ?? string.Empty,
-            DepartureTimezone = lastLeg?.ArrivalTimezone ?? "UTC",
-            DepartureIataCode = lastLeg?.ArrivalIataCode,
-            DepartureDate = lastLeg?.ArrivalDate ?? DateTime.Today.AddMonths(1),
-            DepartureTime = lastLeg?.ArrivalTime ?? new DateTime(1, 1, 1, 12, 0, 0),
-            ArrivalDate = (lastLeg?.ArrivalDate ?? DateTime.Today.AddMonths(1)).AddDays(1),
-            ArrivalTime = new DateTime(1, 1, 1, 12, 0, 0)
-        };
-        
-        legs.Add(newLeg);
+            var lastLeg = legs.LastOrDefault();
+            
+            var newLeg = new TripLegEditModel
+            {
+                Id = nextLegId++,
+                DepartureCity = lastLeg?.ArrivalCity ?? string.Empty,
+                DepartureCountry = lastLeg?.ArrivalCountry ?? string.Empty,
+                DepartureTimezone = lastLeg?.ArrivalTimezone ?? "UTC",
+                DepartureIataCode = lastLeg?.ArrivalIataCode,
+                DepartureDate = lastLeg?.ArrivalDate ?? DateTime.Today.AddMonths(1),
+                DepartureTime = lastLeg?.ArrivalTime ?? new DateTime(1, 1, 1, 12, 0, 0),
+                ArrivalDate = lastLeg?.ArrivalDate ?? DateTime.Today.AddMonths(1),
+                ArrivalTime = new DateTime(1, 1, 1, 12, 0, 0)
+            };
+            
+            legs.Add(newLeg);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error adding leg to forecast");
+            throw;
+        }
     }
 
     private void RemoveLeg(int legId)
@@ -50,53 +77,75 @@ public partial class Forecast
         if (legs.Count > 1)
         {
             legs.RemoveAll(l => l.Id == legId);
+            StateHasChanged();
         }
     }
 
     private async Task CalculateForecast()
     {
-        // Validate all legs have required information
-        if (legs.Any(leg => string.IsNullOrWhiteSpace(leg.ArrivalCountry) || 
-                           !leg.ArrivalDate.HasValue || !leg.ArrivalTime.HasValue ||
-                           !leg.DepartureDate.HasValue || !leg.DepartureTime.HasValue))
+        try
         {
-            return;
-        }
-
-        // Convert legs to DTOs
-        var legDtos = legs.Select(leg => new TripLegDto
-        {
-            DepartureCountry = leg.DepartureCountry,
-            DepartureCity = leg.DepartureCity,
-            DepartureDateTime = CombineDateAndTime(leg.DepartureDate!.Value, leg.DepartureTime!.Value),
-            DepartureTimezone = leg.DepartureTimezone,
-            DepartureIataCode = leg.DepartureIataCode,
-            ArrivalCountry = leg.ArrivalCountry,
-            ArrivalCity = leg.ArrivalCity,
-            ArrivalDateTime = CombineDateAndTime(leg.ArrivalDate!.Value, leg.ArrivalTime!.Value),
-            ArrivalTimezone = leg.ArrivalTimezone,
-            ArrivalIataCode = leg.ArrivalIataCode
-        }).ToList();
-
-        var forecastResponse = await ApiClient.ForecastDaysWithTripsAsync(legDtos);
-
-        currentDaysPerCountry = forecastResponse.Current.ToDictionary(c => c.CountryName, c => c.Days);
-        forecastDaysPerCountry = forecastResponse.Forecast.ToDictionary(c => c.CountryName, c => c.Days);
-        forecastCalculated = true;
-
-        // Find all countries visited in forecast
-        var countriesVisited = legDtos.Select(l => l.ArrivalCountry).Distinct().ToList();
-        
-        // Calculate 183-day limit planning if any country exceeds 183 days
-        foreach (var country in countriesVisited)
-        {
-            var countryDays = forecastDaysPerCountry.ContainsKey(country) ? forecastDaysPerCountry[country] : 0;
-            if (countryDays > 183)
+            // Validate all legs have required information
+            var invalidLegs = legs.Where(leg => string.IsNullOrWhiteSpace(leg.ArrivalCountry) || 
+                               !leg.ArrivalDate.HasValue || !leg.ArrivalTime.HasValue ||
+                               !leg.DepartureDate.HasValue || !leg.DepartureTime.HasValue).ToList();
+            
+            if (invalidLegs.Any())
             {
-                // For multi-leg trips, user should manually adjust dates
-                standardDurationForecasts = new();
-                break;
+                Logger.LogWarning("Validation failed. Invalid legs: {Count}. Missing data: {Issues}", 
+                    invalidLegs.Count,
+                    string.Join(", ", invalidLegs.Select((leg, idx) => 
+                        $"Leg {idx}: ArrivalCountry={string.IsNullOrWhiteSpace(leg.ArrivalCountry)}, " +
+                        $"ArrivalDate={!leg.ArrivalDate.HasValue}, ArrivalTime={!leg.ArrivalTime.HasValue}, " +
+                        $"DepartureDate={!leg.DepartureDate.HasValue}, DepartureTime={!leg.DepartureTime.HasValue}")));
+                return;
             }
+
+            Logger.LogInformation("Calculating forecast with {LegCount} legs", legs.Count);
+
+            // Convert legs to DTOs
+            var legDtos = legs.Select(leg => new TripLegDto
+            {
+                DepartureCountry = leg.DepartureCountry,
+                DepartureCity = leg.DepartureCity,
+                DepartureDateTime = CombineDateAndTime(leg.DepartureDate!.Value, leg.DepartureTime!.Value),
+                DepartureTimezone = leg.DepartureTimezone,
+                DepartureIataCode = leg.DepartureIataCode,
+                ArrivalCountry = leg.ArrivalCountry,
+                ArrivalCity = leg.ArrivalCity,
+                ArrivalDateTime = CombineDateAndTime(leg.ArrivalDate!.Value, leg.ArrivalTime!.Value),
+                ArrivalTimezone = leg.ArrivalTimezone,
+                ArrivalIataCode = leg.ArrivalIataCode
+            }).ToList();
+
+            var forecastResponse = await ApiClient.ForecastDaysWithTripsAsync(legDtos);
+
+            Logger.LogInformation("Forecast response received. Current: {CurrentCount} countries, Forecast: {ForecastCount} countries",
+                forecastResponse.Current.Count, forecastResponse.Forecast.Count);
+
+            currentDaysPerCountry = forecastResponse.Current.ToDictionary(c => c.CountryName, c => c.Days);
+            forecastDaysPerCountry = forecastResponse.Forecast.ToDictionary(c => c.CountryName, c => c.Days);
+            forecastCalculated = true;
+
+            // Find all countries visited in forecast
+            var countriesVisited = legDtos.Select(l => l.ArrivalCountry).Distinct().ToList();
+            
+            // Calculate 183-day limit planning if any country exceeds 183 days
+            foreach (var country in countriesVisited)
+            {
+                var countryDays = forecastDaysPerCountry.ContainsKey(country) ? forecastDaysPerCountry[country] : 0;
+                if (countryDays > 183)
+                {
+                    // For multi-leg trips, user should manually adjust dates
+                    standardDurationForecasts = new();
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error calculating forecast with legs: {LegCount}", legs.Count);
+            throw;
         }
     }
 
@@ -178,6 +227,16 @@ public partial class Forecast
         }
         
         return longestStay?.ArrivalCountry ?? legs.First().ArrivalCountry;
+    }
+
+    private void OnDepartureDateChanged(TripLegEditModel leg, DateTime? newDate)
+    {
+        Logger.LogInformation("OnDepartureDateChanged called. Leg ID: {LegId}, New Departure: {NewDate}, Current Arrival: {ArrivalDate}", 
+            leg.Id, newDate, leg.ArrivalDate);
+        
+        // Keep arrival date in sync with departure date (same date for flight legs)
+        leg.ArrivalDate = newDate;
+        Logger.LogInformation("Updated arrival date to: {NewArrivalDate}", leg.ArrivalDate);
     }
 
     private DateTime ConvertToUtc(DateTime localTime, string timezoneId)
