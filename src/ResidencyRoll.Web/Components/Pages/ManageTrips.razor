@@ -159,6 +159,13 @@
                             <RadzenButton Icon="playlist_add" Text="Save and Add Leg" Click="@(() => SaveDetailedTrip(addLegAfterSave: true))" ButtonStyle="ButtonStyle.Info" />
                             <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
                         </RadzenStack>
+                        
+                        @if (!string.IsNullOrEmpty(validationMessage))
+                        {
+                            <RadzenText TextStyle="TextStyle.Body2" Style="color: #dc3545; margin-top: 0.5rem;">
+                                @validationMessage
+                            </RadzenText>
+                        }
                     </RadzenStack>
                 }
             </RadzenCard>
@@ -180,6 +187,7 @@
     private DateTime? arrivalDate;
     private DateTime? arrivalTime;
     private int selectedTabIndex = 0; // 0 = Trip List, 1 = Trip Editor
+    private string validationMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -325,9 +333,34 @@
 
     private async Task SaveDetailedTrip(bool addLegAfterSave = false)
     {
+        validationMessage = string.Empty;
+        
         if (currentEditTrip == null || departureDate == null || departureTime == null || 
             arrivalDate == null || arrivalTime == null)
         {
+            validationMessage = "Please fill in all date and time fields.";
+            return;
+        }
+
+        // Validate required fields
+        var missingFields = new List<string>();
+        
+        if (string.IsNullOrWhiteSpace(currentEditTrip.DepartureCity))
+            missingFields.Add("Departure City");
+        if (string.IsNullOrWhiteSpace(currentEditTrip.DepartureCountry))
+            missingFields.Add("Departure Country");
+        if (string.IsNullOrWhiteSpace(currentEditTrip.DepartureTimezone))
+            missingFields.Add("Departure Timezone");
+        if (string.IsNullOrWhiteSpace(currentEditTrip.ArrivalCity))
+            missingFields.Add("Arrival City");
+        if (string.IsNullOrWhiteSpace(currentEditTrip.ArrivalCountry))
+            missingFields.Add("Arrival Country");
+        if (string.IsNullOrWhiteSpace(currentEditTrip.ArrivalTimezone))
+            missingFields.Add("Arrival Timezone");
+        
+        if (missingFields.Any())
+        {
+            validationMessage = $"Please complete the following required fields: {string.Join(", ", missingFields)}";
             return;
         }
 
@@ -335,10 +368,12 @@
         currentEditTrip.DepartureDateTime = departureDate.Value.Date.Add(departureTime.Value.TimeOfDay);
         currentEditTrip.ArrivalDateTime = arrivalDate.Value.Date.Add(arrivalTime.Value.TimeOfDay);
 
-        TripDto savedTrip = currentEditTrip;
+        TripDto savedTrip;
         if (currentEditTrip.Id > 0)
         {
             await ApiClient.UpdateTripAsync(currentEditTrip.Id, currentEditTrip);
+            // Fetch back from API to ensure we have the exact saved values
+            savedTrip = await ApiClient.GetTripByIdAsync(currentEditTrip.Id) ?? currentEditTrip;
         }
         else
         {
@@ -346,13 +381,14 @@
             currentEditTrip.Id = savedTrip.Id;
         }
 
-        await LoadData();
-
         if (addLegAfterSave)
         {
             AddLeg(savedTrip);
+            await LoadData();
             return;
         }
+
+        await LoadData();
 
         editingTrip = false;
         currentEditTrip = null;
@@ -364,6 +400,7 @@
     {
         editingTrip = false;
         currentEditTrip = null;
+        validationMessage = string.Empty;
         selectedTabIndex = 0;
     }
 
