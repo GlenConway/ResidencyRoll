@@ -332,19 +332,49 @@ tripsProxy.MapDelete("/{id:int}", async (int id, TripsApiClient apiClient) =>
 
 tripsProxy.MapPost("/forecast", async (ForecastRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.ForecastDaysWithTripAsync(request.CountryName!, request.TripStart, request.TripEnd);
+    var response = await apiClient.ForecastDaysWithTripAsync(
+        request.DepartureCountry,
+        request.DepartureCity,
+        request.DepartureDateTime,
+        request.DepartureTimezone,
+        request.DepartureIataCode,
+        request.ArrivalCountry,
+        request.ArrivalCity,
+        request.ArrivalDateTime,
+        request.ArrivalTimezone,
+        request.ArrivalIataCode);
     return Results.Ok(response);
 }).DisableAntiforgery();
 
 tripsProxy.MapPost("/forecast/max-end-date", async (MaxTripEndDateRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.CalculateMaxTripEndDateAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    var response = await apiClient.CalculateMaxTripEndDateAsync(
+        request.DepartureCountry,
+        request.DepartureCity,
+        request.DepartureTimezone,
+        request.DepartureIataCode,
+        request.ArrivalCountry,
+        request.ArrivalCity,
+        request.TripStart,
+        request.ArrivalTimezone,
+        request.ArrivalIataCode,
+        request.DayLimit);
     return Results.Ok(response);
 }).DisableAntiforgery();
 
 tripsProxy.MapPost("/forecast/standard-durations", async (StandardDurationForecastRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.CalculateStandardDurationForecastsAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    var response = await apiClient.CalculateStandardDurationForecastsAsync(
+        request.DepartureCountry,
+        request.DepartureCity,
+        request.DepartureTimezone,
+        request.DepartureIataCode,
+        request.ArrivalCountry,
+        request.ArrivalCity,
+        request.TripStart,
+        request.ArrivalTimezone,
+        request.ArrivalIataCode,
+        request.DayLimit);
     return Results.Ok(response);
 }).DisableAntiforgery();
 

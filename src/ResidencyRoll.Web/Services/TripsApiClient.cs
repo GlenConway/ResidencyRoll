@@ -71,13 +71,24 @@ public class TripsApiClient
         return await _httpClient.GetFromJsonAsync<int>($"{BaseRoute}/days-at-home/last365");
     }
 
-    public async Task<ForecastResponseDto> ForecastDaysWithTripAsync(string countryName, DateTime tripStart, DateTime tripEnd)
+    public async Task<ForecastResponseDto> ForecastDaysWithTripAsync(
+        string departureCountry, string departureCity, DateTime departureDateTime, 
+        string departureTimezone, string? departureIataCode,
+        string arrivalCountry, string arrivalCity, DateTime arrivalDateTime,
+        string arrivalTimezone, string? arrivalIataCode)
     {
         var request = new ForecastRequestDto
         {
-            CountryName = countryName,
-            TripStart = tripStart,
-            TripEnd = tripEnd
+            DepartureCountry = departureCountry,
+            DepartureCity = departureCity,
+            DepartureDateTime = departureDateTime,
+            DepartureTimezone = departureTimezone,
+            DepartureIataCode = departureIataCode,
+            ArrivalCountry = arrivalCountry,
+            ArrivalCity = arrivalCity,
+            ArrivalDateTime = arrivalDateTime,
+            ArrivalTimezone = arrivalTimezone,
+            ArrivalIataCode = arrivalIataCode
         };
 
         var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/forecast", request);
@@ -85,12 +96,22 @@ public class TripsApiClient
         return (await response.Content.ReadFromJsonAsync<ForecastResponseDto>())!;
     }
 
-    public async Task<MaxTripEndDateResponseDto> CalculateMaxTripEndDateAsync(string countryName, DateTime tripStart, int dayLimit = 183)
+    public async Task<MaxTripEndDateResponseDto> CalculateMaxTripEndDateAsync(
+        string departureCountry, string departureCity, string departureTimezone, string? departureIataCode,
+        string arrivalCountry, string arrivalCity, DateTime tripStart,
+        string arrivalTimezone, string? arrivalIataCode, int dayLimit = 183)
     {
         var request = new MaxTripEndDateRequestDto
         {
-            CountryName = countryName,
+            DepartureCountry = departureCountry,
+            DepartureCity = departureCity,
+            DepartureTimezone = departureTimezone,
+            DepartureIataCode = departureIataCode,
+            ArrivalCountry = arrivalCountry,
+            ArrivalCity = arrivalCity,
             TripStart = tripStart,
+            ArrivalTimezone = arrivalTimezone,
+            ArrivalIataCode = arrivalIataCode,
             DayLimit = dayLimit
         };
 
@@ -100,12 +121,21 @@ public class TripsApiClient
     }
 
     public async Task<List<StandardDurationForecastItemDto>> CalculateStandardDurationForecastsAsync(
-        string countryName, DateTime tripStart, int dayLimit = 183)
+        string departureCountry, string departureCity, string departureTimezone, string? departureIataCode,
+        string arrivalCountry, string arrivalCity, DateTime tripStart,
+        string arrivalTimezone, string? arrivalIataCode, int dayLimit = 183)
     {
         var request = new StandardDurationForecastRequestDto
         {
-            CountryName = countryName,
+            DepartureCountry = departureCountry,
+            DepartureCity = departureCity,
+            DepartureTimezone = departureTimezone,
+            DepartureIataCode = departureIataCode,
+            ArrivalCountry = arrivalCountry,
+            ArrivalCity = arrivalCity,
             TripStart = tripStart,
+            ArrivalTimezone = arrivalTimezone,
+            ArrivalIataCode = arrivalIataCode,
             DayLimit = dayLimit
         };
 

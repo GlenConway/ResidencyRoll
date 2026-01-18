@@ -190,7 +190,24 @@ public class TripsController : ControllerBase
         }
 
         var userId = GetUserId();
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(userId, request.CountryName, request.TripStart, request.TripEnd);
+        
+        // Create a hypothetical trip from the forecast request
+        var hypotheticalTrip = new Trip
+        {
+            UserId = userId,
+            DepartureCountry = request.DepartureCountry,
+            DepartureCity = request.DepartureCity,
+            DepartureDateTime = request.DepartureDateTime,
+            DepartureTimezone = request.DepartureTimezone,
+            DepartureIataCode = request.DepartureIataCode,
+            ArrivalCountry = request.ArrivalCountry,
+            ArrivalCity = request.ArrivalCity,
+            ArrivalDateTime = request.ArrivalDateTime,
+            ArrivalTimezone = request.ArrivalTimezone,
+            ArrivalIataCode = request.ArrivalIataCode
+        };
+        
+        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(userId, hypotheticalTrip);
 
         var response = new ForecastResponseDto
         {
@@ -212,7 +229,23 @@ public class TripsController : ControllerBase
         }
 
         var userId = GetUserId();
-        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(userId, request.CountryName, request.TripStart, request.DayLimit);
+        
+        // Create a hypothetical trip from the request
+        var hypotheticalTrip = new Trip
+        {
+            UserId = userId,
+            DepartureCountry = request.DepartureCountry,
+            DepartureCity = request.DepartureCity,
+            DepartureTimezone = request.DepartureTimezone,
+            DepartureIataCode = request.DepartureIataCode,
+            ArrivalCountry = request.ArrivalCountry,
+            ArrivalCity = request.ArrivalCity,
+            ArrivalDateTime = request.TripStart,
+            ArrivalTimezone = request.ArrivalTimezone,
+            ArrivalIataCode = request.ArrivalIataCode
+        };
+        
+        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(userId, hypotheticalTrip, request.DayLimit);
         return Ok(new MaxTripEndDateResponseDto
         {
             MaxEndDate = maxEndDate,
@@ -231,7 +264,23 @@ public class TripsController : ControllerBase
         }
 
         var userId = GetUserId();
-        var results = await _tripService.CalculateStandardDurationForecastsAsync(userId, request.CountryName, request.TripStart, request.DayLimit, request.Durations);
+        
+        // Create a hypothetical trip from the request
+        var hypotheticalTrip = new Trip
+        {
+            UserId = userId,
+            DepartureCountry = request.DepartureCountry,
+            DepartureCity = request.DepartureCity,
+            DepartureTimezone = request.DepartureTimezone,
+            DepartureIataCode = request.DepartureIataCode,
+            ArrivalCountry = request.ArrivalCountry,
+            ArrivalCity = request.ArrivalCity,
+            ArrivalDateTime = request.TripStart,
+            ArrivalTimezone = request.ArrivalTimezone,
+            ArrivalIataCode = request.ArrivalIataCode
+        };
+        
+        var results = await _tripService.CalculateStandardDurationForecastsAsync(userId, hypotheticalTrip, request.DayLimit, request.Durations);
 
         var response = results.Select(r => new StandardDurationForecastItemDto
         {
