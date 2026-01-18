@@ -138,16 +138,20 @@ public class UserScenarioTest
         }
         
         _output.WriteLine("");
-        _output.WriteLine("Expected per MIDNIGHT RULE:");
-        _output.WriteLine("Jan 6: Australia (at midnight, still in Sydney - departed later at 11:45am)");
-        _output.WriteLine("Jan 7: New Zealand (at midnight, in Auckland - arrived previous day)");
-        _output.WriteLine("Jan 8: New Zealand (at midnight, in Auckland)");
-        _output.WriteLine("Jan 9: New Zealand (at midnight, still in Auckland - departed later at 2:10pm)");
+        _output.WriteLine("Expected per PARTIAL DAY RULE (Australia & NZ use this):");
+        _output.WriteLine("Jan 6: New Zealand (arrived 4:50pm - present for part of day)");
+        _output.WriteLine("Jan 7: New Zealand (full day in Auckland)");
+        _output.WriteLine("Jan 8: New Zealand (full day in Auckland)");
+        _output.WriteLine("Jan 9: Australia (departed Auckland 2:10pm, arrived Sydney 3:55pm - present for part of day)");
         _output.WriteLine("");
-        _output.WriteLine("Note: The midnight rule determines residency based on location at 00:00 local time.");
-        _output.WriteLine("If you want Jan 9 to count as Australia, you'd need a different rule (like partial day rule).");
+        _output.WriteLine("Note: The partial day rule counts any day you're physically present in a country,");
+        _output.WriteLine("including arrival and departure days. This is the actual rule used by Australia,");
+        _output.WriteLine("New Zealand, Canada, USA, and most other countries.");
         
-        // Assertions
+        // Get residency counts which use the country-specific rules
+        var residencyDays = _service.CalculateResidencyDays(dailyPresenceLog);
+        
+        // Assertions based on Partial Day Rule
         var jan6 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2026, 1, 6));
         var jan7 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2026, 1, 7));
         var jan8 = dailyPresenceLog.FirstOrDefault(dp => dp.Date == new DateOnly(2026, 1, 8));
@@ -158,9 +162,20 @@ public class UserScenarioTest
         Assert.NotNull(jan8);
         Assert.NotNull(jan9);
         
-        Assert.Equal("Australia", jan6.LocationAtMidnight);
-        Assert.Equal("New Zealand", jan7.LocationAtMidnight);
-        Assert.Equal("New Zealand", jan8.LocationAtMidnight);
-        Assert.Equal("New Zealand", jan9.LocationAtMidnight); // Correct per midnight rule
+        // With Partial Day Rule, presence during any part of the day counts
+        Assert.True(jan6.LocationsDuringDay.Contains("New Zealand"), "Jan 6 should count for New Zealand (arrived 4:50pm)");
+        Assert.True(jan7.LocationsDuringDay.Contains("New Zealand"), "Jan 7 should count for New Zealand");
+        Assert.True(jan8.LocationsDuringDay.Contains("New Zealand"), "Jan 8 should count for New Zealand");
+        Assert.True(jan9.LocationsDuringDay.Contains("Australia"), "Jan 9 should count for Australia (arrived 3:55pm)");
+        
+        // Verify residency counts include these days
+        var nzDays = residencyDays.GetValueOrDefault("New Zealand", 0);
+        var auDays = residencyDays.GetValueOrDefault("Australia", 0);
+        
+        _output.WriteLine($"New Zealand residency days: {nzDays}");
+        _output.WriteLine($"Australia residency days: {auDays}");
+        
+        Assert.True(nzDays >= 3, $"Expected at least 3 NZ days (6th, 7th, 8th), got {nzDays}");
+        Assert.True(auDays >= 15, $"Expected at least 15 Australia days, got {auDays}");
     }
 }

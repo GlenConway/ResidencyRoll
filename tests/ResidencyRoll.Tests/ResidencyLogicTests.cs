@@ -316,12 +316,13 @@ public class ResidencyLogicTests
         var canadaDays = _service.CalculateResidencyDaysForCountry("Canada", dailyPresenceLog, trips);
 
         // Assert
-        // Expected: 3 days for Canada
-        // - July 1: arrival day, at midnight July 2 (00:00), in Canada (counts)
-        // - July 2: at midnight July 3 (00:00), in Canada (counts)
-        // - July 3: at midnight July 4 (00:00), in Canada (counts)
-        // - July 4: departure day, at midnight July 5 (00:00), already left (doesn't count)
-        Assert.Equal(3, canadaDays);
+        // Expected: 4 days for Canada (Partial Day Rule)
+        // - July 1: arrival day at 1:00 PM - present for part of day (counts)
+        // - July 2: full day in Canada (counts)
+        // - July 3: full day in Canada (counts)
+        // - July 4: departure day at 1:00 PM - present for part of day (counts)
+        // Canada uses Partial Day Rule - any part of a day counts
+        Assert.Equal(4, canadaDays);
     }
 
     #endregion
@@ -470,9 +471,9 @@ public class ResidencyLogicTests
     [Fact]
     public void CountryRules_AreCorrectlyConfigured()
     {
-        // Assert: Verify country rules are set up correctly
+        // Assert: Verify country rules are set up correctly per actual tax laws
         var canadaRule = _service.GetCountryRule("Canada");
-        Assert.Equal(ResidencyRuleType.MidnightRule, canadaRule.RuleType);
+        Assert.Equal(ResidencyRuleType.PartialDayRule, canadaRule.RuleType);
         Assert.Equal(183, canadaRule.ResidencyThresholdDays);
 
         var usaRule = _service.GetCountryRule("USA");
@@ -483,7 +484,10 @@ public class ResidencyLogicTests
         Assert.Equal(ResidencyRuleType.MidnightRule, ukRule.RuleType);
 
         var australiaRule = _service.GetCountryRule("Australia");
-        Assert.Equal(ResidencyRuleType.MidnightRule, australiaRule.RuleType);
+        Assert.Equal(ResidencyRuleType.PartialDayRule, australiaRule.RuleType);
+        
+        var nzRule = _service.GetCountryRule("New Zealand");
+        Assert.Equal(ResidencyRuleType.PartialDayRule, nzRule.RuleType);
     }
 
     [Fact]

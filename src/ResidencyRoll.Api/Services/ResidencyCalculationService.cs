@@ -26,7 +26,7 @@ public class ResidencyCalculationService
             {
                 CountryCode = "CA",
                 CountryName = "Canada",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["United Kingdom"] = new CountryResidencyRule
@@ -47,14 +47,14 @@ public class ResidencyCalculationService
             {
                 CountryCode = "AU",
                 CountryName = "Australia",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["New Zealand"] = new CountryResidencyRule
             {
                 CountryCode = "NZ",
                 CountryName = "New Zealand",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["United States"] = new CountryResidencyRule
