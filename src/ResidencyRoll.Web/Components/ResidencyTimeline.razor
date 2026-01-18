@@ -45,10 +45,10 @@
                 {
                     var color = ColorService.GetCountryColor(country);
                     var isHome = country == homeCountry;
-                    var style = isHome ? $"background-color: {color}; border: 2px solid {ColorService.GetCountryColorDark(country)};" : $"background-color: {color};";
+                    var style = isHome ? "background-color: #f5f5f5; border: 1px solid #ddd;" : $"background-color: {color};";
                     <span class="legend-item">
                         <span class="legend-box" style="@style"></span>
-                        <span>@country @(isHome ? "🏠" : "")</span>
+                        <span>@country @(isHome ? "(home)" : "")</span>
                     </span>
                 }
                 <span class="legend-item"><span class="legend-box" style="background-color: #FF9800;"></span> Transit</span>

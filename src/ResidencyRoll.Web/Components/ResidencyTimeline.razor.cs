@@ -128,13 +128,17 @@ public partial class ResidencyTimeline
         if (presence.LocationAtMidnight == "IDL_SKIP" || presence.IsInTransitAtMidnight)
             return string.Empty;
 
-        var color = ColorService.GetCountryColor(presence.LocationAtMidnight);
         var isHome = presence.LocationAtMidnight == homeCountry;
         
-        // Home country gets a border highlight
-        var border = isHome ? $"3px solid {ColorService.GetCountryColorDark(presence.LocationAtMidnight)}; box-shadow: 0 0 4px {color};" : "1px solid #ddd;";
-        
-        return $"background-color: {color}; border: {border} color: white;";
+        // Home country gets a clear/light background to fade into the background
+        if (isHome)
+        {
+            return "background-color: #f5f5f5; border: 1px solid #ddd; color: #999;";
+        }
+
+        // Other countries get their assigned colors to stand out
+        var color = ColorService.GetCountryColor(presence.LocationAtMidnight);
+        return $"background-color: {color}; border: 1px solid {ColorService.GetCountryColorDark(presence.LocationAtMidnight)}; color: white;";
     }
 
     private string GetDayTooltip(DailyPresenceDto presence)
