@@ -337,7 +337,7 @@ public class TripsController : ControllerBase
         }
 
         var bytes = Encoding.UTF8.GetBytes(string.Join('\n', csvLines));
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var filename = $"trips_{timestamp}.csv";
         return File(bytes, "text/csv", filename);
     }
