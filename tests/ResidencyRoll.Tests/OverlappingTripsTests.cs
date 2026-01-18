@@ -24,7 +24,8 @@ public class OverlappingTripsTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
-        _tripService = new TripService(_context);
+        var residencyService = new ResidencyCalculationService();
+        _tripService = new TripService(_context, residencyService);
     }
 
     public void Dispose()
@@ -228,21 +229,35 @@ public class OverlappingTripsTests : IDisposable
         var japanTrip = new Trip
         {
             UserId = _testUserId,
-            CountryName = "Japan",
-            StartDate = new DateTime(2026, 1, 1),
-            EndDate = new DateTime(2026, 1, 15)
+            ArrivalCountry = "Japan",
+            ArrivalCity = "Tokyo",
+            ArrivalDateTime = new DateTime(2026, 1, 1),
+            ArrivalTimezone = "Asia/Tokyo",
+            DepartureCountry = "Japan",
+            DepartureCity = "Tokyo",
+            DepartureDateTime = new DateTime(2026, 1, 15),
+            DepartureTimezone = "Asia/Tokyo"
         };
 
         await _context.Trips.AddAsync(japanTrip);
         await _context.SaveChangesAsync();
 
+        // Create hypothetical trip to South Korea
+        var hypotheticalTrip = new Trip
+        {
+            UserId = _testUserId,
+            ArrivalCountry = "South Korea",
+            ArrivalCity = "Seoul",
+            ArrivalDateTime = new DateTime(2026, 1, 10),
+            ArrivalTimezone = "Asia/Seoul",
+            DepartureCountry = "South Korea",
+            DepartureCity = "Seoul",
+            DepartureDateTime = new DateTime(2026, 1, 20),
+            DepartureTimezone = "Asia/Seoul"
+        };
+
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(
-            _testUserId,
-            "South Korea",
-            new DateTime(2026, 1, 10),
-            new DateTime(2026, 1, 20)
-        );
+        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
 
         // Assert - Current should just have Japan with full days
         Assert.Single(current);
@@ -268,21 +283,35 @@ public class OverlappingTripsTests : IDisposable
         var thailandTrip = new Trip
         {
             UserId = _testUserId,
-            CountryName = "Thailand",
-            StartDate = thailandStart,
-            EndDate = thailandEnd
+            ArrivalCountry = "Thailand",
+            ArrivalCity = "Bangkok",
+            ArrivalDateTime = thailandStart,
+            ArrivalTimezone = "Asia/Bangkok",
+            DepartureCountry = "Thailand",
+            DepartureCity = "Bangkok",
+            DepartureDateTime = thailandEnd,
+            DepartureTimezone = "Asia/Bangkok"
         };
 
         await _context.Trips.AddAsync(thailandTrip);
         await _context.SaveChangesAsync();
 
+        // Create hypothetical trip to Vietnam
+        var hypotheticalTrip = new Trip
+        {
+            UserId = _testUserId,
+            ArrivalCountry = "Vietnam",
+            ArrivalCity = "Hanoi",
+            ArrivalDateTime = vietnamStart,
+            ArrivalTimezone = "Asia/Ho_Chi_Minh",
+            DepartureCountry = "Vietnam",
+            DepartureCity = "Hanoi",
+            DepartureDateTime = vietnamEnd,
+            DepartureTimezone = "Asia/Ho_Chi_Minh"
+        };
+
         // Act - forecast window is 365 days ending at vietnamEnd
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(
-            _testUserId,
-            "Vietnam",
-            vietnamStart,
-            vietnamEnd
-        );
+        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
 
         // Assert - Current window (last 365 from today)
         // Thailand from 29 days ago to today = 29 days

@@ -15,9 +15,10 @@ using System.Reflection;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Debug()
-    .WriteTo.Console()
-    .WriteTo.File("logs/web-.log", rollingInterval: RollingInterval.Day)
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json")
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .Build())
     .CreateLogger();
 
 try
@@ -332,19 +333,39 @@ tripsProxy.MapDelete("/{id:int}", async (int id, TripsApiClient apiClient) =>
 
 tripsProxy.MapPost("/forecast", async (ForecastRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.ForecastDaysWithTripAsync(request.CountryName!, request.TripStart, request.TripEnd);
+    var response = await apiClient.ForecastDaysWithTripsAsync(request.Legs);
     return Results.Ok(response);
 }).DisableAntiforgery();
 
 tripsProxy.MapPost("/forecast/max-end-date", async (MaxTripEndDateRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.CalculateMaxTripEndDateAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    var response = await apiClient.CalculateMaxTripEndDateAsync(
+        request.DepartureCountry,
+        request.DepartureCity,
+        request.DepartureTimezone,
+        request.DepartureIataCode,
+        request.ArrivalCountry,
+        request.ArrivalCity,
+        request.TripStart,
+        request.ArrivalTimezone,
+        request.ArrivalIataCode,
+        request.DayLimit);
     return Results.Ok(response);
 }).DisableAntiforgery();
 
 tripsProxy.MapPost("/forecast/standard-durations", async (StandardDurationForecastRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.CalculateStandardDurationForecastsAsync(request.CountryName!, request.TripStart, request.DayLimit);
+    var response = await apiClient.CalculateStandardDurationForecastsAsync(
+        request.DepartureCountry,
+        request.DepartureCity,
+        request.DepartureTimezone,
+        request.DepartureIataCode,
+        request.ArrivalCountry,
+        request.ArrivalCity,
+        request.TripStart,
+        request.ArrivalTimezone,
+        request.ArrivalIataCode,
+        request.DayLimit);
     return Results.Ok(response);
 }).DisableAntiforgery();
 

@@ -1,26 +1,21 @@
 namespace ResidencyRoll.Shared.Trips;
 
-public class MaxTripEndDateRequestDto
+/// <summary>
+/// Represents a single leg of a trip (one flight/journey segment)
+/// </summary>
+public class TripLegDto
 {
     // Departure information
     public string DepartureCountry { get; set; } = string.Empty;
     public string DepartureCity { get; set; } = string.Empty;
+    public DateTime DepartureDateTime { get; set; }
     public string DepartureTimezone { get; set; } = "UTC";
     public string? DepartureIataCode { get; set; }
     
     // Arrival information
     public string ArrivalCountry { get; set; } = string.Empty;
     public string ArrivalCity { get; set; } = string.Empty;
-    public DateTime TripStart { get; set; }
+    public DateTime ArrivalDateTime { get; set; }
     public string ArrivalTimezone { get; set; } = "UTC";
     public string? ArrivalIataCode { get; set; }
-    
-    public int DayLimit { get; set; } = 183;
-    
-    // Legacy support
-    public string CountryName
-    {
-        get => string.IsNullOrEmpty(ArrivalCountry) ? string.Empty : ArrivalCountry;
-        set => ArrivalCountry = value;
-    }
 }

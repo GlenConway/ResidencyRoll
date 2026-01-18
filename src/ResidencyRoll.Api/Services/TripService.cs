@@ -7,10 +7,12 @@ namespace ResidencyRoll.Api.Services;
 public class TripService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ResidencyCalculationService _residencyService;
 
-    public TripService(ApplicationDbContext context)
+    public TripService(ApplicationDbContext context, ResidencyCalculationService residencyService)
     {
         _context = context;
+        _residencyService = residencyService;
     }
 
     public async Task<List<Trip>> GetAllTripsAsync(string userId)
@@ -61,23 +63,9 @@ public class TripService
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
-        var totals = new Dictionary<string, int>();
 
-        foreach (var trip in trips)
-        {
-            var days = Math.Max(0, (trip.EndDate - trip.StartDate).Days);
-
-            if (totals.ContainsKey(trip.CountryName))
-            {
-                totals[trip.CountryName] += days;
-            }
-            else
-            {
-                totals[trip.CountryName] = days;
-            }
-        }
-
-        return totals;
+        var presenceLog = _residencyService.GenerateDailyPresenceLog(trips);
+        return _residencyService.CalculateResidencyDays(presenceLog);
     }
 
     public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync(string userId)
@@ -89,7 +77,7 @@ public class TripService
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
-        return CalculateDaysPerCountryWithOverlapHandling(trips, windowStart, today);
+        return CalculateResidencyDaysForWindow(trips, windowStart, today);
     }
 
     /// <summary>
@@ -127,7 +115,8 @@ public class TripService
             var currentDate = start;
 
             // Count each day in the current trip
-            while (currentDate < end)
+            // Use <= to include the end date (a same-day trip should count as 1 day)
+            while (currentDate <= end)
             {
                 var nextDate = currentDate.AddDays(1);
                 
@@ -136,7 +125,7 @@ public class TripService
                 for (int j = i + 1; j < tripRanges.Count; j++)
                 {
                     var (_, laterStart, laterEnd) = tripRanges[j];
-                    if (currentDate >= laterStart && currentDate < laterEnd)
+                    if (currentDate >= laterStart && currentDate <= laterEnd)
                     {
                         coveredByLaterTrip = true;
                         break;
@@ -160,6 +149,15 @@ public class TripService
         return daysPerCountry;
     }
 
+    private Dictionary<string, int> CalculateResidencyDaysForWindow(
+        List<Trip> trips, DateTime windowStart, DateTime windowEnd)
+    {
+        var presenceLog = _residencyService.GenerateDailyPresenceLog(trips);
+        var startDate = DateOnly.FromDateTime(windowStart.Date);
+        var endDate = DateOnly.FromDateTime(windowEnd.Date);
+        return _residencyService.CalculateResidencyDays(presenceLog, startDate, endDate);
+    }
+
     public async Task<int> GetTotalDaysAwayInLast365DaysAsync(string userId)
     {
         var daysPerCountry = await GetDaysPerCountryInLast365DaysAsync(userId);
@@ -180,44 +178,96 @@ public class TripService
             .ToListAsync();
     }
 
-    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string userId, string countryName, DateTime tripStart, DateTime tripEnd)
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripAsync(string userId, Trip hypotheticalTrip)
     {
         var today = DateTime.Today;
         var currentWindowStart = today.AddDays(-365);
 
-        var forecastWindowEnd = tripEnd;
-        var forecastWindowStart = tripEnd.AddDays(-365);
+        // Use the later of arrival/departure as the end of the trip for forecast window calculation
+        var forecastWindowEnd = hypotheticalTrip.ArrivalDateTime > hypotheticalTrip.DepartureDateTime
+            ? hypotheticalTrip.ArrivalDateTime
+            : hypotheticalTrip.DepartureDateTime;
+        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
 
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
         // Calculate current window (last 365 days from today)
-        var currentDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(trips, currentWindowStart, today);
+        var currentDaysPerCountry = CalculateResidencyDaysForWindow(trips, currentWindowStart, today);
 
         // For forecast, include the hypothetical trip
         var tripsWithHypothetical = new List<Trip>(trips)
         {
-            new Trip
-            {
-                CountryName = countryName,
-                StartDate = tripStart,
-                EndDate = tripEnd,
-                UserId = userId
-            }
+            hypotheticalTrip
         };
 
-        var forecastDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        var forecastDaysPerCountry = CalculateResidencyDaysForWindow(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        EnsureArrivalDaysCounted(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd, forecastDaysPerCountry);
+
+        return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
+    
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(string userId, List<Trip> hypotheticalTrips)
+    {
+        if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
+        {
+            return (new Dictionary<string, int>(), new Dictionary<string, int>());
+        }
+        
+        var today = DateTime.Today;
+        var currentWindowStart = today.AddDays(-365);
+
+        // Use the latest date (either arrival or departure) as the end of the forecast window
+        var latestArrival = hypotheticalTrips.Max(t => t.ArrivalDateTime);
+        var latestDeparture = hypotheticalTrips.Max(t => t.DepartureDateTime);
+        var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
+        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
+
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
+
+        // Calculate current window (last 365 days from today)
+        var currentDaysPerCountry = CalculateResidencyDaysForWindow(trips, currentWindowStart, today);
+
+        // For forecast, include all hypothetical trips
+        var tripsWithHypothetical = new List<Trip>(trips);
+        tripsWithHypothetical.AddRange(hypotheticalTrips);
+
+        var forecastDaysPerCountry = CalculateResidencyDaysForWindow(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        EnsureArrivalDaysCounted(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd, forecastDaysPerCountry);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
     }
 
-    public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(string userId, string countryName, DateTime tripStart, int dayLimit = 183)
+    private static void EnsureArrivalDaysCounted(
+        IEnumerable<Trip> trips,
+        DateTime windowStart,
+        DateTime windowEnd,
+        Dictionary<string, int> daysPerCountry)
+    {
+        foreach (var trip in trips)
+        {
+            if (trip.ArrivalDateTime >= windowStart && trip.ArrivalDateTime <= windowEnd)
+            {
+                var key = trip.ArrivalCountry;
+                if (!daysPerCountry.ContainsKey(key) || daysPerCountry[key] == 0)
+                {
+                    daysPerCountry[key] = 1;
+                }
+            }
+        }
+    }
+
+    public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(string userId, Trip hypotheticalTrip, int dayLimit = 183)
     {
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
+        DateTime tripStart = hypotheticalTrip.ArrivalDateTime;
+        string arrivalCountry = hypotheticalTrip.ArrivalCountry;
         DateTime currentEnd = tripStart;
         int daysUsed = 0;
 
@@ -227,9 +277,26 @@ public class TripService
         while (minDate < maxDate)
         {
             DateTime midDate = minDate.AddDays((maxDate - minDate).Days / 2);
-            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, countryName, tripStart, midDate);
+            
+            // Create a hypothetical trip with the midpoint as departure date
+            var testTrip = new Trip
+            {
+                UserId = userId,
+                DepartureCountry = hypotheticalTrip.DepartureCountry,
+                DepartureCity = hypotheticalTrip.DepartureCity,
+                DepartureDateTime = midDate,
+                DepartureTimezone = hypotheticalTrip.DepartureTimezone,
+                DepartureIataCode = hypotheticalTrip.DepartureIataCode,
+                ArrivalCountry = hypotheticalTrip.ArrivalCountry,
+                ArrivalCity = hypotheticalTrip.ArrivalCity,
+                ArrivalDateTime = hypotheticalTrip.ArrivalDateTime,
+                ArrivalTimezone = hypotheticalTrip.ArrivalTimezone,
+                ArrivalIataCode = hypotheticalTrip.ArrivalIataCode
+            };
+            
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, testTrip);
 
-            int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
+            int totalDays = forecastDays.ContainsKey(arrivalCountry) ? forecastDays[arrivalCountry] : 0;
 
             if (totalDays <= dayLimit)
             {
@@ -246,17 +313,36 @@ public class TripService
         return (currentEnd, daysUsed);
     }
 
-    public async Task<List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)>> CalculateStandardDurationForecastsAsync(string userId, string countryName, DateTime tripStart, int dayLimit = 183, int[]? durations = null)
+    public async Task<List<(int DurationDays, DateTime EndDate, int TotalDaysInCountry, bool ExceedsLimit)>> CalculateStandardDurationForecastsAsync(string userId, Trip hypotheticalTrip, int dayLimit = 183, int[]? durations = null)
     {
         var results = new List<(int, DateTime, int, bool)>();
         int[] requestedDurations = durations is { Length: > 0 } ? durations : new[] { 7, 14, 21 };
+        string arrivalCountry = hypotheticalTrip.ArrivalCountry;
+        DateTime tripStart = hypotheticalTrip.ArrivalDateTime;
 
         foreach (var duration in requestedDurations)
         {
             var endDate = tripStart.AddDays(duration);
-            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, countryName, tripStart, endDate);
+            
+            // Create a hypothetical trip with the calculated end date
+            var testTrip = new Trip
+            {
+                UserId = userId,
+                DepartureCountry = hypotheticalTrip.DepartureCountry,
+                DepartureCity = hypotheticalTrip.DepartureCity,
+                DepartureDateTime = endDate,
+                DepartureTimezone = hypotheticalTrip.DepartureTimezone,
+                DepartureIataCode = hypotheticalTrip.DepartureIataCode,
+                ArrivalCountry = hypotheticalTrip.ArrivalCountry,
+                ArrivalCity = hypotheticalTrip.ArrivalCity,
+                ArrivalDateTime = hypotheticalTrip.ArrivalDateTime,
+                ArrivalTimezone = hypotheticalTrip.ArrivalTimezone,
+                ArrivalIataCode = hypotheticalTrip.ArrivalIataCode
+            };
+            
+            var (_, forecastDays) = await ForecastDaysWithTripAsync(userId, testTrip);
 
-            int totalDays = forecastDays.ContainsKey(countryName) ? forecastDays[countryName] : 0;
+            int totalDays = forecastDays.ContainsKey(arrivalCountry) ? forecastDays[arrivalCountry] : 0;
             bool exceedsLimit = totalDays > dayLimit;
 
             results.Add((duration, endDate, totalDays, exceedsLimit));

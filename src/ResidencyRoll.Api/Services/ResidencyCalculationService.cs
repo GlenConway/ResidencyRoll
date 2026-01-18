@@ -193,23 +193,44 @@ public class ResidencyCalculationService
             var departureTimeZone = TimeZoneInfo.FindSystemTimeZoneById(trip.DepartureTimezone);
             var arrivalTimeZone = TimeZoneInfo.FindSystemTimeZoneById(trip.ArrivalTimezone);
             
+            // Normalize DateTimeKind to Unspecified before timezone conversion to avoid Local/UTC mismatches
+            var departureSource = trip.DepartureDateTime.Kind == DateTimeKind.Unspecified
+                ? trip.DepartureDateTime
+                : DateTime.SpecifyKind(trip.DepartureDateTime, DateTimeKind.Unspecified);
+            var arrivalSource = trip.ArrivalDateTime.Kind == DateTimeKind.Unspecified
+                ? trip.ArrivalDateTime
+                : DateTime.SpecifyKind(trip.ArrivalDateTime, DateTimeKind.Unspecified);
+
             // Convert to UTC (the only absolute timeline)
             var departureUtc = trip.DepartureDateTime.Kind == DateTimeKind.Utc 
                 ? trip.DepartureDateTime 
-                : TimeZoneInfo.ConvertTimeToUtc(trip.DepartureDateTime, departureTimeZone);
+                : TimeZoneInfo.ConvertTimeToUtc(departureSource, departureTimeZone);
             
             var arrivalUtc = trip.ArrivalDateTime.Kind == DateTimeKind.Utc 
                 ? trip.ArrivalDateTime 
-                : TimeZoneInfo.ConvertTimeToUtc(trip.ArrivalDateTime, arrivalTimeZone);
+                : TimeZoneInfo.ConvertTimeToUtc(arrivalSource, arrivalTimeZone);
             
             // Get local times for reference
             var departureLocal = TimeZoneInfo.ConvertTime(departureUtc, departureTimeZone);
             var arrivalLocal = TimeZoneInfo.ConvertTime(arrivalUtc, arrivalTimeZone);
+            var arrivalDate = DateOnly.FromDateTime(arrivalLocal.Date);
+            var departureDate = DateOnly.FromDateTime(departureLocal.Date);
+
+            // Fill the stay from arrival through departure in the arrival country (counts nights in-country)
+            if (arrivalDate <= departureDate)
+            {
+                var stayDate = arrivalDate;
+                while (stayDate <= departureDate)
+                {
+                    AddOrUpdatePresence(presenceMap, stayDate, trip.ArrivalCountry, isInTransit: false);
+                    stayDate = stayDate.AddDays(1);
+                }
+            }
             
             // Find all calendar dates that might be relevant
             // We need to check dates in BOTH departure and arrival timezones (for IDL)
-            var departureDateLocal = DateOnly.FromDateTime(departureLocal.Date);
-            var arrivalDateLocal = DateOnly.FromDateTime(arrivalLocal.Date);
+            var departureDateLocal = departureDate;
+            var arrivalDateLocal = arrivalDate;
             
             // The relevant date range must include BOTH local dates
             var minDate = new[] { departureDateLocal, arrivalDateLocal }.Min();

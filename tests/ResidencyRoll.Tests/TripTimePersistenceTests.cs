@@ -24,7 +24,8 @@ public class TripTimePersistenceTests
     public async Task CreateTrip_PersistsDepartureAndArrivalTimes()
     {
         using var context = BuildContext(nameof(CreateTrip_PersistsDepartureAndArrivalTimes));
-        var service = new TripService(context);
+        var residencyService = new ResidencyCalculationService();
+        var service = new TripService(context, residencyService);
 
         var dto = new TripDto
         {
@@ -56,7 +57,8 @@ public class TripTimePersistenceTests
     public async Task UpdateTrip_DoesNotStripTimes()
     {
         using var context = BuildContext(nameof(UpdateTrip_DoesNotStripTimes));
-        var service = new TripService(context);
+        var residencyService = new ResidencyCalculationService();
+        var service = new TripService(context, residencyService);
 
         var original = new Trip
         {
