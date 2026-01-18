@@ -253,9 +253,9 @@
     {
         try
         {
-            var csvBytes = await ApiClient.ExportTripsAsync();
+            var (csvBytes, filename) = await ApiClient.ExportTripsAsync();
             var base64 = Convert.ToBase64String(csvBytes);
-            await JS.InvokeVoidAsync("downloadFile", "trips.csv", "text/csv", base64);
+            await JS.InvokeVoidAsync("downloadFile", filename, "text/csv", base64);
         }
         catch (Exception ex)
         {

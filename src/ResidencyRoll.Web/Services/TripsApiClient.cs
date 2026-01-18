@@ -148,11 +148,20 @@ public class TripsApiClient
         return result ?? new List<ResidencySummaryDto>();
     }
 
-    public async Task<byte[]> ExportTripsAsync()
+    public async Task<(byte[], string)> ExportTripsAsync()
     {
         var response = await _httpClient.GetAsync($"{BaseRoute}/export");
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsByteArrayAsync();
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        
+        // Extract filename from Content-Disposition header
+        var filename = "trips.csv";
+        if (response.Content.Headers.ContentDisposition?.FileName is not null)
+        {
+            filename = response.Content.Headers.ContentDisposition.FileName.Trim('"');
+        }
+        
+        return (bytes, filename);
     }
 
     public async Task<(int Imported, string Message, int Errors)> ImportTripsAsync(Stream fileStream, string fileName)
