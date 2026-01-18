@@ -16,6 +16,17 @@
         </RadzenColumn>
     </RadzenRow>
 
+    @if (availableCountries.Count > 0)
+    {
+        <RadzenRow Gap="1rem" class="rz-mt-3">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenLabel Text="Home Country" for="homeCountry" />
+                <RadzenDropDown @bind-Value="@homeCountry" Data="@availableCountries" 
+                               id="homeCountry" Placeholder="Select home country" />
+            </RadzenColumn>
+        </RadzenRow>
+    }
+
     @if (loading)
     {
         <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="rz-mt-4" />
@@ -30,7 +41,16 @@
     {
         <div class="timeline-container rz-mt-4">
             <div class="timeline-legend">
-                <span class="legend-item"><span class="legend-box" style="background-color: #4CAF50;"></span> Location</span>
+                @foreach (var country in availableCountries)
+                {
+                    var color = ColorService.GetCountryColor(country);
+                    var isHome = country == homeCountry;
+                    var style = isHome ? $"background-color: {color}; border: 2px solid {ColorService.GetCountryColorDark(country)};" : $"background-color: {color};";
+                    <span class="legend-item">
+                        <span class="legend-box" style="@style"></span>
+                        <span>@country @(isHome ? "🏠" : "")</span>
+                    </span>
+                }
                 <span class="legend-item"><span class="legend-box" style="background-color: #FF9800;"></span> Transit</span>
                 <span class="legend-item"><span class="legend-box" style="background-color: #f0f0f0; border: 1px solid #ccc;"></span> IDL Skip</span>
             </div>
@@ -43,9 +63,11 @@
                         <div class="days-container">
                             @foreach (var presence in group.Value)
                             {
+                                var cellStyle = GetDayStyle(presence);
                                 <div class="day-cell @GetDayClass(presence)" 
+                                     style="@cellStyle"
                                      title="@GetDayTooltip(presence)"
-                                     @onclick="() => ShowDayDetails(presence)">
+                                     @onclick="@((MouseEventArgs _) => ShowDayDetails(presence))">
                                     <div class="day-number">@presence.Date.Day</div>
                                     @if (presence.IsInTransitAtMidnight)
                                     {
@@ -168,7 +190,6 @@
     }
 
     .day-cell.location {
-        background-color: #4CAF50;
         color: white;
     }
 

@@ -185,6 +185,9 @@ builder.Services.AddHttpClient<TripsApiClient>(client =>
 })
 .AddHttpMessageHandler<ApiAuthenticationHandler>();
 
+// Register utility services
+builder.Services.AddScoped<CountryColorService>();
+
 // Register AccessTokenProvider for Blazor circuits
 builder.Services.AddScoped<AccessTokenProvider>();
 
