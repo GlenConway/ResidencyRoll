@@ -66,4 +66,38 @@ public class TripLegFactoryTests
         Assert.Equal("UTC", next.DepartureTimezone);
         Assert.Equal(new DateTime(2024, 10, 5, 7, 0, 0), next.DepartureDateTime);
     }
+
+    [Fact]
+    public void CreatesNextLeg_PreservesAllArrivalAirportData()
+    {
+        // Simulates the "Save and Add Leg" scenario where all airport data should be preserved
+        var baseTrip = new TripDto
+        {
+            DepartureCountry = "Canada",
+            DepartureCity = "Montreal",
+            DepartureIataCode = "YUL",
+            DepartureTimezone = "America/Toronto",
+            DepartureDateTime = new DateTime(2024, 7, 15, 8, 0, 0),
+            ArrivalCountry = "United Kingdom",
+            ArrivalCity = "London",
+            ArrivalIataCode = "LHR",
+            ArrivalTimezone = "Europe/London",
+            ArrivalDateTime = new DateTime(2024, 7, 15, 20, 30, 0)
+        };
+
+        var next = TripLegFactory.CreateNextLeg(baseTrip);
+
+        // Verify all arrival airport data becomes departure data for the next leg
+        Assert.Equal("United Kingdom", next.DepartureCountry);
+        Assert.Equal("London", next.DepartureCity);
+        Assert.Equal("LHR", next.DepartureIataCode);
+        Assert.Equal("Europe/London", next.DepartureTimezone);
+        
+        // Verify times are calculated correctly
+        Assert.Equal(new DateTime(2024, 7, 15, 22, 30, 0), next.DepartureDateTime); // +2h default layover
+        Assert.Equal(new DateTime(2024, 7, 16, 0, 30, 0), next.ArrivalDateTime);   // +2h default duration
+        
+        // Verify arrival is still initialized with the same timezone
+        Assert.Equal("Europe/London", next.ArrivalTimezone);
+    }
 }

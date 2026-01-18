@@ -78,6 +78,16 @@
         // Show first 20 airports initially (includes international airports)
         filteredAirports = AirportDatabase.GetAllAirports().Take(20).ToList();
         
+        UpdateSearchTextFromParameters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        UpdateSearchTextFromParameters();
+    }
+
+    private void UpdateSearchTextFromParameters()
+    {
         // If IataCode is provided, initialize with that airport
         if (!string.IsNullOrEmpty(IataCode))
         {
@@ -97,6 +107,15 @@
             {
                 searchText = selectedAirport.DisplayName;
             }
+            else
+            {
+                // If no matching airport found, just show the city
+                searchText = string.Empty;
+            }
+        }
+        else
+        {
+            searchText = string.Empty;
         }
     }
 
@@ -198,13 +217,13 @@
             IataCode = selectedAirport.IataCode;
             searchText = selectedAirport.DisplayName;
 
-            // Notify parent components
+            // Notify parent components - await all to ensure they complete
             await CityChanged.InvokeAsync(City);
             await CountryChanged.InvokeAsync(Country);
             await SelectedTimezoneChanged.InvokeAsync(SelectedTimezone);
             await IataCodeChanged.InvokeAsync(IataCode);
 
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
