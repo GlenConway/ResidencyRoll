@@ -62,13 +62,12 @@ public partial class ResidencyTimeline
             
             dailyPresence = await ApiClient.GetDailyPresenceAsync(start, end);
             
-            // Fill in IDL skipped days (westbound crossings)
-            FillIdlSkippedDays();
+            // Sort dailyPresence by date descending for display
+            dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
 
             // Build list of available countries and register them with the color service
             availableCountries = dailyPresence
                 .Where(d => !string.IsNullOrEmpty(d.LocationAtMidnight) 
-                    && d.LocationAtMidnight != "IDL_SKIP" 
                     && d.LocationAtMidnight != "IN_TRANSIT")
                 .Select(d => d.LocationAtMidnight)
                 .Distinct()
@@ -96,35 +95,6 @@ public partial class ResidencyTimeline
         }
     }
 
-    private void FillIdlSkippedDays()
-    {
-        // Identify date gaps that represent IDL westbound crossings
-        var allDates = dailyPresence.OrderBy(d => d.Date).ToList();
-        for (int i = 0; i < allDates.Count - 1; i++)
-        {
-            var current = allDates[i];
-            var next = allDates[i + 1];
-            var daysBetween = (next.Date.DayNumber - current.Date.DayNumber);
-            
-            if (daysBetween > 1)
-            {
-                // Fill the gap with "IDL skip" markers
-                for (int j = 1; j < daysBetween; j++)
-                {
-                    var skippedDate = current.Date.AddDays(j);
-                    dailyPresence.Add(new DailyPresenceDto
-                    {
-                        Date = skippedDate,
-                        LocationAtMidnight = "IDL_SKIP",
-                        IsInTransitAtMidnight = false
-                    });
-                }
-            }
-        }
-        
-        dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
-    }
-
     private Dictionary<string, List<DailyPresenceDto>> GetGroupedByMonth()
     {
         return dailyPresence
@@ -135,8 +105,6 @@ public partial class ResidencyTimeline
 
     private string GetDayClass(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return "idl-skip";
         if (presence.IsInTransitAtMidnight)
             return "transit";
         return "location";
@@ -144,8 +112,7 @@ public partial class ResidencyTimeline
 
     private string GetDayStyle(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP" 
-            || presence.LocationAtMidnight == "IN_TRANSIT" 
+        if (presence.LocationAtMidnight == "IN_TRANSIT" 
             || presence.IsInTransitAtMidnight)
             return string.Empty;
 
@@ -164,8 +131,6 @@ public partial class ResidencyTimeline
 
     private string GetDayTooltip(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
         if (presence.IsInTransitAtMidnight || presence.LocationAtMidnight == "IN_TRANSIT")
             return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
         return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
@@ -198,9 +163,6 @@ public partial class ResidencyTimeline
 
     private void ShowDayDetails(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return;
-            
         selectedDay = presence;
     }
 }

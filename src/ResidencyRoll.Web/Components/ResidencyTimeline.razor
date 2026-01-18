@@ -52,7 +52,6 @@
                     </span>
                 }
                 <span class="legend-item"><span class="legend-box" style="background-color: #FF9800;"></span> Transit</span>
-                <span class="legend-item"><span class="legend-box" style="background-color: #f0f0f0; border: 1px solid #ccc;"></span> IDL Skip</span>
             </div>
             
             <div class="timeline-grid">
@@ -73,7 +72,7 @@
                                     {
                                         <div class="day-label">Transit</div>
                                     }
-                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight) && presence.LocationAtMidnight != "IDL_SKIP")
+                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight))
                                     {
                                         <div class="day-label">@GetCountryCode(presence.LocationAtMidnight)</div>
                                     }
@@ -196,12 +195,6 @@
     .day-cell.transit {
         background-color: #FF9800;
         color: white;
-    }
-
-    .day-cell.idl-skip {
-        background-color: #f0f0f0;
-        border: 1px dashed #999;
-        color: #666;
     }
 
     .day-number {

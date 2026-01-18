@@ -56,9 +56,6 @@ public class CountryColorService
         if (string.IsNullOrEmpty(country))
             return "#808080"; // gray for unknown
 
-        if (country == "IDL_SKIP")
-            return "#f0f0f0"; // light gray for skipped days
-
         if (!_countryColorMap.ContainsKey(country))
         {
             // Assign a color from the palette based on existing entries
@@ -98,7 +95,7 @@ public class CountryColorService
     {
         foreach (var country in countries)
         {
-            if (!_countryColorMap.ContainsKey(country) && country != "IDL_SKIP")
+            if (!_countryColorMap.ContainsKey(country))
             {
                 // Pre-register to ensure consistent ordering
                 var colorIndex = _countryColorMap.Count % ColorPalette.Count;
