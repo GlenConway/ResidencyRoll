@@ -31,15 +31,3 @@
         </div>
     }
 </RadzenCard>
-
-@code {
-    [Parameter]
-    public List<TimelineItem> TimelineItems { get; set; } = new();
-
-    public class TimelineItem
-    {
-        public string Title { get; set; } = string.Empty;
-        public string Subtitle { get; set; } = string.Empty;
-        public string DurationText { get; set; } = string.Empty;
-    }
-}

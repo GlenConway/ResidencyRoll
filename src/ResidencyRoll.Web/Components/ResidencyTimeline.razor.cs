@@ -1,0 +1,134 @@
+using Microsoft.AspNetCore.Components;
+using ResidencyRoll.Shared.Trips;
+using ResidencyRoll.Web.Services;
+
+namespace ResidencyRoll.Web.Components;
+
+public partial class ResidencyTimeline
+{
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private List<DailyPresenceDto> dailyPresence = new();
+    private DailyPresenceDto? selectedDay;
+    private bool loading = false;
+
+    [Inject] private TripsApiClient ApiClient { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Default to last 365 days
+        endDate = DateTime.Today;
+        startDate = DateTime.Today.AddDays(-365);
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var start = startDate.HasValue ? DateOnly.FromDateTime(startDate.Value) : (DateOnly?)null;
+            var end = endDate.HasValue ? DateOnly.FromDateTime(endDate.Value) : (DateOnly?)null;
+            
+            dailyPresence = await ApiClient.GetDailyPresenceAsync(start, end);
+            
+            // Fill in IDL skipped days (westbound crossings)
+            FillIdlSkippedDays();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void FillIdlSkippedDays()
+    {
+        // Identify date gaps that represent IDL westbound crossings
+        var allDates = dailyPresence.OrderBy(d => d.Date).ToList();
+        for (int i = 0; i < allDates.Count - 1; i++)
+        {
+            var current = allDates[i];
+            var next = allDates[i + 1];
+            var daysBetween = (next.Date.DayNumber - current.Date.DayNumber);
+            
+            if (daysBetween > 1)
+            {
+                // Fill the gap with "IDL skip" markers
+                for (int j = 1; j < daysBetween; j++)
+                {
+                    var skippedDate = current.Date.AddDays(j);
+                    dailyPresence.Add(new DailyPresenceDto
+                    {
+                        Date = skippedDate,
+                        LocationAtMidnight = "IDL_SKIP",
+                        IsInTransitAtMidnight = false
+                    });
+                }
+            }
+        }
+        
+        dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
+    }
+
+    private Dictionary<string, List<DailyPresenceDto>> GetGroupedByMonth()
+    {
+        return dailyPresence
+            .GroupBy(d => d.Date.ToString("MMMM yyyy"))
+            .OrderByDescending(g => dailyPresence.First(d => d.Date.ToString("MMMM yyyy") == g.Key).Date)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Date).ToList());
+    }
+
+    private string GetDayClass(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return "idl-skip";
+        if (presence.IsInTransitAtMidnight)
+            return "transit";
+        return "location";
+    }
+
+    private string GetDayTooltip(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
+        if (presence.IsInTransitAtMidnight)
+            return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
+        return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
+    }
+
+    private string GetCountryCode(string countryName)
+    {
+        // Return 2-3 letter country codes for display
+        var codes = new Dictionary<string, string>
+        {
+            {"Canada", "CA"},
+            {"United States", "US"},
+            {"USA", "US"},
+            {"United Kingdom", "UK"},
+            {"Australia", "AU"},
+            {"New Zealand", "NZ"},
+            {"France", "FR"},
+            {"Germany", "DE"},
+            {"Japan", "JP"},
+            {"China", "CN"},
+            {"India", "IN"},
+            {"Brazil", "BR"},
+            {"Mexico", "MX"},
+            {"Spain", "ES"},
+            {"Italy", "IT"},
+        };
+
+        return codes.TryGetValue(countryName, out var code) ? code : countryName.Substring(0, Math.Min(3, countryName.Length)).ToUpper();
+    }
+
+    private void ShowDayDetails(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP")
+            return;
+            
+        selectedDay = presence;
+    }
+}
