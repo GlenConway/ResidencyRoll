@@ -77,7 +77,7 @@ public class TripService
             .Where(t => t.UserId == userId)
             .ToListAsync();
 
-        return CalculateResidencyDaysForWindow(trips, windowStart, today);
+        return CalculateDaysPerCountryByDateRange(trips, windowStart, today);
     }
 
     /// <summary>
@@ -194,7 +194,7 @@ public class TripService
             .ToListAsync();
 
         // Calculate current window (last 365 days from today)
-        var currentDaysPerCountry = CalculateResidencyDaysForWindow(trips, currentWindowStart, today);
+        var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(trips, currentWindowStart, today);
 
         // For forecast, include the hypothetical trip
         var tripsWithHypothetical = new List<Trip>(trips)
@@ -202,7 +202,7 @@ public class TripService
             hypotheticalTrip
         };
 
-        var forecastDaysPerCountry = CalculateResidencyDaysForWindow(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
         EnsureArrivalDaysCounted(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd, forecastDaysPerCountry);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
@@ -229,16 +229,86 @@ public class TripService
             .ToListAsync();
 
         // Calculate current window (last 365 days from today)
-        var currentDaysPerCountry = CalculateResidencyDaysForWindow(trips, currentWindowStart, today);
+        var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(trips, currentWindowStart, today);
 
         // For forecast, include all hypothetical trips
         var tripsWithHypothetical = new List<Trip>(trips);
         tripsWithHypothetical.AddRange(hypotheticalTrips);
 
-        var forecastDaysPerCountry = CalculateResidencyDaysForWindow(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
         EnsureArrivalDaysCounted(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd, forecastDaysPerCountry);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
+
+    private Dictionary<string, int> CalculateDaysPerCountryByDateRange(
+        IEnumerable<Trip> trips,
+        DateTime windowStart,
+        DateTime windowEnd)
+    {
+        var windowStartDate = DateOnly.FromDateTime(windowStart.Date);
+        var windowEndDate = DateOnly.FromDateTime(windowEnd.Date);
+        var daysByDate = new Dictionary<DateOnly, string>();
+
+        var orderedTrips = trips
+            .Select(t => new
+            {
+                Country = string.IsNullOrWhiteSpace(t.ArrivalCountry) ? t.CountryName : t.ArrivalCountry,
+                Start = t.ArrivalDateTime,
+                End = t.DepartureDateTime
+            })
+            .Where(t => !string.IsNullOrWhiteSpace(t.Country))
+            .Select(t => new
+            {
+                t.Country,
+                Start = t.Start == default ? DateOnly.FromDateTime(DateTime.MinValue) : DateOnly.FromDateTime(t.Start.Date),
+                End = t.End == default ? DateOnly.FromDateTime(DateTime.MinValue) : DateOnly.FromDateTime(t.End.Date)
+            })
+            .OrderBy(t => t.Start)
+            .ThenBy(t => t.End)
+            .ToList();
+
+        foreach (var trip in orderedTrips)
+        {
+            var start = trip.Start;
+            var end = trip.End;
+
+            if (end == default || start == default)
+            {
+                continue;
+            }
+
+            if (end < start)
+            {
+                (start, end) = (end, start);
+            }
+
+            if (end <= start)
+            {
+                continue;
+            }
+
+            if (start < windowStartDate)
+            {
+                start = windowStartDate;
+            }
+
+            if (end > windowEndDate)
+            {
+                end = windowEndDate;
+            }
+
+            var current = start;
+            while (current < end)
+            {
+                daysByDate[current] = trip.Country;
+                current = current.AddDays(1);
+            }
+        }
+
+        return daysByDate
+            .GroupBy(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
     }
 
     private static void EnsureArrivalDaysCounted(
