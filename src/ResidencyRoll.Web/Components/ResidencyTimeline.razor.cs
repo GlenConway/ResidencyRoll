@@ -11,15 +11,43 @@ public partial class ResidencyTimeline
     private List<DailyPresenceDto> dailyPresence = new();
     private DailyPresenceDto? selectedDay;
     private bool loading = false;
+    private string? homeCountry;
+    private string? _previousHomeCountry;
+    private List<string> availableCountries = new();
 
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
+    [Inject] private CountryColorService ColorService { get; set; } = default!;
+    [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
         // Default to last 365 days
         endDate = DateTime.Today;
         startDate = DateTime.Today.AddDays(-365);
+        
+        // Load saved home country from localStorage
+        homeCountry = await LocalStorage.GetItemAsync("residencyroll_home_country");
+        
         await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Handle home country changes after render
+        if (homeCountry != _previousHomeCountry)
+        {
+            _previousHomeCountry = homeCountry;
+            ColorService.HomeCountry = homeCountry;
+            
+            // Save to localStorage
+            if (!string.IsNullOrEmpty(homeCountry))
+            {
+                await LocalStorage.SetItemAsync("residencyroll_home_country", homeCountry);
+            }
+            
+            StateHasChanged();
+        }
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     private async Task LoadData()
@@ -36,6 +64,30 @@ public partial class ResidencyTimeline
             
             // Fill in IDL skipped days (westbound crossings)
             FillIdlSkippedDays();
+
+            // Build list of available countries and register them with the color service
+            availableCountries = dailyPresence
+                .Where(d => !string.IsNullOrEmpty(d.LocationAtMidnight) 
+                    && d.LocationAtMidnight != "IDL_SKIP" 
+                    && d.LocationAtMidnight != "IN_TRANSIT")
+                .Select(d => d.LocationAtMidnight)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+
+            ColorService.RegisterCountries(availableCountries);
+            
+            // Set home country if not already set or if saved country is not in the list
+            if ((string.IsNullOrEmpty(homeCountry) || !availableCountries.Contains(homeCountry)) 
+                && availableCountries.Count > 0)
+            {
+                homeCountry = availableCountries[0];
+                ColorService.HomeCountry = homeCountry;
+            }
+            else if (!string.IsNullOrEmpty(homeCountry))
+            {
+                ColorService.HomeCountry = homeCountry;
+            }
         }
         finally
         {
@@ -90,11 +142,31 @@ public partial class ResidencyTimeline
         return "location";
     }
 
+    private string GetDayStyle(DailyPresenceDto presence)
+    {
+        if (presence.LocationAtMidnight == "IDL_SKIP" 
+            || presence.LocationAtMidnight == "IN_TRANSIT" 
+            || presence.IsInTransitAtMidnight)
+            return string.Empty;
+
+        var isHome = presence.LocationAtMidnight == homeCountry;
+        
+        // Home country gets a clear/light background to fade into the background
+        if (isHome)
+        {
+            return "background-color: #f5f5f5; border: 1px solid #ddd; color: #999;";
+        }
+
+        // Other countries get their assigned colors to stand out
+        var color = ColorService.GetCountryColor(presence.LocationAtMidnight);
+        return $"background-color: {color}; border: 1px solid {ColorService.GetCountryColorDark(presence.LocationAtMidnight)}; color: white;";
+    }
+
     private string GetDayTooltip(DailyPresenceDto presence)
     {
         if (presence.LocationAtMidnight == "IDL_SKIP")
             return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
-        if (presence.IsInTransitAtMidnight)
+        if (presence.IsInTransitAtMidnight || presence.LocationAtMidnight == "IN_TRANSIT")
             return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
         return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
     }
