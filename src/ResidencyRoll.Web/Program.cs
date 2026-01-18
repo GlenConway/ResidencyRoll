@@ -332,17 +332,7 @@ tripsProxy.MapDelete("/{id:int}", async (int id, TripsApiClient apiClient) =>
 
 tripsProxy.MapPost("/forecast", async (ForecastRequestDto request, TripsApiClient apiClient) =>
 {
-    var response = await apiClient.ForecastDaysWithTripAsync(
-        request.DepartureCountry,
-        request.DepartureCity,
-        request.DepartureDateTime,
-        request.DepartureTimezone,
-        request.DepartureIataCode,
-        request.ArrivalCountry,
-        request.ArrivalCity,
-        request.ArrivalDateTime,
-        request.ArrivalTimezone,
-        request.ArrivalIataCode);
+    var response = await apiClient.ForecastDaysWithTripsAsync(request.Legs);
     return Results.Ok(response);
 }).DisableAntiforgery();
 

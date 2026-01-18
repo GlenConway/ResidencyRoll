@@ -206,6 +206,38 @@ public class TripService
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
     }
+    
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(string userId, List<Trip> hypotheticalTrips)
+    {
+        if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
+        {
+            return (new Dictionary<string, int>(), new Dictionary<string, int>());
+        }
+        
+        var today = DateTime.Today;
+        var currentWindowStart = today.AddDays(-365);
+
+        // Use the latest date (either arrival or departure) as the end of the forecast window
+        var latestArrival = hypotheticalTrips.Max(t => t.ArrivalDateTime);
+        var latestDeparture = hypotheticalTrips.Max(t => t.DepartureDateTime);
+        var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
+        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
+
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
+
+        // Calculate current window (last 365 days from today)
+        var currentDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(trips, currentWindowStart, today);
+
+        // For forecast, include all hypothetical trips
+        var tripsWithHypothetical = new List<Trip>(trips);
+        tripsWithHypothetical.AddRange(hypotheticalTrips);
+
+        var forecastDaysPerCountry = CalculateDaysPerCountryWithOverlapHandling(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+
+        return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
 
     public async Task<(DateTime MaxEndDate, int DaysAtLimit)> CalculateMaxTripEndDateAsync(string userId, Trip hypotheticalTrip, int dayLimit = 183)
     {

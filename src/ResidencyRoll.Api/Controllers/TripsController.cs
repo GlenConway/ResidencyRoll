@@ -191,23 +191,35 @@ public class TripsController : ControllerBase
 
         var userId = GetUserId();
         
-        // Create a hypothetical trip from the forecast request
-        var hypotheticalTrip = new Trip
+        // Convert legs to Trip objects
+        var hypotheticalTrips = request.Legs.Select(leg => new Trip
         {
             UserId = userId,
-            DepartureCountry = request.DepartureCountry,
-            DepartureCity = request.DepartureCity,
-            DepartureDateTime = request.DepartureDateTime,
-            DepartureTimezone = request.DepartureTimezone,
-            DepartureIataCode = request.DepartureIataCode,
-            ArrivalCountry = request.ArrivalCountry,
-            ArrivalCity = request.ArrivalCity,
-            ArrivalDateTime = request.ArrivalDateTime,
-            ArrivalTimezone = request.ArrivalTimezone,
-            ArrivalIataCode = request.ArrivalIataCode
-        };
+            DepartureCountry = leg.DepartureCountry,
+            DepartureCity = leg.DepartureCity,
+            DepartureDateTime = leg.DepartureDateTime,
+            DepartureTimezone = leg.DepartureTimezone,
+            DepartureIataCode = leg.DepartureIataCode,
+            ArrivalCountry = leg.ArrivalCountry,
+            ArrivalCity = leg.ArrivalCity,
+            ArrivalDateTime = leg.ArrivalDateTime,
+            ArrivalTimezone = leg.ArrivalTimezone,
+            ArrivalIataCode = leg.ArrivalIataCode
+        }).ToList();
         
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(userId, hypotheticalTrip);
+        Dictionary<string, int> current;
+        Dictionary<string, int> forecast;
+        
+        if (hypotheticalTrips.Count > 0)
+        {
+            (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(userId, hypotheticalTrips);
+        }
+        else
+        {
+            // Fall back to empty forecast if no legs provided
+            current = new Dictionary<string, int>();
+            forecast = new Dictionary<string, int>();
+        }
 
         var response = new ForecastResponseDto
         {

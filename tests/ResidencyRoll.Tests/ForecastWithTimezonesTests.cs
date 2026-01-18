@@ -262,4 +262,95 @@ public class ForecastWithTimezonesTests : IDisposable
                 "ExceedsLimit flag should match actual count");
         }
     }
+
+    [Fact]
+    public async Task ForecastWithMultipleTrips_TwoLegs_CalculatesCorrectly()
+    {
+        // Test forecasting with multiple trips (e.g., outbound and return)
+        // Arrange: No existing trips
+        
+        // Trip 1: Travel to London, stay for 7 days
+        // Arrive London: Feb 2, 2026 at 6:00 AM GMT (after departing Canada Feb 1)
+        // Depart London: Feb 9, 2026 at 10:00 AM GMT
+        var trip1 = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "Canada",
+            DepartureCity = "Toronto",
+            DepartureDateTime = new DateTime(2026, 2, 9, 10, 0, 0),
+            DepartureTimezone = "Europe/London",  // Departing FROM London
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "United Kingdom",
+            ArrivalCity = "London",
+            ArrivalDateTime = new DateTime(2026, 2, 2, 6, 0, 0),
+            ArrivalTimezone = "Europe/London",
+            ArrivalIataCode = "LHR"
+        };
+
+        var trips = new List<Trip> { trip1 };
+
+        // Act
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);
+
+        // Assert
+        Assert.NotNull(forecast);
+        
+        // Debug: Print what's in forecast
+        var forecastKeys = string.Join(", ", forecast.Keys);
+        Assert.True(forecast.ContainsKey("United Kingdom"), $"United Kingdom should be in forecast. Found: {forecastKeys}");
+        
+        // Should count approximately 7 days in UK
+        var ukDays = forecast["United Kingdom"];
+        Assert.True(ukDays >= 6 && ukDays <= 8, $"Should count approximately 7 days in UK, got {ukDays}");
+    }
+
+    [Fact]
+    public async Task ForecastWithMultipleTrips_RoundTripWithConnections_CalculatesCorrectly()
+    {
+        // Test a realistic scenario: Travel to UK and stay for 14 days
+        // Arrive in UK: Mar 2, 2026 at 8:00 AM GMT
+        // Depart from UK: Mar 16, 2026 at 10:00 AM GMT  
+        // This represents the STAY in United Kingdom
+        var ukStay = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "Canada",  // Departed back to Canada
+            DepartureCity = "Toronto",
+            DepartureDateTime = new DateTime(2026, 3, 16, 10, 0, 0),
+            DepartureTimezone = "Europe/London",  // Departing FROM London
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "United Kingdom",  // Arrived in UK
+            ArrivalCity = "London",
+            ArrivalDateTime = new DateTime(2026, 3, 2, 8, 0, 0),
+            ArrivalTimezone = "Europe/London",
+            ArrivalIataCode = "LHR"
+        };
+
+        var trips = new List<Trip> { ukStay };
+
+        // Act
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);
+
+        // Assert
+        Assert.NotNull(forecast);
+        Assert.True(forecast.ContainsKey("United Kingdom"), "United Kingdom should be in forecast");
+        
+        // Should count approximately 14 days in UK (from arrival Mar 2 to departure Mar 16)
+        var ukDays = forecast["United Kingdom"];
+        Assert.True(ukDays >= 13 && ukDays <= 15, $"Should count approximately 14 days in UK, got {ukDays}");
+    }
+
+    [Fact]
+    public async Task ForecastWithMultipleTrips_EmptyList_ReturnsEmpty()
+    {
+        // Test with empty trip list
+        var trips = new List<Trip>();
+
+        // Act
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);
+
+        // Assert
+        Assert.NotNull(forecast);
+        Assert.Empty(forecast);
+    }
 }

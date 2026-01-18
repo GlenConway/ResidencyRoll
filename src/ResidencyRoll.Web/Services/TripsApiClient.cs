@@ -71,6 +71,18 @@ public class TripsApiClient
         return await _httpClient.GetFromJsonAsync<int>($"{BaseRoute}/days-at-home/last365");
     }
 
+    public async Task<ForecastResponseDto> ForecastDaysWithTripsAsync(List<TripLegDto> legs)
+    {
+        var request = new ForecastRequestDto
+        {
+            Legs = legs
+        };
+
+        var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/forecast", request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ForecastResponseDto>())!;
+    }
+    
     public async Task<ForecastResponseDto> ForecastDaysWithTripAsync(
         string departureCountry, string departureCity, DateTime departureDateTime, 
         string departureTimezone, string? departureIataCode,
@@ -79,16 +91,22 @@ public class TripsApiClient
     {
         var request = new ForecastRequestDto
         {
-            DepartureCountry = departureCountry,
-            DepartureCity = departureCity,
-            DepartureDateTime = departureDateTime,
-            DepartureTimezone = departureTimezone,
-            DepartureIataCode = departureIataCode,
-            ArrivalCountry = arrivalCountry,
-            ArrivalCity = arrivalCity,
-            ArrivalDateTime = arrivalDateTime,
-            ArrivalTimezone = arrivalTimezone,
-            ArrivalIataCode = arrivalIataCode
+            Legs = new List<TripLegDto>
+            {
+                new TripLegDto
+                {
+                    DepartureCountry = departureCountry,
+                    DepartureCity = departureCity,
+                    DepartureDateTime = departureDateTime,
+                    DepartureTimezone = departureTimezone,
+                    DepartureIataCode = departureIataCode,
+                    ArrivalCountry = arrivalCountry,
+                    ArrivalCity = arrivalCity,
+                    ArrivalDateTime = arrivalDateTime,
+                    ArrivalTimezone = arrivalTimezone,
+                    ArrivalIataCode = arrivalIataCode
+                }
+            }
         };
 
         var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/forecast", request);
