@@ -187,77 +187,57 @@ public class ResidencyCalculationService
     /// </summary>
     private void ProcessTripForDailyPresence(Trip trip, Dictionary<DateOnly, DailyPresence> presenceMap)
     {
-        try
+        // Get timezone information with safe fallbacks to UTC
+        var departureTimeZone = GetTimeZoneOrUtc(trip.DepartureTimezone);
+        var arrivalTimeZone = GetTimeZoneOrUtc(trip.ArrivalTimezone);
+
+        // Normalize DateTimeKind to Unspecified before timezone conversion to avoid Local/UTC mismatches
+        var departureSource = trip.DepartureDateTime.Kind == DateTimeKind.Unspecified
+            ? trip.DepartureDateTime
+            : DateTime.SpecifyKind(trip.DepartureDateTime, DateTimeKind.Unspecified);
+        var arrivalSource = trip.ArrivalDateTime.Kind == DateTimeKind.Unspecified
+            ? trip.ArrivalDateTime
+            : DateTime.SpecifyKind(trip.ArrivalDateTime, DateTimeKind.Unspecified);
+
+        // Convert to UTC (the only absolute timeline)
+        var departureUtc = trip.DepartureDateTime.Kind == DateTimeKind.Utc 
+            ? trip.DepartureDateTime 
+            : TimeZoneInfo.ConvertTimeToUtc(departureSource, departureTimeZone);
+        
+        var arrivalUtc = trip.ArrivalDateTime.Kind == DateTimeKind.Utc 
+            ? trip.ArrivalDateTime 
+            : TimeZoneInfo.ConvertTimeToUtc(arrivalSource, arrivalTimeZone);
+        
+        // Ensure we always have a meaningful departure country (fallback to arrival if missing)
+        var departureCountry = string.IsNullOrWhiteSpace(trip.DepartureCountry)
+            ? trip.ArrivalCountry
+            : trip.DepartureCountry;
+
+        // Find all calendar dates that might be relevant
+        // We need to check dates in BOTH departure and arrival timezones (for IDL)
+        var departureLocal = TimeZoneInfo.ConvertTime(departureUtc, departureTimeZone);
+        var arrivalLocal = TimeZoneInfo.ConvertTime(arrivalUtc, arrivalTimeZone);
+        var departureDate = DateOnly.FromDateTime(departureLocal.Date);
+        var arrivalDate = DateOnly.FromDateTime(arrivalLocal.Date);
+
+        // The relevant date range must include BOTH local dates
+        var minDate = new[] { departureDate, arrivalDate }.Min();
+        var maxDate = new[] { departureDate, arrivalDate }.Max();
+        
+        // Add buffer ONLY for eastbound IDL crossings (arrival date < departure date)
+        // This handles the case where you arrive "yesterday" due to crossing the date line
+        if (arrivalDate < departureDate)
         {
-            // Get timezone information
-            var departureTimeZone = TimeZoneInfo.FindSystemTimeZoneById(trip.DepartureTimezone);
-            var arrivalTimeZone = TimeZoneInfo.FindSystemTimeZoneById(trip.ArrivalTimezone);
-            
-            // Normalize DateTimeKind to Unspecified before timezone conversion to avoid Local/UTC mismatches
-            var departureSource = trip.DepartureDateTime.Kind == DateTimeKind.Unspecified
-                ? trip.DepartureDateTime
-                : DateTime.SpecifyKind(trip.DepartureDateTime, DateTimeKind.Unspecified);
-            var arrivalSource = trip.ArrivalDateTime.Kind == DateTimeKind.Unspecified
-                ? trip.ArrivalDateTime
-                : DateTime.SpecifyKind(trip.ArrivalDateTime, DateTimeKind.Unspecified);
-
-            // Convert to UTC (the only absolute timeline)
-            var departureUtc = trip.DepartureDateTime.Kind == DateTimeKind.Utc 
-                ? trip.DepartureDateTime 
-                : TimeZoneInfo.ConvertTimeToUtc(departureSource, departureTimeZone);
-            
-            var arrivalUtc = trip.ArrivalDateTime.Kind == DateTimeKind.Utc 
-                ? trip.ArrivalDateTime 
-                : TimeZoneInfo.ConvertTimeToUtc(arrivalSource, arrivalTimeZone);
-            
-            // Get local times for reference
-            var departureLocal = TimeZoneInfo.ConvertTime(departureUtc, departureTimeZone);
-            var arrivalLocal = TimeZoneInfo.ConvertTime(arrivalUtc, arrivalTimeZone);
-            var arrivalDate = DateOnly.FromDateTime(arrivalLocal.Date);
-            var departureDate = DateOnly.FromDateTime(departureLocal.Date);
-
-            // Fill the stay from arrival through departure in the arrival country (counts nights in-country)
-            if (arrivalDate <= departureDate)
-            {
-                var stayDate = arrivalDate;
-                while (stayDate <= departureDate)
-                {
-                    AddOrUpdatePresence(presenceMap, stayDate, trip.ArrivalCountry, isInTransit: false);
-                    stayDate = stayDate.AddDays(1);
-                }
-            }
-            
-            // Find all calendar dates that might be relevant
-            // We need to check dates in BOTH departure and arrival timezones (for IDL)
-            var departureDateLocal = departureDate;
-            var arrivalDateLocal = arrivalDate;
-            
-            // The relevant date range must include BOTH local dates
-            var minDate = new[] { departureDateLocal, arrivalDateLocal }.Min();
-            var maxDate = new[] { departureDateLocal, arrivalDateLocal }.Max();
-            
-            // Add buffer ONLY for eastbound IDL crossings (arrival date < departure date)
-            // This handles the case where you arrive "yesterday" due to crossing the date line
-            if (arrivalDateLocal < departureDateLocal)
-            {
-                // Eastbound IDL crossing - need extra buffer
-                minDate = minDate.AddDays(-1);
-                maxDate = maxDate.AddDays(1);
-            }
-            
-            // For each calendar date in this range, check where the person was at midnight
-            var currentDate = minDate;
-            while (currentDate <= maxDate)
-            {
-                ProcessDateForTrip(currentDate, trip, departureUtc, arrivalUtc, departureTimeZone, arrivalTimeZone, presenceMap);
-                currentDate = currentDate.AddDays(1);
-            }
+            minDate = minDate.AddDays(-1);
+            maxDate = maxDate.AddDays(1);
         }
-        catch (TimeZoneNotFoundException ex)
+        
+        // For each calendar date in this range, check where the person was at midnight
+        var currentDate = minDate;
+        while (currentDate <= maxDate)
         {
-            // Fallback: use UTC if timezone not found
-            Console.WriteLine($"Timezone not found: {ex.Message}. Using UTC as fallback.");
-            ProcessTripWithUtcFallback(trip, presenceMap);
+            ProcessDateForTrip(currentDate, trip, departureUtc, arrivalUtc, departureTimeZone, arrivalTimeZone, presenceMap, departureCountry);
+            currentDate = currentDate.AddDays(1);
         }
     }
     
@@ -272,17 +252,33 @@ public class ResidencyCalculationService
         DateTime arrivalUtc,
         TimeZoneInfo departureTimeZone,
         TimeZoneInfo arrivalTimeZone,
-        Dictionary<DateOnly, DailyPresence> presenceMap)
+        Dictionary<DateOnly, DailyPresence> presenceMap,
+        string effectiveDepartureCountry)
     {
-        // Check midnight in departure timezone for this date
-        CheckMidnightInTimezone(date, trip.DepartureCountry, trip.ArrivalCountry, 
-            departureUtc, arrivalUtc, departureTimeZone, presenceMap);
-        
-        // Also check midnight in arrival timezone (important for IDL scenarios)
+        // Evaluate midnights in chronological order to ensure the latest applicable timezone
+        // can override earlier calculations (important for IDL crossings).
+        var midnightMoments = new List<(DateTime MidnightUtc, TimeZoneInfo Zone, bool AllowOverride)>
+        {
+            (GetDayStartUtc(date, departureTimeZone), departureTimeZone, true)
+        };
+
         if (departureTimeZone.Id != arrivalTimeZone.Id)
         {
-            CheckMidnightInTimezone(date, trip.DepartureCountry, trip.ArrivalCountry, 
-                departureUtc, arrivalUtc, arrivalTimeZone, presenceMap);
+            midnightMoments.Add((GetDayStartUtc(date, arrivalTimeZone), arrivalTimeZone, false));
+        }
+
+        foreach (var entry in midnightMoments.OrderBy(m => m.MidnightUtc))
+        {
+            CheckMidnightInTimezone(
+                date,
+                effectiveDepartureCountry,
+                trip.ArrivalCountry,
+                departureUtc,
+                arrivalUtc,
+                entry.Zone,
+                presenceMap,
+                entry.MidnightUtc,
+                entry.AllowOverride);
         }
         
         // Track locations visited during the day (for USA Partial Day Rule)
@@ -328,14 +324,12 @@ public class ResidencyCalculationService
         DateTime departureUtc,
         DateTime arrivalUtc,
         TimeZoneInfo timeZone,
-        Dictionary<DateOnly, DailyPresence> presenceMap)
+        Dictionary<DateOnly, DailyPresence> presenceMap,
+        DateTime midnightUtc,
+        bool allowOverride)
     {
         try
         {
-            // Midnight of this date in this timezone
-            var midnightLocal = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Unspecified);
-            var midnightUtc = TimeZoneInfo.ConvertTimeToUtc(midnightLocal, timeZone);
-            
             // Determine where the person was at this exact UTC moment
             string locationAtMidnight;
             bool isInTransit;
@@ -365,17 +359,26 @@ public class ResidencyCalculationService
                 presence = new DailyPresence
                 {
                     Date = date,
-                    LocationAtMidnight = locationAtMidnight,
-                    IsInTransitAtMidnight = isInTransit,
                     LocationsDuringDay = new HashSet<string>()
                 };
                 presenceMap[date] = presence;
             }
-            else if (string.IsNullOrEmpty(presence.LocationAtMidnight) || presence.LocationAtMidnight == "")
+
+            // Later evaluations (later midnight moments) override earlier ones.
+            if (isInTransit)
             {
-                // Only update if not yet set (first timezone checked wins)
+                // Only mark transit if we have not already recorded a concrete location.
+                if (allowOverride || string.IsNullOrEmpty(presence.LocationAtMidnight))
+                {
+                    presence.LocationAtMidnight = "IN_TRANSIT";
+                    presence.IsInTransitAtMidnight = true;
+                }
+                return;
+            }
+            else
+            {
                 presence.LocationAtMidnight = locationAtMidnight;
-                presence.IsInTransitAtMidnight = isInTransit;
+                presence.IsInTransitAtMidnight = false;
             }
         }
         catch
@@ -585,6 +588,23 @@ public class ResidencyCalculationService
         // 3. The purpose is transit (connecting flight, etc.)
         
         return daysInCountry.Count;
+    }
+
+    private TimeZoneInfo GetTimeZoneOrUtc(string timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch
+        {
+            return TimeZoneInfo.Utc;
+        }
     }
 
     private void IncrementCountryDays(Dictionary<string, int> residencyDays, string countryName)
