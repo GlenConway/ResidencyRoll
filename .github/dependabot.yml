@@ -7,7 +7,7 @@ updates:
       interval: weekly
       day: monday
       time: "09:00"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 1
     allow:
       - dependency-type: "production"
       - dependency-type: "development"
@@ -23,6 +23,13 @@ updates:
       include: "scope"
     pull-request-branch-name:
       separator: "/"
+    groups:
+      nuget-all:
+        dependency-types:
+          - "production"
+          - "development"
+        patterns:
+          - "*"
     ignore:
       - dependency-name: "Swashbuckle.AspNetCore"
         update-types: ["version-update:semver-major"]
