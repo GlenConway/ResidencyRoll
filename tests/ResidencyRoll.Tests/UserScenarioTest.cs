@@ -175,7 +175,14 @@ public class UserScenarioTest
         _output.WriteLine($"New Zealand residency days: {nzDays}");
         _output.WriteLine($"Australia residency days: {auDays}");
         
-        Assert.True(nzDays >= 3, $"Expected at least 3 NZ days (6th, 7th, 8th), got {nzDays}");
-        Assert.True(auDays >= 15, $"Expected at least 15 Australia days, got {auDays}");
+        _output.WriteLine("");
+        _output.WriteLine("Detailed breakdown:");
+        _output.WriteLine($"Jan 6 LocationsDuringDay: {string.Join(", ", jan6.LocationsDuringDay)}");
+        _output.WriteLine($"Jan 7 LocationsDuringDay: {string.Join(", ", jan7.LocationsDuringDay)}");
+        _output.WriteLine($"Jan 8 LocationsDuringDay: {string.Join(", ", jan8.LocationsDuringDay)}");
+        _output.WriteLine($"Jan 9 LocationsDuringDay: {string.Join(", ", jan9.LocationsDuringDay)}");
+        
+        Assert.True(nzDays >= 4, $"Expected at least 4 NZ days (6th, 7th, 8th, 9th), got {nzDays}");
+        Assert.True(auDays >= 17, $"Expected at least 17 Australia days (including 6th and 9th), got {auDays}");
     }
 }

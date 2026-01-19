@@ -326,7 +326,9 @@ public class TripsController : ControllerBase
             filteredPresence = filteredPresence.Where(dp => dp.Date <= endDate.Value);
         }
         
-        var result = filteredPresence.Select(dp => new DailyPresenceDto
+        var presenceList = filteredPresence.OrderBy(d => d.Date).ToList();
+        
+        var result = presenceList.Select(dp => new DailyPresenceDto
         {
             Date = dp.Date,
             LocationAtMidnight = dp.LocationAtMidnight,
