@@ -52,7 +52,6 @@
                     </span>
                 }
                 <span class="legend-item"><span class="legend-box" style="background-color: #FF9800;"></span> Transit</span>
-                <span class="legend-item"><span class="legend-box" style="background-color: #f0f0f0; border: 1px solid #ccc;"></span> IDL Skip</span>
             </div>
             
             <div class="timeline-grid">
@@ -73,9 +72,23 @@
                                     {
                                         <div class="day-label">Transit</div>
                                     }
-                                    else if (!string.IsNullOrEmpty(presence.LocationAtMidnight) && presence.LocationAtMidnight != "IDL_SKIP")
+                                    else if (presence.LocationsDuringDay?.Count > 1)
                                     {
-                                        <div class="day-label">@GetCountryCode(presence.LocationAtMidnight)</div>
+                                        <div class="day-label multi-country">
+                                            @foreach (var country in presence.LocationsDuringDay.OrderBy(c => c))
+                                            {
+                                                <span class="country-badge">@GetCountryCode(country)</span>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @* Use LocationsDuringDay if available, otherwise LocationAtMidnight *@
+                                        var location = presence.LocationsDuringDay?.FirstOrDefault() ?? presence.LocationAtMidnight;
+                                        @if (!string.IsNullOrEmpty(location))
+                                        {
+                                            <div class="day-label">@GetCountryCode(location)</div>
+                                        }
                                     }
                                 </div>
                             }
@@ -97,16 +110,30 @@
                         <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="In Transit at Midnight" />
                         <RadzenText>No country residency claimed for this day.</RadzenText>
                     }
+                    else if (selectedDay.LocationsDuringDay?.Count > 1)
+                    {
+                        <RadzenText>
+                            <strong>Multiple Countries (Partial Day Rule):</strong>
+                        </RadzenText>
+                        @foreach (var country in selectedDay.LocationsDuringDay)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@country" />
+                        }
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-mt-2">
+                            Under the Partial Day Rule, both countries count this day toward residency because you were physically present in each country for part of the day.
+                        </RadzenText>
+                    }
                     else
                     {
                         <RadzenText>
                             <strong>Location at Midnight:</strong> @selectedDay.LocationAtMidnight
                         </RadzenText>
+                        <RadzenText>This day counts toward @selectedDay.LocationAtMidnight residency.</RadzenText>
                     }
                     
-                    @if (selectedDay.LocationsDuringDay.Count > 0)
+                    @if (selectedDay.LocationsDuringDay?.Count > 0)
                     {
-                        <RadzenText>
+                        <RadzenText class="rz-mt-2">
                             <strong>Countries visited during day:</strong> @string.Join(", ", selectedDay.LocationsDuringDay)
                         </RadzenText>
                     }
@@ -198,12 +225,6 @@
         color: white;
     }
 
-    .day-cell.idl-skip {
-        background-color: #f0f0f0;
-        border: 1px dashed #999;
-        color: #666;
-    }
-
     .day-number {
         font-weight: 600;
         font-size: 1rem;
@@ -218,4 +239,19 @@
         white-space: nowrap;
         max-width: 100%;
     }
-</style>
+
+    .day-label.multi-country {
+        display: flex;
+        gap: 0.125rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+
+    .country-badge {
+        font-size: 0.5rem;
+        font-weight: 600;
+        padding: 0.0625rem 0.1875rem;
+        background-color: rgba(255, 255, 255, 0.3);
+        border-radius: 0.125rem;
+    }</style>

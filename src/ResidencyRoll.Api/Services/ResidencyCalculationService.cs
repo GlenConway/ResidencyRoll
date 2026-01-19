@@ -26,7 +26,7 @@ public class ResidencyCalculationService
             {
                 CountryCode = "CA",
                 CountryName = "Canada",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["United Kingdom"] = new CountryResidencyRule
@@ -47,14 +47,14 @@ public class ResidencyCalculationService
             {
                 CountryCode = "AU",
                 CountryName = "Australia",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["New Zealand"] = new CountryResidencyRule
             {
                 CountryCode = "NZ",
                 CountryName = "New Zealand",
-                RuleType = ResidencyRuleType.MidnightRule,
+                RuleType = ResidencyRuleType.PartialDayRule,
                 ResidencyThresholdDays = 183
             },
             ["United States"] = new CountryResidencyRule
@@ -134,14 +134,27 @@ public class ResidencyCalculationService
             if (string.Equals(currentTrip.ArrivalCountry, nextTrip.DepartureCountry, StringComparison.OrdinalIgnoreCase))
             {
                 // Fill the gap between arrival and departure
-                var arrivalLocal = TimeZoneInfo.ConvertTime(
-                    currentTrip.ArrivalDateTime,
-                    TimeZoneInfo.FindSystemTimeZoneById(currentTrip.ArrivalTimezone)
-                );
-                var departureLocal = TimeZoneInfo.ConvertTime(
-                    nextTrip.DepartureDateTime,
-                    TimeZoneInfo.FindSystemTimeZoneById(nextTrip.DepartureTimezone)
-                );
+                // Normalize DateTimeKind to Unspecified before timezone conversion
+                var arrivalSource = currentTrip.ArrivalDateTime.Kind == DateTimeKind.Unspecified
+                    ? currentTrip.ArrivalDateTime
+                    : DateTime.SpecifyKind(currentTrip.ArrivalDateTime, DateTimeKind.Unspecified);
+                var departureSource = nextTrip.DepartureDateTime.Kind == DateTimeKind.Unspecified
+                    ? nextTrip.DepartureDateTime
+                    : DateTime.SpecifyKind(nextTrip.DepartureDateTime, DateTimeKind.Unspecified);
+                
+                var arrivalTz = GetTimeZoneOrUtc(currentTrip.ArrivalTimezone);
+                var departureTz = GetTimeZoneOrUtc(nextTrip.DepartureTimezone);
+                
+                // Convert to UTC first, then to local timezone
+                var arrivalUtc = currentTrip.ArrivalDateTime.Kind == DateTimeKind.Utc 
+                    ? currentTrip.ArrivalDateTime 
+                    : TimeZoneInfo.ConvertTimeToUtc(arrivalSource, arrivalTz);
+                var departureUtc = nextTrip.DepartureDateTime.Kind == DateTimeKind.Utc 
+                    ? nextTrip.DepartureDateTime 
+                    : TimeZoneInfo.ConvertTimeToUtc(departureSource, departureTz);
+                
+                var arrivalLocal = TimeZoneInfo.ConvertTime(arrivalUtc, arrivalTz);
+                var departureLocal = TimeZoneInfo.ConvertTime(departureUtc, departureTz);
                 
                 var arrivalDate = DateOnly.FromDateTime(arrivalLocal.Date);
                 var departureDate = DateOnly.FromDateTime(departureLocal.Date);

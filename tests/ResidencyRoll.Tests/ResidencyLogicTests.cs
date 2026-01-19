@@ -316,12 +316,13 @@ public class ResidencyLogicTests
         var canadaDays = _service.CalculateResidencyDaysForCountry("Canada", dailyPresenceLog, trips);
 
         // Assert
-        // Expected: 3 days for Canada
-        // - July 1: arrival day, at midnight July 2 (00:00), in Canada (counts)
-        // - July 2: at midnight July 3 (00:00), in Canada (counts)
-        // - July 3: at midnight July 4 (00:00), in Canada (counts)
-        // - July 4: departure day, at midnight July 5 (00:00), already left (doesn't count)
-        Assert.Equal(3, canadaDays);
+        // Expected: 4 days for Canada (Partial Day Rule)
+        // - July 1: arrival day at 1:00 PM - present for part of day (counts)
+        // - July 2: full day in Canada (counts)
+        // - July 3: full day in Canada (counts)
+        // - July 4: departure day at 1:00 PM - present for part of day (counts)
+        // Canada uses Partial Day Rule - any part of a day counts
+        Assert.Equal(4, canadaDays);
     }
 
     #endregion
@@ -470,9 +471,9 @@ public class ResidencyLogicTests
     [Fact]
     public void CountryRules_AreCorrectlyConfigured()
     {
-        // Assert: Verify country rules are set up correctly
+        // Assert: Verify country rules are set up correctly per actual tax laws
         var canadaRule = _service.GetCountryRule("Canada");
-        Assert.Equal(ResidencyRuleType.MidnightRule, canadaRule.RuleType);
+        Assert.Equal(ResidencyRuleType.PartialDayRule, canadaRule.RuleType);
         Assert.Equal(183, canadaRule.ResidencyThresholdDays);
 
         var usaRule = _service.GetCountryRule("USA");
@@ -483,7 +484,10 @@ public class ResidencyLogicTests
         Assert.Equal(ResidencyRuleType.MidnightRule, ukRule.RuleType);
 
         var australiaRule = _service.GetCountryRule("Australia");
-        Assert.Equal(ResidencyRuleType.MidnightRule, australiaRule.RuleType);
+        Assert.Equal(ResidencyRuleType.PartialDayRule, australiaRule.RuleType);
+        
+        var nzRule = _service.GetCountryRule("New Zealand");
+        Assert.Equal(ResidencyRuleType.PartialDayRule, nzRule.RuleType);
     }
 
     [Fact]
@@ -722,6 +726,129 @@ public class ResidencyLogicTests
         
         // Singapore: At least 2 days (Dec 8-10)
         Assert.True(singaporeDays >= 2, $"Expected at least 2 Singapore days, got {singaporeDays}");
+    }
+
+    #endregion
+
+    #region Sydney-Auckland No IDL Crossing Tests
+
+    /// <summary>
+    /// Tests that a trip from Sydney, Australia to Auckland, New Zealand does NOT show IDL crossing.
+    /// Both cities are on the same side of the International Date Line (west side).
+    /// Sydney: longitude ~151°E, timezone UTC+10/+11
+    /// Auckland: longitude ~174°E, timezone UTC+12/+13
+    /// </summary>
+    [Fact]
+    public void SydneyToAuckland_NoIDL_ContinuousDates()
+    {
+        // Arrange: User in Sydney from Dec 25, 2025 to Jan 15, 2026
+        // With a trip to Auckland from Jan 6 to Jan 9
+        var trips = new List<Trip>
+        {
+            // Initial arrival in Sydney
+            new Trip
+            {
+                Id = 1,
+                UserId = "user1",
+                DepartureCountry = "Canada",
+                DepartureCity = "Vancouver",
+                DepartureDateTime = new DateTime(2025, 12, 24, 10, 0, 0, DateTimeKind.Utc),
+                DepartureTimezone = "America/Vancouver",
+                ArrivalCountry = "Australia",
+                ArrivalCity = "Sydney",
+                ArrivalDateTime = new DateTime(2025, 12, 25, 20, 0, 0, DateTimeKind.Utc), // Dec 26, 7:00 AM AEDT
+                ArrivalTimezone = "Australia/Sydney"
+            },
+            // Trip to Auckland
+            new Trip
+            {
+                Id = 2,
+                UserId = "user1",
+                DepartureCountry = "Australia",
+                DepartureCity = "Sydney",
+                DepartureDateTime = new DateTime(2026, 1, 5, 22, 0, 0, DateTimeKind.Utc), // Jan 6, 9:00 AM AEDT
+                DepartureTimezone = "Australia/Sydney",
+                ArrivalCountry = "New Zealand",
+                ArrivalCity = "Auckland",
+                ArrivalDateTime = new DateTime(2026, 1, 6, 2, 0, 0, DateTimeKind.Utc), // Jan 6, 3:00 PM NZDT
+                ArrivalTimezone = "Pacific/Auckland"
+            },
+            // Return to Sydney
+            new Trip
+            {
+                Id = 3,
+                UserId = "user1",
+                DepartureCountry = "New Zealand",
+                DepartureCity = "Auckland",
+                DepartureDateTime = new DateTime(2026, 1, 8, 23, 0, 0, DateTimeKind.Utc), // Jan 9, 12:00 PM NZDT
+                DepartureTimezone = "Pacific/Auckland",
+                ArrivalCountry = "Australia",
+                ArrivalCity = "Sydney",
+                ArrivalDateTime = new DateTime(2026, 1, 9, 2, 0, 0, DateTimeKind.Utc), // Jan 9, 1:00 PM AEDT
+                ArrivalTimezone = "Australia/Sydney"
+            },
+            // Final departure from Sydney
+            new Trip
+            {
+                Id = 4,
+                UserId = "user1",
+                DepartureCountry = "Australia",
+                DepartureCity = "Sydney",
+                DepartureDateTime = new DateTime(2026, 1, 14, 23, 0, 0, DateTimeKind.Utc), // Jan 15, 10:00 AM AEDT
+                DepartureTimezone = "Australia/Sydney",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Vancouver",
+                ArrivalDateTime = new DateTime(2026, 1, 15, 14, 0, 0, DateTimeKind.Utc), // Jan 15, 6:00 AM PST
+                ArrivalTimezone = "America/Vancouver"
+            }
+        };
+
+        // Act
+        var dailyPresenceLog = _service.GenerateDailyPresenceLog(trips);
+
+        // Assert: All dates from Dec 25 to Jan 15 should be present with NO gaps
+        var firstDate = new DateOnly(2025, 12, 25);
+        var lastDate = new DateOnly(2026, 1, 15);
+        var currentDate = firstDate;
+        
+        var dateList = new List<DateOnly>();
+        while (currentDate <= lastDate)
+        {
+            dateList.Add(currentDate);
+            currentDate = currentDate.AddDays(1);
+        }
+
+        // Verify no dates are missing
+        var presenceDates = dailyPresenceLog.Select(d => d.Date).ToHashSet();
+        var missingDates = dateList.Where(d => !presenceDates.Contains(d)).ToList();
+        
+        Assert.Empty(missingDates); // No dates should be missing
+        
+        // Verify Jan 6 is NOT marked as IDL
+        var jan6 = dailyPresenceLog.FirstOrDefault(d => d.Date == new DateOnly(2026, 1, 6));
+        Assert.NotNull(jan6);
+        // Jan 6: Departed Sydney in morning, arrived Auckland afternoon - should be in transit or at destination
+        Assert.NotEqual("IDL_SKIP", jan6.LocationAtMidnight);
+        Assert.True(jan6.LocationAtMidnight == "Australia" || jan6.LocationAtMidnight == "New Zealand" || jan6.LocationAtMidnight == "IN_TRANSIT",
+            $"Expected Jan 6 to be Australia, New Zealand or IN_TRANSIT, got: {jan6.LocationAtMidnight}");
+        
+        // Verify Jan 9 is NOT marked as IDL
+        var jan9 = dailyPresenceLog.FirstOrDefault(d => d.Date == new DateOnly(2026, 1, 9));
+        Assert.NotNull(jan9);
+        Assert.NotEqual("IDL_SKIP", jan9.LocationAtMidnight);
+        Assert.True(jan9.LocationAtMidnight == "New Zealand" || jan9.LocationAtMidnight == "Australia" || jan9.LocationAtMidnight == "IN_TRANSIT",
+            $"Expected Jan 9 to be New Zealand, Australia or IN_TRANSIT, got: {jan9.LocationAtMidnight}");
+        
+        // Verify residency counts
+        var residencyDays = _service.CalculateResidencyDays(dailyPresenceLog);
+        var australiaDays = residencyDays.GetValueOrDefault("Australia", 0);
+        var nzDays = residencyDays.GetValueOrDefault("New Zealand", 0);
+        
+        // Should have significant days in Australia (around 17-18 days)
+        Assert.True(australiaDays >= 15, $"Expected at least 15 Australia days, got {australiaDays}");
+        
+        // Should have a few days in New Zealand (2-3 days)
+        Assert.True(nzDays >= 2, $"Expected at least 2 New Zealand days, got {nzDays}");
     }
 
     #endregion

@@ -62,19 +62,35 @@ public partial class ResidencyTimeline
             
             dailyPresence = await ApiClient.GetDailyPresenceAsync(start, end);
             
-            // Fill in IDL skipped days (westbound crossings)
-            FillIdlSkippedDays();
+            // Sort dailyPresence by date descending for display
+            dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
 
-            // Build list of available countries and register them with the color service
-            availableCountries = dailyPresence
-                .Where(d => !string.IsNullOrEmpty(d.LocationAtMidnight) 
-                    && d.LocationAtMidnight != "IDL_SKIP" 
-                    && d.LocationAtMidnight != "IN_TRANSIT")
-                .Select(d => d.LocationAtMidnight)
-                .Distinct()
-                .OrderBy(c => c)
-                .ToList();
-
+            // Build list of available countries from both LocationAtMidnight AND LocationsDuringDay
+            var allCountries = new HashSet<string>();
+            
+            foreach (var presence in dailyPresence)
+            {
+                // Add from LocationAtMidnight (if not transit)
+                if (!string.IsNullOrEmpty(presence.LocationAtMidnight) 
+                    && presence.LocationAtMidnight != "IN_TRANSIT")
+                {
+                    allCountries.Add(presence.LocationAtMidnight);
+                }
+                
+                // Add all countries from LocationsDuringDay (Partial Day Rule)
+                if (presence.LocationsDuringDay != null)
+                {
+                    foreach (var country in presence.LocationsDuringDay)
+                    {
+                        if (!string.IsNullOrEmpty(country))
+                        {
+                            allCountries.Add(country);
+                        }
+                    }
+                }
+            }
+            
+            availableCountries = allCountries.OrderBy(c => c).ToList();
             ColorService.RegisterCountries(availableCountries);
             
             // Set home country if not already set or if saved country is not in the list
@@ -96,35 +112,6 @@ public partial class ResidencyTimeline
         }
     }
 
-    private void FillIdlSkippedDays()
-    {
-        // Identify date gaps that represent IDL westbound crossings
-        var allDates = dailyPresence.OrderBy(d => d.Date).ToList();
-        for (int i = 0; i < allDates.Count - 1; i++)
-        {
-            var current = allDates[i];
-            var next = allDates[i + 1];
-            var daysBetween = (next.Date.DayNumber - current.Date.DayNumber);
-            
-            if (daysBetween > 1)
-            {
-                // Fill the gap with "IDL skip" markers
-                for (int j = 1; j < daysBetween; j++)
-                {
-                    var skippedDate = current.Date.AddDays(j);
-                    dailyPresence.Add(new DailyPresenceDto
-                    {
-                        Date = skippedDate,
-                        LocationAtMidnight = "IDL_SKIP",
-                        IsInTransitAtMidnight = false
-                    });
-                }
-            }
-        }
-        
-        dailyPresence = dailyPresence.OrderByDescending(d => d.Date).ToList();
-    }
-
     private Dictionary<string, List<DailyPresenceDto>> GetGroupedByMonth()
     {
         return dailyPresence
@@ -135,8 +122,6 @@ public partial class ResidencyTimeline
 
     private string GetDayClass(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return "idl-skip";
         if (presence.IsInTransitAtMidnight)
             return "transit";
         return "location";
@@ -144,12 +129,43 @@ public partial class ResidencyTimeline
 
     private string GetDayStyle(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP" 
-            || presence.LocationAtMidnight == "IN_TRANSIT" 
+        if (presence.LocationAtMidnight == "IN_TRANSIT" 
             || presence.IsInTransitAtMidnight)
             return string.Empty;
 
-        var isHome = presence.LocationAtMidnight == homeCountry;
+        // Handle multiple countries in one day (Partial Day Rule)
+        if (presence.LocationsDuringDay?.Count > 1)
+        {
+            // Create a gradient with multiple country colors
+            var colors = presence.LocationsDuringDay
+                .Select(country => ColorService.GetCountryColor(country))
+                .ToList();
+            
+            if (colors.Count == 2)
+            {
+                // Split the cell diagonally or vertically
+                return $"background: linear-gradient(135deg, {colors[0]} 0%, {colors[0]} 50%, {colors[1]} 50%, {colors[1]} 100%); color: white;";
+            }
+            else
+            {
+                // For 3+ countries, use striped pattern
+                var gradientStops = new List<string>();
+                var step = 100.0 / colors.Count;
+                for (int i = 0; i < colors.Count; i++)
+                {
+                    gradientStops.Add($"{colors[i]} {i * step}%, {colors[i]} {(i + 1) * step}%");
+                }
+                return $"background: linear-gradient(90deg, {string.Join(", ", gradientStops)}); color: white;";
+            }
+        }
+
+        // Use LocationsDuringDay if available (even if single country - more accurate for Partial Day Rule)
+        var locationToUse = presence.LocationsDuringDay?.FirstOrDefault() ?? presence.LocationAtMidnight;
+        
+        if (string.IsNullOrEmpty(locationToUse))
+            return string.Empty;
+            
+        var isHome = locationToUse == homeCountry;
         
         // Home country gets a clear/light background to fade into the background
         if (isHome)
@@ -158,17 +174,25 @@ public partial class ResidencyTimeline
         }
 
         // Other countries get their assigned colors to stand out
-        var color = ColorService.GetCountryColor(presence.LocationAtMidnight);
-        return $"background-color: {color}; border: 1px solid {ColorService.GetCountryColorDark(presence.LocationAtMidnight)}; color: white;";
+        var color = ColorService.GetCountryColor(locationToUse);
+        return $"background-color: {color}; border: 1px solid {ColorService.GetCountryColorDark(locationToUse)}; color: white;";
     }
 
     private string GetDayTooltip(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return $"{presence.Date:MMM dd, yyyy} - Skipped day (IDL westbound crossing)";
         if (presence.IsInTransitAtMidnight || presence.LocationAtMidnight == "IN_TRANSIT")
             return $"{presence.Date:MMM dd, yyyy} - In Transit at Midnight";
-        return $"{presence.Date:MMM dd, yyyy} - {presence.LocationAtMidnight}";
+        
+        // Show multiple countries if present (Partial Day Rule)
+        if (presence.LocationsDuringDay?.Count > 1)
+        {
+            var countries = string.Join(" & ", presence.LocationsDuringDay.OrderBy(c => c));
+            return $"{presence.Date:MMM dd, yyyy} - {countries} (both count under Partial Day Rule)";
+        }
+        
+        // Use LocationsDuringDay if available, otherwise fall back to LocationAtMidnight
+        var location = presence.LocationsDuringDay?.FirstOrDefault() ?? presence.LocationAtMidnight;
+        return $"{presence.Date:MMM dd, yyyy} - {location}";
     }
 
     private string GetCountryCode(string countryName)
@@ -198,9 +222,6 @@ public partial class ResidencyTimeline
 
     private void ShowDayDetails(DailyPresenceDto presence)
     {
-        if (presence.LocationAtMidnight == "IDL_SKIP")
-            return;
-            
         selectedDay = presence;
     }
 }
