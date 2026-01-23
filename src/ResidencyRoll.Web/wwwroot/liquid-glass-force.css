@@ -1,0 +1,140 @@
+/* ============================================
+   LIQUID GLASS FORCE OVERRIDE
+   Ultra-high specificity rules to ensure glass effects apply
+   ============================================ */
+
+/* FORCE ALL LAYOUT BACKGROUNDS TO BE TRANSPARENT */
+.rz-layout,
+.rz-layout-wrapper,
+.rz-body,
+.rz-body-content,
+body > .rz-body,
+main.rz-body-content,
+div.rz-layout,
+div.rz-body {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* NUCLEAR OPTION: Force glass on ALL Radzen components */
+[class*="rz-"],
+div[class*="rz-"],
+aside[class*="rz-"] {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* FORCE GLASS ON SIDEBAR - NUCLEAR OPTION */
+.rz-sidebar,
+aside.rz-sidebar,
+.rz-sidebar-content,
+aside,
+nav,
+.sidebar {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.18) !important;
+}
+
+/* FORCE GLASS ON HEADER */
+.rz-header,
+header.rz-header,
+.glass-header {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+/* FORCE GLASS ON ALL CARDS */
+.rz-card,
+div.rz-card,
+.rz-panel,
+div.rz-panel {
+    background: rgba(255, 255, 255, 0.25) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+/* ENSURE BODY HAS SUBTLE ELEGANT GRADIENT */
+html {
+    background: linear-gradient(135deg, #fafafa 0%, #f5f5f7 50%, #fafafa 100%) !important;
+    min-height: 100vh;
+}
+
+body {
+    background: transparent !important;
+}
+
+/* FORCE BETTER BUTTON VISIBILITY */
+button.rz-button,
+.rz-button,
+button[type="button"],
+button[type="submit"] {
+    background: rgba(255, 255, 255, 0.4) !important;
+    color: var(--color-text-primary, #1D1D1F) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    font-weight: 500 !important;
+}
+
+button.rz-button:hover,
+.rz-button:hover {
+    background: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Primary buttons stay with gradient */
+button.rz-button-primary,
+.rz-button-primary,
+.rz-button.rz-primary {
+    background: linear-gradient(135deg, #0071E3 0%, #0077ED 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* Warning and Info badges/alerts - Dark text for readability */
+.rz-badge-warning,
+.rz-badge.rz-warning,
+span.rz-badge-warning {
+    color: #1D1D1F !important;
+    font-weight: 600 !important;
+}
+
+.rz-badge-info,
+.rz-badge.rz-info,
+span.rz-badge-info {
+    color: #1D1D1F !important;
+    font-weight: 600 !important;
+}
+
+.rz-alert-warning,
+.rz-alert.rz-warning {
+    color: #1D1D1F !important;
+}
+
+.rz-alert-info,
+.rz-alert.rz-info {
+    color: #1D1D1F !important;
+}
+
+/* Active nav links - ensure white text on blue background */
+.nav-link.active,
+.rz-navigation-item.active {
+    color: white !important;
+}
+
+.nav-link.active *,
+.rz-navigation-item.active * {
+    color: white !important;
+}
