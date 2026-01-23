@@ -10,16 +10,44 @@
 
 <PageTitle>Residency Roll - Travel Tracker</PageTitle>
 
-<h1>Residency Roll - Travel Tracking Dashboard</h1>
+<div class="bento-grid">
+    <!-- Hero Card - Full Width -->
+    <div class="bento-cell-12 fade-in">
+        <RadzenCard>
+            <h1>Travel Tracking Dashboard</h1>
+            <p class="text-secondary">Monitor your residency status and travel history</p>
+        </RadzenCard>
+    </div>
 
-<RadzenRow Gap="1rem" class="rz-mt-4">
-    <RadzenColumn Size="12">
-        <ResidencyStatusDashboard />
-    </RadzenColumn>
-</RadzenRow>
+    <!-- Main Dashboard - Large Card -->
+    <div class="bento-cell-8 bento-row-2 fade-in">
+        <RadzenCard style="height: 100%;">
+            <ResidencyStatusDashboard />
+        </RadzenCard>
+    </div>
 
-<RadzenRow Gap="1rem" class="rz-mt-4">
-    <RadzenColumn Size="12">
-        <ResidencyTimeline />
-    </RadzenColumn>
-</RadzenRow>
+    <!-- Quick Stats - Smaller Cards -->
+    <div class="bento-cell-4 fade-in">
+        <RadzenCard>
+            <h4>Quick Actions</h4>
+            <div class="d-flex flex-column gap-2 mt-3">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Add Trip" />
+                <RadzenButton ButtonStyle="ButtonStyle.Secondary" Text="View Reports" />
+            </div>
+        </RadzenCard>
+    </div>
+
+    <div class="bento-cell-4 fade-in">
+        <RadzenCard>
+            <h4>Recent Activity</h4>
+            <p class="text-secondary">Your latest travel updates</p>
+        </RadzenCard>
+    </div>
+
+    <!-- Timeline - Full Width -->
+    <div class="bento-cell-12 fade-in">
+        <RadzenCard>
+            <ResidencyTimeline />
+        </RadzenCard>
+    </div>
+</div>

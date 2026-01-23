@@ -1,0 +1,752 @@
+/* ============================================
+   macOS 26 "Liquid Glass" Theme 
+   2026 Modern Design System for Radzen Blazor
+   ============================================ */
+
+/* ========== ROOT VARIABLES ========== */
+:root {
+    /* 2026 Color Palette */
+    --color-background: #F5F5F7; /* Cloud Dancer */
+    --color-surface: #FFFFFF;
+    --color-accent: #0071E3; /* Electric Blue */
+    --color-accent-hover: #0077ED;
+    --color-accent-active: #005BB5;
+    --color-text-primary: #1D1D1F;
+    --color-text-secondary: #86868B;
+    --color-border: rgba(0, 0, 0, 0.08);
+    
+    /* Glass Effect Variables */
+    --glass-bg-light: rgba(255, 255, 255, 0.4);
+    --glass-border-light: rgba(255, 255, 255, 0.5);
+    --glass-border-secondary: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    --glass-shadow-hover: 0 12px 48px 0 rgba(31, 38, 135, 0.2);
+    
+    /* Spacing & Borders */
+    --bento-gap: 24px;
+    --border-radius: 16px;
+    --border-radius-lg: 24px;
+    --border-radius-sm: 12px;
+    
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    --font-size-base: 16px;
+    --line-height-base: 1.6;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 600;
+    --font-weight-heavy: 700;
+}
+
+/* Dark Mode Variables */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-background: #1D1D1F;
+        --color-surface: #2C2C2E;
+        --color-text-primary: #F5F5F7;
+        --color-text-secondary: #98989D;
+        --color-border: rgba(255, 255, 255, 0.1);
+        --glass-bg-light: rgba(25, 25, 25, 0.6);
+        --glass-border-light: rgba(255, 255, 255, 0.18);
+        --glass-border-secondary: rgba(255, 255, 255, 0.05);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        --glass-shadow-hover: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* ========== BASE STYLES ========== */
+
+/* Override Radzen's theme colors completely */
+.rz-theme-material,
+body.rz-body,
+html {
+    --rz-primary: var(--color-accent) !important;
+    --rz-primary-light: var(--color-accent-hover) !important;
+    --rz-primary-dark: var(--color-accent-active) !important;
+    --rz-text-color: var(--color-text-primary) !important;
+    --rz-secondary-color: var(--color-text-secondary) !important;
+    --rz-base-background-color: var(--color-background) !important;
+}
+
+html, body {
+    font-family: var(--font-family) !important;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
+    background-color: var(--color-background) !important;
+    /* Add subtle gradient for glass effect visibility */
+    background-image: radial-gradient(circle at 20% 50%, rgba(0, 113, 227, 0.05) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 80%, rgba(0, 113, 227, 0.03) 0%, transparent 50%) !important;
+    background-attachment: fixed !important;
+    color: var(--color-text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* ========== TYPOGRAPHY ========== */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+    color: var(--color-text-primary);
+}
+
+h1 {
+    font-size: 3.5rem;
+    line-height: 1.1;
+    font-weight: var(--font-weight-heavy);
+}
+
+h2 {
+    font-size: 2.5rem;
+    line-height: 1.2;
+}
+
+h3 {
+    font-size: 2rem;
+    line-height: 1.3;
+}
+
+h4 {
+    font-size: 1.5rem;
+    line-height: 1.4;
+}
+
+p {
+    margin-bottom: 1rem;
+    color: var(--color-text-secondary);
+}
+
+/* ========== RADZEN LAYOUT OVERRIDES ========== */
+
+/* Main Layout Container */
+.rz-body,
+body > .rz-body {
+    background-color: var(--color-background) !important;
+}
+
+/* RadzenLayout wrapper */
+.rz-layout,
+.rz-layout-wrapper {
+    background-color: var(--color-background) !important;
+}
+
+/* Explicit Glass Header Class */
+.glass-header,
+.rz-header.glass-header,
+header.glass-header {
+    background: var(--glass-bg-light) !important;
+    background-color: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-bottom: 1px solid var(--glass-border-light) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    padding: 1rem 2rem !important;
+    min-height: 72px !important;
+    height: auto !important;
+}
+
+/* Explicit Glass Sidebar Class */
+.glass-sidebar,
+.rz-sidebar.glass-sidebar,
+aside.glass-sidebar {
+    background: var(--glass-bg-light) !important;
+    background-color: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-right: 1px solid var(--glass-border-light) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* Radzen Sidebar Glass Effect - More specific selectors */
+.rz-sidebar,
+.rz-sidebar-content,
+aside.rz-sidebar,
+::deep .rz-sidebar,
+::deep aside.rz-sidebar {
+    background: var(--glass-bg-light) !important;
+    background-color: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-right: 1px solid var(--glass-border-light) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* Radzen Header Glass Effect - More specific selectors */
+.rz-header,
+header.rz-header,
+::deep .rz-header,
+::deep header.rz-header {
+    background: var(--glass-bg-light) !important;
+    background-color: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-bottom: 1px solid var(--glass-border-light) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    padding: 1rem 2rem !important;
+    min-height: 72px !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Fix header content alignment */
+.rz-header > *,
+header.rz-header > * {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+/* Header Content Container */
+.header-content {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 1rem !important;
+}
+
+.header-title {
+    margin: 0 !important;
+    color: var(--color-text-primary) !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    flex-shrink: 0;
+}
+
+/* Radzen Body (Main Content Area) */
+.rz-body-content,
+.rz-body main,
+::deep .rz-body-content {
+    padding: var(--bento-gap) !important;
+    background-color: transparent !important;
+}
+
+/* ========== BENTO GRID SYSTEM ========== */
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--bento-gap);
+    padding: var(--bento-gap);
+}
+
+/* Responsive grid for larger screens */
+@media (min-width: 768px) {
+    .bento-grid {
+        grid-template-columns: repeat(12, 1fr);
+    }
+    
+    .bento-cell-1 { grid-column: span 1; }
+    .bento-cell-2 { grid-column: span 2; }
+    .bento-cell-3 { grid-column: span 3; }
+    .bento-cell-4 { grid-column: span 4; }
+    .bento-cell-5 { grid-column: span 5; }
+    .bento-cell-6 { grid-column: span 6; }
+    .bento-cell-7 { grid-column: span 7; }
+    .bento-cell-8 { grid-column: span 8; }
+    .bento-cell-9 { grid-column: span 9; }
+    .bento-cell-10 { grid-column: span 10; }
+    .bento-cell-11 { grid-column: span 11; }
+    .bento-cell-12 { grid-column: span 12; }
+    
+    /* Row span options */
+    .bento-row-2 { grid-row: span 2; }
+    .bento-row-3 { grid-row: span 3; }
+}
+
+/* Mobile: single column */
+@media (max-width: 767px) {
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========== RADZEN CARD GLASS EFFECT ========== */
+.rz-card,
+.rz-card-content,
+div.rz-card,
+::deep .rz-card,
+::deep div.rz-card {
+    background: var(--glass-bg-light) !important;
+    background-color: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-radius: var(--border-radius) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    box-shadow: var(--glass-shadow) !important;
+    padding: 1.5rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.rz-card:hover,
+div.rz-card:hover,
+::deep .rz-card:hover,
+::deep div.rz-card:hover {
+    box-shadow: var(--glass-shadow-hover) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Card Header */
+::deep .rz-card-title,
+.rz-card-title {
+    font-size: 1.5rem !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Card Content */
+::deep .rz-card-content,
+.rz-card-content {
+    color: var(--color-text-secondary) !important;
+    line-height: var(--line-height-base) !important;
+}
+
+/* ========== BUTTONS & INTERACTIVE ELEMENTS ========== */
+
+/* Primary Button */
+::deep .rz-button-primary,
+.rz-button-primary,
+::deep .rz-button.rz-primary,
+.rz-button.rz-primary {
+    background-color: var(--color-accent) !important;
+    border: none !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.75rem 1.5rem !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: white !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3) !important;
+}
+
+::deep .rz-button-primary:hover,
+.rz-button-primary:hover,
+::deep .rz-button.rz-primary:hover,
+.rz-button.rz-primary:hover {
+    background-color: var(--color-accent-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 113, 227, 0.4) !important;
+}
+
+::deep .rz-button-primary:active,
+.rz-button-primary:active,
+::deep .rz-button.rz-primary:active,
+.rz-button.rz-primary:active {
+    background-color: var(--color-accent-active) !important;
+    transform: translateY(0);
+}
+
+/* Secondary Button with Glass Effect */
+::deep .rz-button-secondary,
+.rz-button-secondary,
+::deep .rz-button.rz-secondary,
+.rz-button.rz-secondary {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.75rem 1.5rem !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: var(--color-text-primary) !important;
+    transition: all 0.2s ease !important;
+}
+
+::deep .rz-button-secondary:hover,
+.rz-button-secondary:hover {
+    box-shadow: var(--glass-shadow) !important;
+    transform: translateY(-1px);
+}
+
+/* ========== NAVIGATION MENU ========== */
+
+/* Nav Links */
+::deep .rz-navigation-item,
+.rz-navigation-item,
+::deep .nav-link,
+.nav-link {
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.75rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    color: var(--color-text-secondary) !important;
+    font-weight: var(--font-weight-medium) !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+}
+
+::deep .rz-navigation-item:hover,
+.rz-navigation-item:hover,
+::deep .nav-link:hover,
+.nav-link:hover {
+    background: var(--glass-bg-light) !important;
+    color: var(--color-text-primary) !important;
+    transform: translateX(4px);
+}
+
+/* Active Nav Link */
+::deep .rz-navigation-item.active,
+.rz-navigation-item.active,
+::deep .nav-link.active,
+.nav-link.active {
+    background-color: var(--color-accent) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3) !important;
+}
+
+/* ========== INPUTS & FORMS ========== */
+
+::deep .rz-textbox,
+.rz-textbox,
+::deep input.rz-inputtext,
+input.rz-inputtext,
+::deep .rz-dropdown,
+.rz-dropdown {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.75rem 1rem !important;
+    color: var(--color-text-primary) !important;
+    transition: all 0.2s ease !important;
+}
+
+::deep .rz-textbox:focus,
+.rz-textbox:focus,
+::deep input.rz-inputtext:focus,
+input.rz-inputtext:focus {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1) !important;
+    outline: none !important;
+}
+
+/* ========== DATA GRID & TABLES ========== */
+
+::deep .rz-datatable,
+.rz-datatable {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-radius: var(--border-radius) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    overflow: hidden !important;
+}
+
+::deep .rz-datatable-header,
+.rz-datatable-header {
+    background: rgba(0, 0, 0, 0.05) !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+}
+
+::deep .rz-datatable-row:hover,
+.rz-datatable-row:hover {
+    background: rgba(0, 113, 227, 0.05) !important;
+}
+
+/* ========== MODAL & DIALOG ========== */
+
+::deep .rz-dialog,
+.rz-dialog {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border-radius: var(--border-radius-lg) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+}
+
+::deep .rz-dialog-titlebar,
+.rz-dialog-titlebar {
+    background: transparent !important;
+    border-bottom: 1px solid var(--glass-border-light) !important;
+    padding: 1.5rem !important;
+}
+
+/* ========== PANELS & ACCORDIONS ========== */
+
+::deep .rz-panel,
+.rz-panel {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border-radius: var(--border-radius) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    margin-bottom: var(--bento-gap) !important;
+}
+
+/* ========== UTILITIES ========== */
+
+.glass {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(15px) saturate(160%) !important;
+    border: 1px solid var(--glass-border-light) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+.rounded-lg {
+    border-radius: var(--border-radius-lg) !important;
+}
+
+.rounded {
+    border-radius: var(--border-radius) !important;
+}
+
+.rounded-sm {
+    border-radius: var(--border-radius-sm) !important;
+}
+
+/* Accent color utility */
+.accent {
+    color: var(--color-accent) !important;
+}
+
+.bg-accent {
+    background-color: var(--color-accent) !important;
+}
+
+/* Text utilities */
+.text-primary {
+    color: var(--color-text-primary) !important;
+}
+
+.text-secondary {
+    color: var(--color-text-secondary) !important;
+}
+
+/* ========== ANIMATIONS ========== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* ========== LOGIN DISPLAY COMPONENT ========== */
+
+.login-display {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.user-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-medium);
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius-sm);
+}
+
+.user-name i {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+.btn-logout,
+.btn-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-medium);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-logout {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--color-text-primary);
+}
+
+.btn-logout:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.btn-login {
+    background: var(--color-accent);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+}
+
+.btn-login:hover {
+    background: var(--color-accent-hover);
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.4);
+    transform: translateY(-1px);
+}
+
+/* ========== NAV MENU COMPONENT ========== */
+
+.nav-menu-container {
+    padding: 1.5rem 1rem;
+}
+
+.nav-menu-container .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.nav-menu-container .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.nav-menu-container .nav-link span:first-child {
+    font-size: 1.1rem;
+    width: 1.25rem;
+    text-align: center;
+}
+
+.nav-menu-container .nav-link:hover {
+    background: rgba(0, 113, 227, 0.08);
+    color: var(--color-accent);
+    transform: translateX(4px);
+}
+
+.nav-menu-container .nav-link.active {
+    background: var(--color-accent);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+}
+
+.nav-menu-container .nav-link.active:hover {
+    transform: translateX(2px);
+}
+
+/* ========== DARK MODE ADJUSTMENTS ========== */
+
+@media (prefers-color-scheme: dark) {
+    .user-name {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-logout {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-logout:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+    
+    .nav-menu-container .nav-link:hover {
+        background: rgba(0, 113, 227, 0.15);
+    }
+}
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Smooth transitions */
+* {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== SCROLLBAR STYLING ========== */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border-light);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+/* ========== LEGACY LAYOUT OVERRIDES ========== */
+
+/* Override old sidebar styles */
+.sidebar {
+    background: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%);
+    -webkit-backdrop-filter: blur(15px) saturate(160%);
+    border-right: 1px solid var(--glass-border-light);
+    box-shadow: var(--glass-shadow);
+}
+
+/* Override old top-row styles */
+.top-row {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%);
+    -webkit-backdrop-filter: blur(15px) saturate(160%);
+    border-bottom: 1px solid var(--glass-border-light) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.page {
+    background-color: var(--color-background) !important;
+}
+
+/* ========== RESPONSIVE ADJUSTMENTS ========== */
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 2rem;
+    }
+    
+    .bento-grid {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    ::deep .rz-header,
+    .rz-header {
+        padding: 1rem !important;
+    }
+}
