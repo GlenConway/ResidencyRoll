@@ -103,6 +103,14 @@ button.rz-button-primary,
     border: none !important;
 }
 
+/* Primary button hover - maintain gradient, prevent white background */
+button.rz-button-primary:hover,
+.rz-button-primary:hover,
+.rz-button.rz-primary:hover {
+    background: linear-gradient(135deg, #0077ED 0%, #0071E3 100%) !important;
+    color: white !important;
+}
+
 /* Warning and Info badges/alerts - Dark text for readability */
 .rz-badge-warning,
 .rz-badge.rz-warning,
