@@ -2,7 +2,7 @@
 @using Radzen.Blazor
 @using ResidencyRoll.Shared.Trips
 
-<RadzenCard>
+<RadzenCard Style="height: 100%;">
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Residency Status Dashboard</RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">
         Last 365 days residency calculation based on midnight and partial-day rules
@@ -33,9 +33,8 @@
                                     </RadzenText>
                                 </RadzenColumn>
                                 <RadzenColumn Size="4" Style="text-align: right;">
-                                    <RadzenBadge BadgeStyle="@GetBadgeStyle(summary.RuleType)" 
-                                                Text="@summary.RuleType" 
-                                                Style="font-size: 0.75rem;" />
+                                    <RadzenBadge BadgeStyle="@GetBadgeStyle(summary.RuleType)" Text="@summary.RuleType"
+                                        Style="font-size: 0.75rem;" />
                                 </RadzenColumn>
                             </RadzenRow>
 
@@ -46,10 +45,8 @@
                                 </span>
                             </div>
 
-                            <RadzenProgressBar Value="@GetProgressPercentage(summary)" 
-                                             ShowValue="false" 
-                                             Style="height: 8px; margin: 0.5rem 0;" 
-                                             ProgressBarStyle="@GetProgressBarStyle(summary)" />
+                            <RadzenProgressBar Value="@GetProgressPercentage(summary)" ShowValue="false"
+                                Style="height: 8px; margin: 0.5rem 0;" ProgressBarStyle="@GetProgressBarStyle(summary)" />
 
                             <RadzenRow>
                                 <RadzenColumn Size="6">
@@ -60,15 +57,13 @@
                                 <RadzenColumn Size="6" Style="text-align: right;">
                                     @if (summary.IsApproachingThreshold)
                                     {
-                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" 
-                                                    Text="@($"⚠️ {summary.DaysUntilThreshold} days left")" 
-                                                    Style="font-size: 0.7rem;" />
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning"
+                                            Text="@($"⚠️ {summary.DaysUntilThreshold} days left")" Style="font-size: 0.7rem;" />
                                     }
                                     else if (summary.TotalDays >= summary.ThresholdDays)
                                     {
-                                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" 
-                                                    Text="⛔ Over Threshold" 
-                                                    Style="font-size: 0.7rem;" />
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="⛔ Over Threshold"
+                                            Style="font-size: 0.7rem;" />
                                     }
                                     else
                                     {
@@ -101,12 +96,11 @@
 
 <style>
     .country-card {
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: box-shadow 0.2s;
     }
 
     .country-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
     }
 
     .days-display {

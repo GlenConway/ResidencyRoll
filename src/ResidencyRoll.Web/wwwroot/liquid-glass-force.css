@@ -1,0 +1,233 @@
+/* ============================================
+   LIQUID GLASS FORCE OVERRIDE
+   Ultra-high specificity rules to ensure glass effects apply
+   ============================================ */
+
+/* Calendar and Dropdown exceptions - restore proper background BEFORE broad rules */
+.rz-calendar,
+.rz-datepicker-container,
+.rz-monthpicker,
+.rz-daypicker,
+.rz-datepicker,
+.rz-calendar-row,
+.rz-calendar-cell {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+}
+
+/* Calendar day cells - white background by default */
+.rz-calendar-cell,
+td.rz-calendar-cell,
+.rz-state-default {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+    color: var(--color-text-primary, #1D1D1F) !important;
+}
+
+/* Calendar day hover - blue tint */
+.rz-calendar-cell:hover,
+td.rz-calendar-cell:hover,
+.rz-state-default:hover {
+    background-color: rgba(0, 113, 227, 0.12) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+/* Calendar selected day - darker blue tint */
+.rz-state-active,
+.rz-calendar-cell.rz-state-active,
+td.rz-calendar-cell.rz-state-active,
+.rz-state-highlight {
+    background-color: rgba(0, 113, 227, 0.18) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 600 !important;
+}
+
+/* Calendar today - accent border */
+.rz-state-today,
+.rz-calendar-cell.rz-state-today,
+td.rz-calendar-cell.rz-state-today {
+    border: 2px solid var(--color-accent, #0071E3) !important;
+}
+
+.rz-dropdown-panel,
+.rz-dropdown-items,
+.rz-listbox {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+}
+
+/* Dropdown items - white background by default */
+.rz-dropdown-item,
+li.rz-dropdown-item {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+    color: var(--color-text-primary, #1D1D1F) !important;
+}
+
+/* Dropdown item hover - blue tint */
+.rz-dropdown-item:hover,
+li.rz-dropdown-item:hover {
+    background-color: rgba(0, 113, 227, 0.12) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+/* Dropdown item selected/active - darker blue tint */
+.rz-dropdown-item.rz-state-highlight,
+li.rz-dropdown-item.rz-state-highlight,
+.rz-dropdown-item[aria-selected="true"],
+li.rz-dropdown-item[aria-selected="true"] {
+    background-color: rgba(0, 113, 227, 0.18) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 500 !important;
+}
+
+/* FORCE ALL LAYOUT BACKGROUNDS TO BE TRANSPARENT */
+.rz-layout,
+.rz-layout-wrapper,
+.rz-body,
+.rz-body-content,
+body > .rz-body,
+main.rz-body-content,
+div.rz-layout,
+div.rz-body {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* NUCLEAR OPTION: Force glass on ALL Radzen components - EXCEPT calendar and dropdown */
+[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
+div[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
+li[class*="rz-"]:not(.rz-dropdown-item),
+aside[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item) {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* FORCE GLASS ON SIDEBAR - NUCLEAR OPTION */
+.rz-sidebar,
+aside.rz-sidebar,
+.rz-sidebar-content,
+aside,
+nav,
+.sidebar {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 8px 32px rgba(12, 23, 41, 0.16) !important;
+}
+
+/* FORCE GLASS ON HEADER */
+.rz-header,
+header.rz-header,
+.glass-header {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+/* FORCE GLASS ON ALL CARDS */
+.rz-card,
+div.rz-card,
+.rz-panel,
+div.rz-panel {
+    background: rgba(255, 255, 255, 0.25) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 8px 32px rgba(12, 23, 41, 0.16),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+/* ENSURE BODY HAS SUBTLE ELEGANT GRADIENT */
+html {
+    background: linear-gradient(135deg, #fafafa 0%, #f5f5f7 50%, #fafafa 100%) !important;
+    min-height: 100vh;
+}
+
+body {
+    background: transparent !important;
+}
+
+/* FORCE BETTER BUTTON VISIBILITY */
+button.rz-button,
+.rz-button,
+button[type="button"],
+button[type="submit"] {
+    background: rgba(255, 255, 255, 0.4) !important;
+    color: var(--color-text-primary, #1D1D1F) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    font-weight: 500 !important;
+}
+
+button.rz-button:hover,
+.rz-button:hover {
+    background: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Primary buttons stay with gradient */
+button.rz-button-primary,
+.rz-button-primary,
+.rz-button.rz-primary {
+    background: linear-gradient(135deg, #0071E3 0%, #0077ED 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* Primary button hover - maintain gradient, prevent white background */
+button.rz-button-primary:hover,
+.rz-button-primary:hover,
+.rz-button.rz-primary:hover {
+    background: linear-gradient(135deg, #0077ED 0%, #0071E3 100%) !important;
+    color: white !important;
+}
+
+/* Warning and Info badges/alerts - Dark text for readability */
+.rz-badge-warning,
+.rz-badge.rz-warning,
+span.rz-badge-warning {
+    color: #1D1D1F !important;
+    font-weight: 600 !important;
+}
+
+.rz-badge-info,
+.rz-badge.rz-info,
+span.rz-badge-info {
+    color: #1D1D1F !important;
+    font-weight: 600 !important;
+}
+
+.rz-alert-warning,
+.rz-alert.rz-warning {
+    color: #1D1D1F !important;
+}
+
+.rz-alert-info,
+.rz-alert.rz-info {
+    color: #1D1D1F !important;
+}
+
+/* Active nav links - accent text without forcing white */
+.nav-link.active,
+.rz-navigation-item.active {
+    color: var(--color-accent-active, #005BB5) !important;
+    background: rgba(0, 113, 227, 0.14) !important;
+    border: 1px solid rgba(0, 113, 227, 0.22) !important;
+}
+
+.nav-link.active *,
+.rz-navigation-item.active * {
+    color: var(--color-accent-active, #005BB5) !important;
+}

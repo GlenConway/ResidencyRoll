@@ -1,0 +1,351 @@
+/* ============================================
+   2026 Liquid Glass - Accessibility Overrides
+   WCAG AAA Compliance & User Preferences
+   ============================================ */
+
+/* ========== HIGH CONTRAST MODE ========== */
+@media (prefers-contrast: high) {
+    :root {
+        /* Solid backgrounds for better contrast */
+        --glass-light: rgba(255, 255, 255, 0.95);
+        --glass-dark: rgba(20, 20, 20, 0.95);
+        --glass-blur: 0px;
+        --glass-light-catcher: rgba(0, 0, 0, 0.3);
+        
+        /* Enhanced text contrast */
+        --color-text-primary: #000000;
+        --color-text-secondary: #333333;
+        --color-border: rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Dark mode high contrast */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --glass-light: rgba(30, 30, 30, 0.98);
+            --glass-dark: rgba(0, 0, 0, 0.98);
+            --glass-light-catcher: rgba(255, 255, 255, 0.4);
+            --color-text-primary: #FFFFFF;
+            --color-text-secondary: #CCCCCC;
+            --color-border: rgba(255, 255, 255, 0.4);
+        }
+    }
+    
+    /* Enhanced text legibility */
+    h1, h2, h3, h4, h5, h6, p, span, div, button, a {
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    /* Stronger borders */
+    .rz-card,
+    .liquid-glass,
+    .glass,
+    .rz-button {
+        border-width: 2px !important;
+        border-color: var(--color-border) !important;
+    }
+    
+    /* Remove subtle effects */
+    *::before,
+    *::after {
+        opacity: 0 !important;
+    }
+}
+
+/* ========== REDUCED TRANSPARENCY ========== */
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --glass-light: rgba(255, 255, 255, 0.95);
+        --glass-dark: rgba(20, 20, 20, 0.95);
+        --glass-blur: 0px;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --glass-light: rgba(30, 30, 30, 0.98);
+            --glass-dark: rgba(0, 0, 0, 0.98);
+        }
+    }
+    
+    /* Disable backdrop filters */
+    *,
+    .liquid-glass,
+    .glass,
+    .rz-card,
+    .rz-header,
+    .rz-sidebar,
+    .rz-dialog {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    
+    /* Solid backgrounds */
+    .rz-card,
+    .liquid-glass,
+    .glass {
+        background: var(--color-surface) !important;
+    }
+    
+    body::before,
+    body::after {
+        opacity: 0 !important;
+    }
+}
+
+/* ========== REDUCED MOTION ========== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    
+    /* Disable background animations */
+    body::before {
+        animation: none !important;
+    }
+    
+    body::after {
+        animation: none !important;
+    }
+    
+    /* Disable hover animations */
+    .rz-card:hover,
+    .liquid-glass:hover,
+    .hover-lift:hover,
+    .hover-scale:hover {
+        animation: none !important;
+        transform: none !important;
+    }
+    
+    /* Disable scroll animations */
+    .fade-in,
+    .fade-in-delay-1,
+    .fade-in-delay-2,
+    .fade-in-delay-3,
+    .scale-in,
+    .slide-in-left,
+    .slide-in-right {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    
+    /* Instant focus changes */
+    :focus-visible {
+        animation: none !important;
+        outline: 2px solid var(--color-accent) !important;
+        outline-offset: 2px !important;
+    }
+}
+
+/* ========== FORCED COLORS MODE ========== */
+@media (forced-colors: active) {
+    :root {
+        --glass-light: Canvas;
+        --glass-dark: Canvas;
+        --glass-blur: 0px;
+        --color-accent: LinkText;
+        --color-text-primary: CanvasText;
+        --color-text-secondary: CanvasText;
+    }
+    
+    .rz-card,
+    .liquid-glass,
+    .glass {
+        background: Canvas !important;
+        border: 1px solid CanvasText !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    
+    .rz-button-primary {
+        background: ButtonFace !important;
+        color: ButtonText !important;
+        border: 1px solid ButtonText !important;
+    }
+    
+    body::before,
+    body::after {
+        display: none !important;
+    }
+}
+
+/* ========== FOCUS VISIBILITY ENHANCEMENTS ========== */
+:focus-visible {
+    outline: 3px solid var(--color-accent) !important;
+    outline-offset: 3px !important;
+    z-index: 1000 !important;
+}
+
+/* Enhanced focus for interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.25),
+                0 0 0 8px rgba(0, 113, 227, 0.1) !important;
+}
+
+/* ========== SCREEN READER ONLY ========== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+
+/* ========== SKIP LINKS ========== */
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    background: var(--color-accent);
+    color: white;
+    padding: 1rem 2rem;
+    text-decoration: none;
+    z-index: 10000;
+    border-radius: 0 0 var(--border-radius-sm) 0;
+    font-weight: var(--font-weight-bold);
+    transition: top 0.3s ease;
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 3px solid white;
+    outline-offset: -3px;
+}
+
+/* ========== TOUCH TARGET SIZE ========== */
+@media (pointer: coarse) {
+    /* Ensure minimum 44x44px touch targets */
+    button,
+    a,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    .rz-button {
+        min-height: 44px !important;
+        min-width: 44px !important;
+    }
+    
+    /* Increased padding for touch */
+    .nav-link,
+    .rz-navigation-item {
+        padding: 1rem 1.5rem !important;
+    }
+}
+
+/* ========== PRINT STYLES ========== */
+@media print {
+    /* Remove decorative elements */
+    body::before,
+    body::after,
+    .liquid-glass::before,
+    .liquid-glass::after,
+    .glass::before,
+    .glass::after {
+        display: none !important;
+    }
+    
+    /* Solid backgrounds for print */
+    .rz-card,
+    .liquid-glass,
+    .glass {
+        background: white !important;
+        border: 1px solid black !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Black text for readability */
+    * {
+        color: black !important;
+    }
+    
+    /* Show all content */
+    .mobile-hidden,
+    .desktop-hidden {
+        display: block !important;
+    }
+}
+
+/* ========== COLOR BLINDNESS SUPPORT ========== */
+/* Enhanced contrast for color blind users */
+.high-contrast-links a {
+    text-decoration: underline;
+    font-weight: var(--font-weight-bold);
+}
+
+.high-contrast-links .rz-button-primary {
+    border: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+/* ========== CUSTOM ACCESSIBILITY UTILITIES ========== */
+.accessible-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.focus-trap {
+    position: relative;
+}
+
+.focus-trap:focus-within {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 3px;
+}
+
+/* Enhanced contrast for form validation */
+.invalid,
+.rz-invalid {
+    outline: 3px solid #D32F2F !important;
+    outline-offset: 2px !important;
+}
+
+.valid,
+.rz-valid {
+    outline: 3px solid #388E3C !important;
+    outline-offset: 2px !important;
+}
+
+/* Error message accessibility */
+.validation-message,
+.rz-validation-message {
+    color: #D32F2F !important;
+    font-weight: var(--font-weight-bold) !important;
+    margin-top: 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.validation-message::before,
+.rz-validation-message::before {
+    content: '?' !important;
+    font-size: 1.2em !important;
+}

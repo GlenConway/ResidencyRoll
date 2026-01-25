@@ -1,0 +1,1279 @@
+/* ============================================
+   2026 "Liquid Glass" Design System
+   Ultra-Modern Spatial Computing Interface
+   Glassmorphism + WCAG AAA Compliance
+   ============================================ */
+
+/* ========== ROOT VARIABLES ========== */
+:root {
+    /* 2026 Liquid Glass Color Palette */
+    --color-background: #F5F5F7;
+    --color-surface: #FFFFFF;
+    --color-accent: #0071E3;
+    --color-accent-hover: #0077ED;
+    --color-accent-active: #005BB5;
+    --color-text-primary: #1D1D1F;
+    --color-text-secondary: #86868B;
+    --color-border: rgba(0, 0, 0, 0.08);
+    
+    /* 2026 Liquid Glass - Light Mode - MORE TRANSLUCENT */
+    --glass-light: rgba(255, 255, 255, 0.25);
+    --glass-dark: rgba(20, 20, 20, 0.5);
+    --glass-light-catcher: rgba(255, 255, 255, 0.35);
+    --glass-blur: 16px;
+    /* Neutral gray-blue shadows to avoid purple cast */
+    --glass-shadow-sm: 0 4px 16px rgba(12, 23, 41, 0.12);
+    --glass-shadow: 0 8px 32px rgba(12, 23, 41, 0.16);
+    --glass-shadow-lg: 0 16px 64px rgba(12, 23, 41, 0.2);
+    
+    /* Mesh Gradient Colors - SUBTLE & REFINED */
+    --mesh-color-1: rgba(0, 113, 227, 0.05);
+    --mesh-color-2: rgba(64, 158, 255, 0.04);    /* shifted from purple to light blue */
+    --mesh-color-3: rgba(0, 200, 255, 0.05);
+    --mesh-color-4: rgba(80, 200, 255, 0.04);    /* cooled violet to aqua */
+    --mesh-color-5: rgba(200, 230, 255, 0.04);   /* softened to ice blue */
+    
+    /* Spacing & Borders */
+    --bento-gap: 24px;
+    --border-radius: 20px;
+    --border-radius-lg: 28px;
+    --border-radius-sm: 14px;
+    --border-width: 1px;
+    
+    /* Typography - WCAG AAA */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    --font-size-base: 16px;
+    --line-height-base: 1.65;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 600;
+    --font-weight-heavy: 700;
+    
+    /* Animation Variables */
+    --animation-timing: cubic-bezier(0.23, 1, 0.32, 1);
+    --animation-duration: 0.4s;
+}
+
+/* Dark Mode Variables - 2026 Standards */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-background: #0A0A0B;
+        --color-surface: #1A1A1C;
+        --color-text-primary: #F5F5F7;
+        --color-text-secondary: #98989D;
+        --color-border: rgba(255, 255, 255, 0.12);
+        
+        /* Dark Glass with enhanced depth */
+        --glass-light: rgba(255, 255, 255, 0.08);
+        --glass-dark: rgba(20, 20, 20, 0.4);
+        --glass-light-catcher: rgba(255, 255, 255, 0.15);
+        --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --glass-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.7);
+        
+        /* Dark Mode Mesh Gradient - Subtle */
+        --mesh-color-1: rgba(0, 113, 227, 0.08);
+        --mesh-color-2: rgba(64, 158, 255, 0.08);   /* cooled purple out in dark mode */
+        --mesh-color-3: rgba(0, 200, 255, 0.08);
+        --mesh-color-4: rgba(80, 200, 255, 0.08);   /* aqua tint */
+        --mesh-color-5: rgba(200, 230, 255, 0.08);  /* ice blue */
+    }
+}
+
+/* Accessibility: High Contrast Mode - Solid Fallback */
+@media (prefers-contrast: high), (prefers-reduced-transparency: reduce) {
+    :root {
+        --glass-light: rgba(255, 255, 255, 0.95);
+        --glass-dark: rgba(20, 20, 20, 0.95);
+        --glass-blur: 0px;
+        --glass-light-catcher: rgba(0, 0, 0, 0.2);
+        --color-text-primary: #000000;
+        --color-text-secondary: #4A4A4A;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --glass-light: rgba(30, 30, 30, 0.98);
+            --glass-dark: rgba(0, 0, 0, 0.98);
+            --color-text-primary: #FFFFFF;
+            --color-text-secondary: #CCCCCC;
+        }
+    }
+}
+
+
+/* ========== BASE STYLES - MULTI-LAYERED MESH GRADIENT ========== */
+
+/* Override Radzen's theme colors */
+.rz-theme-material,
+body.rz-body,
+html {
+    --rz-primary: var(--color-accent) !important;
+    --rz-primary-light: var(--color-accent-hover) !important;
+    --rz-primary-dark: var(--color-accent-active) !important;
+    --rz-text-color: var(--color-text-primary) !important;
+    --rz-secondary-color: var(--color-text-secondary) !important;
+    --rz-base-background-color: var(--color-background) !important;
+    
+    /* Fix text colors on colored backgrounds */
+    --rz-on-warning: #1D1D1F !important;
+    --rz-on-info: #1D1D1F !important;
+    --rz-on-success: #1D1D1F !important;
+    --rz-on-danger: #FFFFFF !important;
+    --rz-on-primary: #FFFFFF !important;
+}
+
+html, body {
+    font-family: var(--font-family) !important;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
+    background-color: transparent !important;
+    background-image: none !important;
+    color: var(--color-text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Multi-layered Vibrant Mesh Gradient Background - SUBTLE & ELEGANT */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    background: 
+        radial-gradient(circle at 15% 20%, var(--mesh-color-1) 0%, transparent 50%),
+        radial-gradient(circle at 85% 30%, var(--mesh-color-2) 0%, transparent 50%),
+        radial-gradient(circle at 50% 70%, var(--mesh-color-3) 0%, transparent 45%),
+        radial-gradient(circle at 25% 85%, var(--mesh-color-4) 0%, transparent 50%),
+        radial-gradient(circle at 75% 90%, var(--mesh-color-5) 0%, transparent 48%),
+        linear-gradient(135deg, #fafafa 0%, #f5f5f7 50%, #fafafa 100%);
+    background-attachment: fixed;
+    animation: meshFloat 25s ease-in-out infinite;
+}
+
+/* Responsive Lighting Micro-Animation */
+@keyframes meshFloat {
+    0%, 100% {
+        background-position: 0% 0%, 100% 0%, 50% 50%, 0% 100%, 100% 100%;
+    }
+    25% {
+        background-position: 10% 10%, 90% 15%, 55% 45%, 5% 95%, 95% 90%;
+    }
+    50% {
+        background-position: 5% 20%, 95% 25%, 45% 55%, 10% 90%, 90% 85%;
+    }
+    75% {
+        background-position: 15% 15%, 85% 20%, 50% 50%, 8% 92%, 92% 88%;
+    }
+}
+
+/* User focus-based lighting enhancement */
+body::after {
+    content: '';
+    position: fixed;
+    top: var(--mouse-y, 50%);
+    left: var(--mouse-x, 50%);
+    width: 600px;
+    height: 600px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(0, 113, 227, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+    transition: top 0.3s ease, left 0.3s ease;
+    opacity: 0;
+    animation: focusGlow 3s ease-in-out infinite;
+}
+
+@keyframes focusGlow {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.6; }
+}
+
+body:hover::after {
+    opacity: 0.4;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+
+/* ========== TYPOGRAPHY - WCAG AAA COMPLIANCE ========== */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.025em;
+    margin-bottom: 1rem;
+    color: var(--color-text-primary);
+    line-height: 1.2;
+}
+
+h1 {
+    font-size: clamp(2.5rem, 5vw, 3.75rem);
+    font-weight: var(--font-weight-heavy);
+    letter-spacing: -0.03em;
+}
+
+h2 {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+}
+
+h3 {
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+h4 {
+    font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+p {
+    margin-bottom: 1rem;
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    line-height: var(--line-height-base);
+}
+
+/* Ensure WCAG AAA contrast - High readability on glass */
+@media (prefers-contrast: high) {
+    h1, h2, h3, h4, h5, h6, p, span, div {
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+}
+
+
+/* ========== LIQUID GLASS COMPONENT SYSTEM ========== */
+
+/* Core Liquid Glass Mixin - Light Catcher Border Effect */
+.liquid-glass,
+.glass {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    box-shadow: var(--glass-shadow),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+}
+
+/* Enhanced Light-Catcher Edge Refraction */
+.liquid-glass::before,
+.glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--glass-light-catcher) 25%, 
+        var(--glass-light-catcher) 75%, 
+        transparent 100%);
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.liquid-glass::after,
+.glass::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        var(--glass-light-catcher) 25%, 
+        var(--glass-light-catcher) 75%, 
+        transparent 100%);
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Hover: Enhanced Material Thickness Illusion */
+.liquid-glass:hover,
+.glass:hover {
+    box-shadow: var(--glass-shadow-lg),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Active: Depth Press Effect */
+.liquid-glass:active,
+.glass:active {
+    transform: translateY(0) scale(0.998);
+    box-shadow: var(--glass-shadow-sm) !important;
+}
+
+
+/* ========== RADZEN LAYOUT OVERRIDES - LIQUID GLASS ========== */
+
+/* Main Layout Container */
+.rz-body,
+body > .rz-body {
+    background-color: transparent !important;
+}
+
+/* RadzenLayout wrapper */
+.rz-layout,
+.rz-layout-wrapper {
+    background-color: transparent !important;
+}
+
+/* Glass Header with Light-Catcher Border - VERTICALLY CENTERED */
+.glass-header,
+.rz-header.glass-header,
+header.glass-header,
+.rz-header,
+header.rz-header,
+::deep .rz-header,
+::deep header.rz-header {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border-bottom: var(--border-width) solid var(--glass-light-catcher) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08),
+                inset 0 -1px 0 rgba(255, 255, 255, 0.1) !important;
+    padding: 1.25rem 2rem !important;
+    min-height: 80px !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    transition: all var(--animation-duration) var(--animation-timing);
+}
+
+/* Fix Radzen Header Inner Content Alignment */
+.rz-header > *,
+header.rz-header > *,
+.glass-header > * {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
+
+/* Glass Sidebar with Enhanced Depth - FORCE TRANSPARENCY */
+.glass-sidebar,
+.rz-sidebar.glass-sidebar,
+aside.glass-sidebar,
+.rz-sidebar,
+.rz-sidebar-content,
+aside.rz-sidebar,
+aside,
+.rz-layout aside,
+::deep .rz-sidebar,
+::deep aside.rz-sidebar,
+::deep aside {
+    background: var(--glass-light) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border-right: var(--border-width) solid var(--glass-light-catcher) !important;
+    box-shadow: var(--glass-shadow),
+                inset -1px 0 0 rgba(255, 255, 255, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Sidebar inner content also glass */
+.rz-sidebar *,
+aside * {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Header Content Container - Vertically Centered */
+.header-content {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 1.5rem !important;
+    min-height: 48px !important;
+}
+
+.header-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    color: var(--color-text-primary) !important;
+    font-weight: var(--font-weight-bold) !important;
+    font-size: 1.5rem !important;
+    flex-shrink: 0;
+    letter-spacing: -0.02em;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Radzen Body (Main Content Area) */
+.rz-body-content,
+.rz-body main,
+::deep .rz-body-content,
+.main-body {
+    padding: 0;
+    margin: 0 1rem;
+    background-color: transparent !important;
+}
+
+/* Full-width pages (like home with bento grid) - no margin */
+.main-body:has(.full-width-page) {
+    margin: 0;
+}
+
+/* ========== BENTO GRID SYSTEM ========== */
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--bento-gap);
+    padding: 0;
+}
+
+/* Responsive grid for larger screens */
+@media (min-width: 768px) {
+    .bento-grid {
+        grid-template-columns: repeat(12, 1fr);
+    }
+    
+    .bento-cell-1 { grid-column: span 1; }
+    .bento-cell-2 { grid-column: span 2; }
+    .bento-cell-3 { grid-column: span 3; }
+    .bento-cell-4 { grid-column: span 4; }
+    .bento-cell-5 { grid-column: span 5; }
+    .bento-cell-6 { grid-column: span 6; }
+    .bento-cell-7 { grid-column: span 7; }
+    .bento-cell-8 { grid-column: span 8; }
+    .bento-cell-9 { grid-column: span 9; }
+    .bento-cell-10 { grid-column: span 10; }
+    .bento-cell-11 { grid-column: span 11; }
+    .bento-cell-12 { grid-column: span 12; }
+    
+    /* Row span options */
+    .bento-row-2 { grid-row: span 2; }
+    .bento-row-3 { grid-row: span 3; }
+}
+
+/* Mobile: single column */
+@media (max-width: 767px) {
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+
+/* ========== RADZEN CARD - LIQUID GLASS WITH DEPTH ========== */
+.rz-card,
+.rz-card-content,
+div.rz-card,
+::deep .rz-card,
+::deep div.rz-card,
+.rz-panel,
+div.rz-panel {
+    background: var(--glass-light) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border-radius: var(--border-radius) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    box-shadow: var(--glass-shadow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                inset -1px 0 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 0 rgba(255, 255, 255, 0.1) !important;
+    padding: 2rem !important;
+    position: relative;
+    overflow: visible !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+}
+
+/* Light-Catcher Top Edge - MORE VISIBLE */
+.rz-card::before,
+div.rz-card::before,
+.rz-panel::before,
+div.rz-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.8) 50%, 
+        transparent 100%);
+    opacity: 1;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Hover: Enhanced Material Thickness */
+.rz-card:hover,
+div.rz-card:hover,
+::deep .rz-card:hover,
+.rz-panel:hover,
+div.rz-panel:hover {
+    box-shadow: var(--glass-shadow-lg),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                inset -1px 0 0 rgba(255, 255, 255, 0.3),
+                inset 0 -1px 0 rgba(255, 255, 255, 0.2) !important;
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Card Title - High Contrast */
+::deep .rz-card-title,
+.rz-card-title {
+    font-size: 1.5rem !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    margin-bottom: 0.75rem !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Card Content */
+::deep .rz-card-content,
+.rz-card-content {
+    color: var(--color-text-secondary) !important;
+    line-height: var(--line-height-base) !important;
+}
+
+
+/* ========== BUTTONS - SPATIAL COMPUTING READY ========== */
+
+/* Primary Button - Elevated Glass */
+::deep .rz-button-primary,
+.rz-button-primary,
+::deep .rz-button.rz-primary,
+.rz-button.rz-primary {
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%) !important;
+    border: none !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.75rem !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: white !important;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: 0 8px 24px rgba(0, 113, 227, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Button Light-Catcher Edge */
+::deep .rz-button-primary::before,
+.rz-button-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.4) 50%, 
+        transparent 100%);
+    opacity: 0.8;
+}
+
+::deep .rz-button-primary:hover,
+.rz-button-primary:hover {
+    background: linear-gradient(135deg, var(--color-accent-hover) 0%, var(--color-accent) 100%) !important;
+    transform: none;
+    box-shadow: 0 12px 32px rgba(0, 113, 227, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+::deep .rz-button-primary:active,
+.rz-button-primary:active {
+    background: var(--color-accent-active) !important;
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3) !important;
+}
+
+/* Secondary Button - Liquid Glass with Better Visibility */
+::deep .rz-button-secondary,
+.rz-button-secondary,
+::deep .rz-button.rz-secondary,
+.rz-button.rz-secondary,
+::deep .rz-button-light,
+.rz-button-light,
+button.rz-button {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.75rem !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: var(--color-text-primary) !important;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: var(--glass-shadow-sm),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+::deep .rz-button-secondary:hover,
+.rz-button-secondary:hover,
+button.rz-button:hover {
+    background: rgba(255, 255, 255, 0.5) !important;
+    box-shadow: var(--glass-shadow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+    transform: none;
+/* Nav Links */
+::deep .rz-navigation-item,
+.rz-navigation-item,
+::deep .nav-link,
+.nav-link {
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.25rem !important;
+    margin-bottom: 0.5rem !important;
+    color: var(--color-text-secondary) !important;
+    font-weight: var(--font-weight-medium) !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    text-decoration: none !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Nav Link Hover - Glass Effect */
+::deep .rz-navigation-item:hover,
+.rz-navigation-item:hover,
+::deep .nav-link:hover,
+.nav-link:hover {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    color: var(--color-accent-active) !important;
+    transform: none;
+    box-shadow: var(--glass-shadow-sm) !important;
+}
+
+/* Active Nav Link - Elevated Glass with DARK TEXT */
+::deep .rz-navigation-item.active,
+.rz-navigation-item.active,
+::deep .nav-link.active,
+.nav-link.active {
+    background: rgba(0, 113, 227, 0.14) !important;
+    color: var(--color-accent-active) !important;
+    box-shadow: var(--glass-shadow-sm) !important;
+    border: 1px solid rgba(0, 113, 227, 0.22) !important;
+    transform: none;
+}
+
+/* Active Link Light-Catcher */
+::deep .rz-navigation-item.active::before,
+.rz-navigation-item.active::before,
+.nav-link.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.5) 50%, 
+        transparent 100%);
+    opacity: 0.8;
+}
+
+/* Active Nav Link Text - Force white for contrast on blue */
+::deep .rz-navigation-item.active *,
+.rz-navigation-item.active *,
+::deep .nav-link.active *,
+.nav-link.active * {
+    color: var(--color-accent-active) !important;
+}
+
+
+/* ========== INPUTS & FORMS - ACCESSIBLE LIQUID GLASS ========== */
+
+::deep .rz-textbox,
+.rz-textbox,
+::deep input.rz-inputtext,
+input.rz-inputtext,
+::deep .rz-dropdown,
+.rz-dropdown,
+::deep textarea,
+textarea {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.25rem !important;
+    color: var(--color-text-primary) !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Focus State - Enhanced Accessibility */
+::deep .rz-textbox:focus,
+.rz-textbox:focus,
+::deep input.rz-inputtext:focus,
+input.rz-inputtext:focus,
+::deep .rz-dropdown:focus,
+.rz-dropdown:focus,
+::deep textarea:focus,
+textarea:focus {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15),
+                var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    outline: none !important;
+    transform: translateY(-1px);
+}
+
+/* Placeholder - High Contrast */
+::deep .rz-textbox::placeholder,
+.rz-textbox::placeholder,
+::deep input.rz-inputtext::placeholder,
+input.rz-inputtext::placeholder,
+::deep textarea::placeholder,
+textarea::placeholder {
+    color: var(--color-text-secondary) !important;
+    opacity: 0.7;
+}
+
+/* Dropdown Items - Hover & Selected States */
+::deep .rz-dropdown-item,
+.rz-dropdown-item,
+::deep .rz-listbox-item,
+.rz-listbox-item {
+    padding: 0.5rem 1rem !important;
+    color: var(--color-text-primary) !important;
+    transition: all 0.2s ease !important;
+}
+
+::deep .rz-dropdown-item:hover,
+.rz-dropdown-item:hover,
+::deep .rz-listbox-item:hover,
+.rz-listbox-item:hover {
+    background: rgba(0, 113, 227, 0.12) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+::deep .rz-dropdown-item.rz-state-highlight,
+.rz-dropdown-item.rz-state-highlight,
+::deep .rz-listbox-item.rz-state-highlight,
+.rz-listbox-item.rz-state-highlight {
+    background: rgba(0, 113, 227, 0.18) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 500 !important;
+}
+
+
+/* ========== DATA GRID & TABLES - LAYERED GLASS ========== */
+
+::deep .rz-datatable,
+.rz-datatable,
+::deep .rz-grid,
+.rz-grid {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border-radius: var(--border-radius) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    overflow: hidden !important;
+    box-shadow: var(--glass-shadow),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+::deep .rz-datatable-header,
+.rz-datatable-header,
+::deep .rz-grid-header,
+.rz-grid-header {
+    background: rgba(0, 0, 0, 0.03) !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    padding: 1rem !important;
+    border-bottom: var(--border-width) solid var(--glass-light-catcher) !important;
+}
+
+::deep .rz-datatable-row:hover,
+.rz-datatable-row:hover,
+::deep .rz-grid-row:hover,
+.rz-grid-row:hover {
+    background: rgba(0, 113, 227, 0.06) !important;
+    transition: all 0.2s ease;
+}
+
+::deep .rz-datatable-row,
+.rz-datatable-row,
+::deep .rz-grid-row,
+.rz-grid-row {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+
+
+/* ========== MODAL & DIALOG - PREMIUM GLASS ========== */
+
+::deep .rz-dialog,
+.rz-dialog,
+::deep .rz-dialog-mask,
+.rz-dialog-mask {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(calc(var(--glass-blur) * 1.25)) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.25)) saturate(200%) !important;
+    border-radius: var(--border-radius-lg) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Dialog Light-Catcher Top Edge */
+::deep .rz-dialog::before,
+.rz-dialog::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.4) 50%, 
+        transparent 100%);
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 1;
+}
+
+::deep .rz-dialog-titlebar,
+.rz-dialog-titlebar {
+    background: transparent !important;
+    border-bottom: var(--border-width) solid var(--glass-light-catcher) !important;
+    padding: 1.75rem 2rem !important;
+    font-size: 1.5rem !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+}
+
+::deep .rz-dialog-content,
+.rz-dialog-content {
+    padding: 2rem !important;
+    color: var(--color-text-secondary) !important;
+}
+
+/* Dialog Backdrop */
+::deep .rz-dialog-mask,
+.rz-dialog-mask {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    background: rgba(0, 0, 0, 0.4) !important;
+}
+
+
+/* ========== PANELS & ACCORDIONS - LAYERED GLASS ========== */
+
+::deep .rz-panel,
+.rz-panel,
+::deep .rz-accordion,
+.rz-accordion {
+    background: var(--glass-light) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    border-radius: var(--border-radius) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    margin-bottom: var(--bento-gap) !important;
+    box-shadow: var(--glass-shadow),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    overflow: hidden;
+}
+
+::deep .rz-panel-header,
+.rz-panel-header,
+::deep .rz-accordion-header,
+.rz-accordion-header {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-bottom: var(--border-width) solid var(--glass-light-catcher) !important;
+    padding: 1.25rem 1.5rem !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    transition: all 0.3s ease;
+}
+
+::deep .rz-panel-header:hover,
+.rz-panel-header:hover,
+::deep .rz-accordion-header:hover,
+.rz-accordion-header:hover {
+    background: rgba(0, 113, 227, 0.05) !important;
+}
+
+::deep .rz-panel-content,
+.rz-panel-content,
+::deep .rz-accordion-content,
+.rz-accordion-content {
+    padding: 1.5rem !important;
+    color: var(--color-text-secondary) !important;
+}
+
+
+/* ========== RESPONSIVE LIGHTING ANIMATIONS ========== */
+
+/* Shimmer effect for interactive elements */
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+/* Pulse glow for focus states */
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(0, 113, 227, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 113, 227, 0);
+    }
+}
+
+/* Floating micro-animation */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* Apply subtle float to cards on hover */
+.rz-card:hover,
+.liquid-glass:hover {
+    animation: none;
+}
+
+/* Focus ring animation for accessibility */
+:focus-visible {
+    animation: pulseGlow 2s ease-in-out infinite;
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+/* Interactive element shimmer on hover */
+.rz-button:hover::after,
+.nav-link:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
+        transparent 100%
+    );
+    animation: shimmer 2s ease-in-out;
+    pointer-events: none;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    body::before {
+        animation: none !important;
+    }
+}
+    border-radius: var(--border-radius-lg) !important;
+}
+
+.rounded {
+    border-radius: var(--border-radius) !important;
+}
+
+.rounded-sm {
+    border-radius: var(--border-radius-sm) !important;
+}
+
+/* Accent color utility */
+.accent {
+    color: var(--color-accent) !important;
+}
+
+.bg-accent {
+    background-color: var(--color-accent) !important;
+}
+
+/* Text utilities */
+.text-primary {
+    color: var(--color-text-primary) !important;
+}
+
+.text-secondary {
+    color: var(--color-text-secondary) !important;
+}
+
+/* ========== ANIMATIONS ========== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* ========== LOGIN DISPLAY COMPONENT - VERTICALLY CENTERED ========== */
+
+.login-display {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 1rem !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+    height: 100% !important;
+}
+
+.user-name {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-medium);
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius-sm);
+    line-height: 1 !important;
+}
+
+.user-name i {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+.btn-logout,
+.btn-login {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-medium);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    line-height: 1 !important;
+    white-space: nowrap;
+}
+
+.btn-logout {
+    background: rgba(0, 0, 0, 0.08) !important;
+    color: var(--color-text-primary) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.btn-logout:hover {
+    background: rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-1px);
+}
+
+.btn-login {
+    background: var(--color-accent) !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+}
+
+.btn-login:hover {
+    background: var(--color-accent-hover);
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.4);
+    transform: translateY(-1px);
+}
+
+/* ========== NAV MENU COMPONENT ========== */
+
+.nav-menu-container {
+    padding: 1.5rem 1rem;
+}
+
+.nav-menu-container .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.nav-menu-container .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.nav-menu-container .nav-link span:first-child {
+    font-size: 1.1rem;
+    width: 1.25rem;
+    text-align: center;
+}
+
+.nav-menu-container .nav-link:hover {
+    background: rgba(0, 113, 227, 0.08);
+    color: var(--color-accent-active);
+    transform: none;
+}
+
+.nav-menu-container .nav-link.active {
+    background: rgba(0, 113, 227, 0.14);
+    color: var(--color-accent-active);
+    box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.22);
+    border: 1px solid rgba(0, 113, 227, 0.22);
+}
+
+.nav-menu-container .nav-link.active:hover {
+    transform: none;
+}
+
+/* Secondary badges - neutral tint so they sit on glass background */
+.rz-badge-secondary,
+.rz-badge.rz-secondary,
+span.rz-badge-secondary {
+    background: rgba(29, 29, 31, 0.08) !important;
+    color: var(--color-text-primary) !important;
+    border: 1px solid rgba(29, 29, 31, 0.14) !important;
+    box-shadow: var(--glass-shadow-sm) !important;
+}
+
+/* ========== DARK MODE ADJUSTMENTS ========== */
+
+@media (prefers-color-scheme: dark) {
+    .user-name {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-logout {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-logout:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+    
+    .nav-menu-container .nav-link:hover {
+        background: rgba(0, 113, 227, 0.15);
+    }
+}
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Smooth transitions */
+* {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== SCROLLBAR STYLING ========== */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border-light);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+/* ========== LEGACY LAYOUT OVERRIDES ========== */
+
+/* Override old sidebar styles */
+.sidebar {
+    background: var(--glass-bg-light) !important;
+    background-image: none !important;
+    backdrop-filter: blur(15px) saturate(160%);
+    -webkit-backdrop-filter: blur(15px) saturate(160%);
+    border-right: 1px solid var(--glass-border-light);
+    box-shadow: var(--glass-shadow);
+}
+
+/* Override old top-row styles */
+.top-row {
+    background: var(--glass-bg-light) !important;
+    backdrop-filter: blur(15px) saturate(160%);
+    -webkit-backdrop-filter: blur(15px) saturate(160%);
+    border-bottom: 1px solid var(--glass-border-light) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.page {
+    background-color: var(--color-background) !important;
+}
+
+/* ========== RESPONSIVE ADJUSTMENTS ========== */
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 2rem;
+    }
+    
+    .bento-grid {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    ::deep .rz-header,
+    .rz-header {
+        padding: 1rem !important;
+    }
+}

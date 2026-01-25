@@ -10,16 +10,14 @@
 
 <PageTitle>Residency Roll - Travel Tracker</PageTitle>
 
-<h1>Residency Roll - Travel Tracking Dashboard</h1>
-
-<RadzenRow Gap="1rem" class="rz-mt-4">
-    <RadzenColumn Size="12">
+<div class="bento-grid full-width-page">
+    <!-- Main Dashboard - Large Card -->
+    <div class="bento-cell-12 bento-row-2 fade-in">
         <ResidencyStatusDashboard />
-    </RadzenColumn>
-</RadzenRow>
+    </div>
 
-<RadzenRow Gap="1rem" class="rz-mt-4">
-    <RadzenColumn Size="12">
+    <!-- Timeline - Full Width -->
+    <div class="bento-cell-12 fade-in">
         <ResidencyTimeline />
-    </RadzenColumn>
-</RadzenRow>
+    </div>
+</div>

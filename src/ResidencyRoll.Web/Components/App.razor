@@ -9,9 +9,16 @@
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" />
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/default-base.css" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["ResidencyRoll.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["custom-theme.css"]" />
+    <link rel="stylesheet" href="@Assets["liquid-glass-utils.css"]" />
+    <link rel="stylesheet" href="@Assets["liquid-glass-accessibility.css"]" />
+    <link rel="stylesheet" href="@Assets["liquid-glass-force.css"]" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="InteractiveServer" />
@@ -25,6 +32,7 @@
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="js/download.js"></script>
+    <script src="js/liquid-glass.js"></script>
 </body>
 
 </html>

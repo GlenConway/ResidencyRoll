@@ -4,18 +4,23 @@
 
 <AuthorizeView>
     <Authorized>
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-light">Hello, @context.User.Identity?.Name</span>
+        <div class="login-display">
+            <span class="user-name">
+                <i class="bi bi-person-circle"></i>
+                @context.User.Identity?.Name
+            </span>
             <form method="post" action="/logout">
-                <button type="submit" class="btn btn-sm btn-outline-light">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+                <button type="submit" class="btn-logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    Logout
                 </button>
             </form>
         </div>
     </Authorized>
     <NotAuthorized>
-        <a href="/login" class="btn btn-sm btn-primary">
-            <i class="bi bi-box-arrow-in-right"></i> Login
+        <a href="/login" class="btn-login">
+            <i class="bi bi-box-arrow-in-right"></i>
+            Login
         </a>
     </NotAuthorized>
 </AuthorizeView>
