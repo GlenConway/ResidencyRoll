@@ -440,7 +440,7 @@ aside * {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: var(--bento-gap);
-    padding: var(--bento-gap);
+    padding: 0;
 }
 
 /* Responsive grid for larger screens */
