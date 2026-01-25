@@ -10,7 +10,47 @@
 .rz-daypicker,
 .rz-datepicker,
 .rz-calendar-row,
+.rz-calendar-cell {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+}
+
+/* Calendar day cells - white background by default */
 .rz-calendar-cell,
+td.rz-calendar-cell,
+.rz-state-default {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+    color: var(--color-text-primary, #1D1D1F) !important;
+}
+
+/* Calendar day hover - blue tint */
+.rz-calendar-cell:hover,
+td.rz-calendar-cell:hover,
+.rz-state-default:hover {
+    background-color: rgba(0, 113, 227, 0.12) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+/* Calendar selected day - darker blue tint */
+.rz-state-active,
+.rz-calendar-cell.rz-state-active,
+td.rz-calendar-cell.rz-state-active,
+.rz-state-highlight {
+    background-color: rgba(0, 113, 227, 0.18) !important;
+    background-image: none !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 600 !important;
+}
+
+/* Calendar today - accent border */
+.rz-state-today,
+.rz-calendar-cell.rz-state-today,
+td.rz-calendar-cell.rz-state-today {
+    border: 2px solid var(--color-accent, #0071E3) !important;
+}
+
 .rz-dropdown-panel,
 .rz-dropdown-items,
 .rz-listbox {
