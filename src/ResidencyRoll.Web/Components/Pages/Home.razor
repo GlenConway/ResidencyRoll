@@ -7,10 +7,11 @@
 @using ResidencyRoll.Web.Components
 @inject TripsApiClient ApiClient
 @rendermode InteractiveServer
+@attribute [FullWidth]
 
 <PageTitle>Residency Roll - Travel Tracker</PageTitle>
 
-<div class="bento-grid">
+<div class="bento-grid full-width-page">
     <!-- Main Dashboard - Large Card -->
     <div class="bento-cell-8 bento-row-2 fade-in">
         <ResidencyStatusDashboard />
