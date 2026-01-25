@@ -754,6 +754,33 @@ textarea::placeholder {
     opacity: 0.7;
 }
 
+/* Dropdown Items - Hover & Selected States */
+::deep .rz-dropdown-item,
+.rz-dropdown-item,
+::deep .rz-listbox-item,
+.rz-listbox-item {
+    padding: 0.5rem 1rem !important;
+    color: var(--color-text-primary) !important;
+    transition: all 0.2s ease !important;
+}
+
+::deep .rz-dropdown-item:hover,
+.rz-dropdown-item:hover,
+::deep .rz-listbox-item:hover,
+.rz-listbox-item:hover {
+    background: rgba(0, 113, 227, 0.12) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+::deep .rz-dropdown-item.rz-state-highlight,
+.rz-dropdown-item.rz-state-highlight,
+::deep .rz-listbox-item.rz-state-highlight,
+.rz-listbox-item.rz-state-highlight {
+    background: rgba(0, 113, 227, 0.18) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 500 !important;
+}
+
 
 /* ========== DATA GRID & TABLES - LAYERED GLASS ========== */
 
