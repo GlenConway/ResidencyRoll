@@ -3,14 +3,18 @@
    Ultra-high specificity rules to ensure glass effects apply
    ============================================ */
 
-/* Calendar exception - restore proper background BEFORE broad rules */
+/* Calendar and Dropdown exceptions - restore proper background BEFORE broad rules */
 .rz-calendar,
 .rz-datepicker-container,
 .rz-monthpicker,
 .rz-daypicker,
 .rz-datepicker,
 .rz-calendar-row,
-.rz-calendar-cell {
+.rz-calendar-cell,
+.rz-dropdown-panel,
+.rz-dropdown-items,
+.rz-listbox,
+.rz-dropdown-item {
     background-color: var(--color-surface, #FFFFFF) !important;
     background-image: none !important;
 }
@@ -29,10 +33,10 @@ div.rz-body {
     background-image: none !important;
 }
 
-/* NUCLEAR OPTION: Force glass on ALL Radzen components - EXCEPT calendar */
-[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell),
-div[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell),
-aside[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell) {
+/* NUCLEAR OPTION: Force glass on ALL Radzen components - EXCEPT calendar and dropdown */
+[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
+div[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
+aside[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item) {
     background-color: transparent !important;
     background-image: none !important;
 }
