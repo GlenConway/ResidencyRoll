@@ -25,6 +25,15 @@ aside[class*="rz-"] {
     background-image: none !important;
 }
 
+/* Calendar exception - restore proper background */
+.rz-calendar,
+.rz-datepicker-container,
+.rz-monthpicker,
+.rz-daypicker {
+    background-color: var(--color-surface, #FFFFFF) !important;
+    background-image: none !important;
+}
+
 /* FORCE GLASS ON SIDEBAR - NUCLEAR OPTION */
 .rz-sidebar,
 aside.rz-sidebar,
