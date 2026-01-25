@@ -128,13 +128,15 @@ span.rz-badge-info {
     color: #1D1D1F !important;
 }
 
-/* Active nav links - ensure white text on blue background */
+/* Active nav links - accent text without forcing white */
 .nav-link.active,
 .rz-navigation-item.active {
-    color: white !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    background: rgba(0, 113, 227, 0.14) !important;
+    border: 1px solid rgba(0, 113, 227, 0.22) !important;
 }
 
 .nav-link.active *,
 .rz-navigation-item.active * {
-    color: white !important;
+    color: var(--color-accent-active, #005BB5) !important;
 }
