@@ -702,7 +702,7 @@ button.rz-button:hover {
 }
 
 
-/* ========== INPUTS & FORMS - ACCESSIBLE LIQUID GLASS ========== */
+/* ========== INPUTS & FORMS - SOLID BACKGROUND ========== */
 
 ::deep .rz-textbox,
 .rz-textbox,
@@ -710,10 +710,8 @@ button.rz-button:hover {
 input.rz-inputtext,
 ::deep textarea,
 textarea {
-    background: var(--glass-light) !important;
-    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
     border-radius: var(--border-radius-sm) !important;
     padding: 0.875rem 1.25rem !important;
     color: var(--color-text-primary) !important;
@@ -727,9 +725,9 @@ textarea {
 /* Dropdown specific styling with solid background */
 ::deep .rz-dropdown,
 .rz-dropdown {
-    background: #ffffff !important;
+    background: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
-    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    border: var(--border-width) solid var(--color-border) !important;
     border-radius: var(--border-radius-sm) !important;
     padding: 0.875rem 1.25rem !important;
     font-size: 1rem !important;
@@ -740,13 +738,13 @@ textarea {
 }
 
 /* AutoComplete input styling with solid background */
-::deep .rz-autocomplete-input,
-.rz-autocomplete-input,
 ::deep .rz-autocomplete,
-.rz-autocomplete {
-    background: #ffffff !important;
+.rz-autocomplete,
+::deep .rz-autocomplete-input,
+.rz-autocomplete-input {
+    background: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
-    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    border: var(--border-width) solid var(--color-border) !important;
     border-radius: var(--border-radius-sm) !important;
     padding: 0.875rem 1.25rem !important;
     font-size: 1rem !important;
@@ -756,29 +754,42 @@ textarea {
                 inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
+/* AutoComplete dropdown list styling */
+::deep .rz-autocomplete-item,
+.rz-autocomplete-item {
+    background: var(--color-surface) !important;
+    color: var(--color-text-primary) !important;
+    padding: 0.75rem 1rem !important;
+    border-bottom: var(--border-width) solid var(--color-border) !important;
+}
+
+::deep .rz-autocomplete-item:hover,
+.rz-autocomplete-item:hover,
+::deep .rz-autocomplete-item.rz-state-highlight,
+.rz-autocomplete-item.rz-state-highlight {
+    background: var(--color-accent) !important;
+    color: white !important;
+}
+
 /* Focus State - Enhanced Accessibility */
 ::deep .rz-textbox:focus,
 .rz-textbox:focus,
 ::deep input.rz-inputtext:focus,
 input.rz-inputtext:focus,
 ::deep textarea:focus,
-textarea:focus {
+textarea:focus,
+::deep .rz-dropdown:focus,
+.rz-dropdown:focus,
+::deep .rz-autocomplete:focus,
+.rz-autocomplete:focus,
+::deep .rz-autocomplete-input:focus,
+.rz-autocomplete-input:focus {
     border-color: var(--color-accent) !important;
     box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15),
                 var(--glass-shadow-sm),
                 inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     outline: none !important;
     transform: translateY(-1px);
-}
-
-/* Dropdown focus state */
-::deep .rz-dropdown:focus,
-.rz-dropdown:focus {
-    border-color: var(--color-accent) !important;
-    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15),
-                var(--glass-shadow-sm),
-                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-    outline: none !important;
 }
 
 /* Placeholder - High Contrast */
