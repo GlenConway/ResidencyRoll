@@ -741,7 +741,11 @@ textarea {
 ::deep .rz-autocomplete,
 .rz-autocomplete,
 ::deep .rz-autocomplete-input,
-.rz-autocomplete-input {
+.rz-autocomplete-input,
+::deep .rz-autocomplete input,
+.rz-autocomplete input,
+::deep input.rz-autocomplete-input,
+input.rz-autocomplete-input {
     background: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
     border: var(--border-width) solid var(--color-border) !important;
@@ -755,8 +759,16 @@ textarea {
 }
 
 /* AutoComplete dropdown list styling */
+::deep .rz-autocomplete-items,
+.rz-autocomplete-items {
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
+}
+
 ::deep .rz-autocomplete-item,
-.rz-autocomplete-item {
+.rz-autocomplete-item,
+::deep .rz-autocomplete-items .rz-autocomplete-item,
+.rz-autocomplete-items .rz-autocomplete-item {
     background: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
     padding: 0.75rem 1rem !important;
@@ -766,7 +778,9 @@ textarea {
 ::deep .rz-autocomplete-item:hover,
 .rz-autocomplete-item:hover,
 ::deep .rz-autocomplete-item.rz-state-highlight,
-.rz-autocomplete-item.rz-state-highlight {
+.rz-autocomplete-item.rz-state-highlight,
+::deep .rz-autocomplete-items .rz-autocomplete-item:hover,
+.rz-autocomplete-items .rz-autocomplete-item:hover {
     background: var(--color-accent) !important;
     color: white !important;
 }
@@ -810,6 +824,7 @@ textarea::placeholder {
 .rz-listbox-item {
     padding: 0.5rem 1rem !important;
     color: var(--color-text-primary) !important;
+    background: var(--color-surface) !important;
     transition: all 0.2s ease !important;
 }
 
@@ -817,17 +832,24 @@ textarea::placeholder {
 .rz-dropdown-item:hover,
 ::deep .rz-listbox-item:hover,
 .rz-listbox-item:hover {
-    background: rgba(0, 113, 227, 0.12) !important;
-    color: var(--color-accent-active, #005BB5) !important;
+    background: var(--color-accent) !important;
+    color: white !important;
 }
 
 ::deep .rz-dropdown-item.rz-state-highlight,
 .rz-dropdown-item.rz-state-highlight,
 ::deep .rz-listbox-item.rz-state-highlight,
 .rz-listbox-item.rz-state-highlight {
-    background: rgba(0, 113, 227, 0.18) !important;
-    color: var(--color-accent-active, #005BB5) !important;
+    background: var(--color-accent) !important;
+    color: white !important;
     font-weight: 500 !important;
+}
+
+/* Dropdown panel background */
+::deep .rz-dropdown-panel,
+.rz-dropdown-panel {
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
 }
 
 
