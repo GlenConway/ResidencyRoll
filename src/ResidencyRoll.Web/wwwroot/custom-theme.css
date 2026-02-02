@@ -612,7 +612,7 @@ div.rz-panel:hover {
 ::deep .rz-button-light,
 .rz-button-light,
 button.rz-button {
-    background: rgba(255, 255, 255, 0.4) !important;
+    background: rgba(255, 255, 255, 0.85) !important;
     backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
     border: var(--border-width) solid var(--glass-light-catcher) !important;
@@ -708,8 +708,6 @@ button.rz-button:hover {
 .rz-textbox,
 ::deep input.rz-inputtext,
 input.rz-inputtext,
-::deep .rz-dropdown,
-.rz-dropdown,
 ::deep textarea,
 textarea {
     background: var(--glass-light) !important;
@@ -726,13 +724,26 @@ textarea {
                 inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
+/* Dropdown specific styling with solid background */
+::deep .rz-dropdown,
+.rz-dropdown {
+    background: #ffffff !important;
+    color: var(--color-text-primary) !important;
+    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
 /* Focus State - Enhanced Accessibility */
 ::deep .rz-textbox:focus,
 .rz-textbox:focus,
 ::deep input.rz-inputtext:focus,
 input.rz-inputtext:focus,
-::deep .rz-dropdown:focus,
-.rz-dropdown:focus,
 ::deep textarea:focus,
 textarea:focus {
     border-color: var(--color-accent) !important;
@@ -741,6 +752,16 @@ textarea:focus {
                 inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     outline: none !important;
     transform: translateY(-1px);
+}
+
+/* Dropdown focus state */
+::deep .rz-dropdown:focus,
+.rz-dropdown:focus {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15),
+                var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    outline: none !important;
 }
 
 /* Placeholder - High Contrast */
