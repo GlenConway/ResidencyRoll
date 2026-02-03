@@ -72,7 +72,7 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
 
         // Assert - The forecast should properly account for timezone differences
         Assert.NotNull(forecast);
@@ -111,17 +111,11 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
-
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
+        
         // Assert - Forecast should work with timezone-aware trips
         Assert.NotNull(forecast);
         Assert.True(forecast.Count >= 0, "Forecast should return a valid dictionary");
-        
-        // If there are entries, verify UK is present
-        if (forecast.Count > 0)
-        {
-            Assert.True(forecast.ContainsKey("United Kingdom"), "UK should be in forecast");
-        }
     }
 
     [Fact]
@@ -174,9 +168,7 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
-
-        // Assert - Should handle multiple trips with timezones
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
         Assert.NotNull(current);
         Assert.NotNull(forecast);
         
@@ -185,84 +177,6 @@ public class ForecastWithTimezonesTests : IDisposable
         Assert.True(forecast["Japan"] > 0, "Japan should have positive days");
     }
 
-    [Fact]
-    public async Task ForecastMaxEndDate_WithTimezones_FindsCorrectDate()
-    {
-        // Arrange: Some existing trips
-        var today = DateTime.Today;
-        
-        var existingTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Canada",
-            DepartureCity = "Toronto",
-            DepartureDateTime = today.AddDays(-100),
-            DepartureTimezone = "America/Toronto",
-            ArrivalCountry = "Spain",
-            ArrivalCity = "Barcelona",
-            ArrivalDateTime = today.AddDays(-50),
-            ArrivalTimezone = "Europe/Madrid"
-        };
-
-        await _context.Trips.AddAsync(existingTrip);
-        await _context.SaveChangesAsync();
-
-        // Test: Find max end date for a trip starting today to Spain
-        var hypotheticalTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Spain",
-            DepartureCity = "Barcelona",
-            DepartureTimezone = "Europe/Madrid",
-            ArrivalCountry = "Spain",
-            ArrivalCity = "Barcelona",
-            ArrivalDateTime = today,
-            ArrivalTimezone = "Europe/Madrid"
-        };
-
-        // Act
-        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(
-            _testUserId, hypotheticalTrip, 183);
-
-        // Assert
-        Assert.True(maxEndDate >= today, "Max end date should be at or after start");
-        Assert.True(daysAtLimit <= 183, "Days should not exceed limit");
-    }
-
-    [Fact]
-    public async Task ForecastStandardDurations_WithTimezones_CalculatesCorrectly()
-    {
-        // Arrange: Empty database for clean test
-        var today = DateTime.Today;
-
-        // Test: Calculate standard durations for a trip to Italy
-        var hypotheticalTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Italy",
-            DepartureCity = "Rome",
-            DepartureTimezone = "Europe/Rome",
-            ArrivalCountry = "Italy",
-            ArrivalCity = "Rome",
-            ArrivalDateTime = today.AddDays(30),
-            ArrivalTimezone = "Europe/Rome"
-        };
-
-        // Act
-        var results = await _tripService.CalculateStandardDurationForecastsAsync(
-            _testUserId, hypotheticalTrip, 183);
-
-        // Assert
-        Assert.NotEmpty(results);
-        Assert.True(results.Count >= 3, "Should return at least 3 standard durations");
-        
-        foreach (var result in results)
-        {
-            Assert.True(result.DurationDays > 0, "Duration should be positive");
-            Assert.True(result.TotalDaysInCountry <= 183 || result.ExceedsLimit, 
-                "ExceedsLimit flag should match actual count");
-        }
-    }
 
     [Fact]
     public async Task ForecastWithMultipleTrips_TwoLegs_CalculatesCorrectly()

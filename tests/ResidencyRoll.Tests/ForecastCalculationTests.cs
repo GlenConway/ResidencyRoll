@@ -40,8 +40,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "Canada",
                 ArrivalCity = "Toronto",
                 ArrivalDateTime = new DateTime(2026, 1, 1, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/Toronto",
-                CountryName = "Canada"
+                ArrivalTimezone = "America/Toronto"
             },
             new Trip
             {
@@ -54,8 +53,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "United States",
                 ArrivalCity = "New York",
                 ArrivalDateTime = new DateTime(2026, 1, 5, 22, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/New_York",
-                CountryName = "United States"
+                ArrivalTimezone = "America/New_York"
             }
         };
 
@@ -98,8 +96,7 @@ public class ForecastCalculationTests
             ArrivalCountry = "Canada",
             ArrivalCity = "Toronto",
             ArrivalDateTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            ArrivalTimezone = "America/Toronto",
-            CountryName = "Canada"
+            ArrivalTimezone = "America/Toronto"
         });
 
         // Departure from Canada back to USA on May 31
@@ -114,8 +111,7 @@ public class ForecastCalculationTests
             ArrivalCountry = "USA",
             ArrivalCity = "Boston",
             ArrivalDateTime = new DateTime(2026, 6, 1, 3, 0, 0, DateTimeKind.Utc),
-            ArrivalTimezone = "America/New_York",
-            CountryName = "USA"
+            ArrivalTimezone = "America/New_York"
         });
 
         // New trip: YHZ (Montreal) to LHR (London)
@@ -131,8 +127,7 @@ public class ForecastCalculationTests
             ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
             ArrivalDateTime = new DateTime(2026, 2, 19, 20, 35, 0, DateTimeKind.Utc),
-            ArrivalTimezone = "Europe/London",
-            CountryName = "United Kingdom"
+            ArrivalTimezone = "Europe/London"
         });
 
         // Return: LHR to YHZ
@@ -148,8 +143,7 @@ public class ForecastCalculationTests
             ArrivalCountry = "Canada",
             ArrivalCity = "Montreal",
             ArrivalDateTime = new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc),
-            ArrivalTimezone = "America/Toronto",
-            CountryName = "Canada"
+            ArrivalTimezone = "America/Toronto"
         });
 
         // Act
@@ -182,8 +176,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "Canada",
                 ArrivalCity = "Toronto",
                 ArrivalDateTime = new DateTime(2026, 1, 1, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/Toronto",
-                CountryName = "Canada"
+                ArrivalTimezone = "America/Toronto"
             }
         };
 
@@ -218,8 +211,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "United Kingdom",
                 ArrivalCity = "London",
                 ArrivalDateTime = new DateTime(2026, 2, 20, 4, 0, 0, DateTimeKind.Utc), // 4 AM GMT next day
-                ArrivalTimezone = "Europe/London",
-                CountryName = "United Kingdom"
+                ArrivalTimezone = "Europe/London"
             }
         };
 
@@ -255,8 +247,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "Canada",
                 ArrivalCity = "Toronto",
                 ArrivalDateTime = new DateTime(2026, 2, 1, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/Toronto",
-                CountryName = "Canada"
+                ArrivalTimezone = "America/Toronto"
             },
             new Trip
             {
@@ -269,8 +260,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "USA",
                 ArrivalCity = "Boston",
                 ArrivalDateTime = new DateTime(2026, 2, 5, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/New_York",
-                CountryName = "USA"
+                ArrivalTimezone = "America/New_York"
             },
             new Trip
             {
@@ -283,8 +273,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "Canada",
                 ArrivalCity = "Toronto",
                 ArrivalDateTime = new DateTime(2026, 2, 10, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/Toronto",
-                CountryName = "Canada"
+                ArrivalTimezone = "America/Toronto"
             },
             new Trip
             {
@@ -297,8 +286,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "USA",
                 ArrivalCity = "Boston",
                 ArrivalDateTime = new DateTime(2026, 2, 15, 19, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/New_York",
-                CountryName = "USA"
+                ArrivalTimezone = "America/New_York"
             },
             new Trip
             {
@@ -311,8 +299,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "United Kingdom",
                 ArrivalCity = "London",
                 ArrivalDateTime = new DateTime(2026, 2, 20, 22, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "Europe/London",
-                CountryName = "United Kingdom"
+                ArrivalTimezone = "Europe/London"
             },
             new Trip
             {
@@ -325,8 +312,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "USA",
                 ArrivalCity = "Boston",
                 ArrivalDateTime = new DateTime(2026, 2, 25, 18, 0, 0, DateTimeKind.Utc),
-                ArrivalTimezone = "America/New_York",
-                CountryName = "USA"
+                ArrivalTimezone = "America/New_York"
             }
         };
 
@@ -364,8 +350,7 @@ public class ForecastCalculationTests
                 ArrivalCountry = "United Kingdom",
                 ArrivalCity = "London",
                 ArrivalDateTime = new DateTime(2026, 2, 20, 13, 35, 0, DateTimeKind.Utc), // 13:35 GMT
-                ArrivalTimezone = "Europe/London",
-                CountryName = "United Kingdom"
+                ArrivalTimezone = "Europe/London"
             }
         };
 
