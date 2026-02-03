@@ -777,12 +777,16 @@ input.rz-autocomplete-input {
 
 ::deep .rz-autocomplete-item:hover,
 .rz-autocomplete-item:hover,
+::deep .rz-autocomplete-items .rz-autocomplete-item:hover {
+    background: rgba(0, 113, 227, 0.12) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
 ::deep .rz-autocomplete-item.rz-state-highlight,
-.rz-autocomplete-item.rz-state-highlight,
-::deep .rz-autocomplete-items .rz-autocomplete-item:hover,
-.rz-autocomplete-items .rz-autocomplete-item:hover {
-    background: var(--color-accent) !important;
-    color: white !important;
+.rz-autocomplete-item.rz-state-highlight {
+    background: rgba(0, 113, 227, 0.18) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 500 !important;
 }
 
 /* Focus State - Enhanced Accessibility */
