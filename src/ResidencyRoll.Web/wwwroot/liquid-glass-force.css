@@ -99,11 +99,59 @@ div.rz-body {
     background-image: none !important;
 }
 
-/* NUCLEAR OPTION: Force glass on ALL Radzen components - EXCEPT calendar and dropdown */
-[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
-div[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item),
+/* NUCLEAR OPTION: Force glass on ALL Radzen components - EXCEPT calendar, dropdowns, and inputs */
+[class*="rz-"]
+    :not(.rz-calendar)
+    :not(.rz-datepicker)
+    :not(.rz-monthpicker)
+    :not(.rz-daypicker)
+    :not(.rz-datepicker-container)
+    :not(.rz-calendar-row)
+    :not(.rz-calendar-cell)
+    :not(.rz-dropdown)
+    :not(.rz-dropdown-panel)
+    :not(.rz-dropdown-items)
+    :not(.rz-dropdown-item)
+    :not(.rz-listbox)
+    :not(.rz-textbox)
+    :not(.rz-inputtext)
+    :not(.rz-autocomplete)
+    :not(.rz-autocomplete-input),
+div[class*="rz-"]
+    :not(.rz-calendar)
+    :not(.rz-datepicker)
+    :not(.rz-monthpicker)
+    :not(.rz-daypicker)
+    :not(.rz-datepicker-container)
+    :not(.rz-calendar-row)
+    :not(.rz-calendar-cell)
+    :not(.rz-dropdown)
+    :not(.rz-dropdown-panel)
+    :not(.rz-dropdown-items)
+    :not(.rz-dropdown-item)
+    :not(.rz-listbox)
+    :not(.rz-textbox)
+    :not(.rz-inputtext)
+    :not(.rz-autocomplete)
+    :not(.rz-autocomplete-input),
 li[class*="rz-"]:not(.rz-dropdown-item),
-aside[class*="rz-"]:not(.rz-calendar):not(.rz-datepicker):not(.rz-monthpicker):not(.rz-daypicker):not(.rz-datepicker-container):not(.rz-calendar-row):not(.rz-calendar-cell):not(.rz-dropdown-panel):not(.rz-dropdown-items):not(.rz-listbox):not(.rz-dropdown-item) {
+aside[class*="rz-"]
+    :not(.rz-calendar)
+    :not(.rz-datepicker)
+    :not(.rz-monthpicker)
+    :not(.rz-daypicker)
+    :not(.rz-datepicker-container)
+    :not(.rz-calendar-row)
+    :not(.rz-calendar-cell)
+    :not(.rz-dropdown)
+    :not(.rz-dropdown-panel)
+    :not(.rz-dropdown-items)
+    :not(.rz-dropdown-item)
+    :not(.rz-listbox)
+    :not(.rz-textbox)
+    :not(.rz-inputtext)
+    :not(.rz-autocomplete)
+    :not(.rz-autocomplete-input) {
     background-color: transparent !important;
     background-image: none !important;
 }
