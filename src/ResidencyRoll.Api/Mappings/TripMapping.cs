@@ -32,11 +32,7 @@ public static class TripMapping
         ArrivalCity = dto.ArrivalCity,
         ArrivalDateTime = dto.ArrivalDateTime,
         ArrivalTimezone = dto.ArrivalTimezone,
-        ArrivalIataCode = dto.ArrivalIataCode,
-        // Legacy fields - computed properties will handle these
-        CountryName = dto.ArrivalCountry,
-        StartDate = dto.ArrivalDateTime,
-        EndDate = dto.DepartureDateTime
+        ArrivalIataCode = dto.ArrivalIataCode
     };
 }
 

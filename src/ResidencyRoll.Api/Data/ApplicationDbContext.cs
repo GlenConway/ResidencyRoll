@@ -20,9 +20,6 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.UserId).IsRequired().HasMaxLength(256);
-            entity.Property(e => e.CountryName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.StartDate).IsRequired();
-            entity.Property(e => e.EndDate).IsRequired();
             entity.HasIndex(e => e.UserId);
         });
     }

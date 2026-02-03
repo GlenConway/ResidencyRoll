@@ -49,8 +49,6 @@ public class TripTimePersistenceTests
         Assert.NotNull(saved);
         Assert.Equal(dto.DepartureDateTime, saved!.DepartureDateTime);
         Assert.Equal(dto.ArrivalDateTime, saved.ArrivalDateTime);
-        Assert.Equal(dto.DepartureDateTime, saved.EndDate);      // legacy field should keep time
-        Assert.Equal(dto.ArrivalDateTime, saved.StartDate);      // legacy field should keep time
     }
 
     [Fact]
@@ -70,10 +68,7 @@ public class TripTimePersistenceTests
             ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
             ArrivalTimezone = "Europe/London",
-            ArrivalDateTime = new DateTime(2025, 3, 11, 7, 30, 0),
-            CountryName = "United Kingdom",
-            StartDate = new DateTime(2025, 3, 11, 7, 30, 0),
-            EndDate = new DateTime(2025, 3, 10, 14, 0, 0)
+            ArrivalDateTime = new DateTime(2025, 3, 11, 7, 30, 0)
         };
 
         await service.CreateTripAsync(original);
@@ -81,8 +76,6 @@ public class TripTimePersistenceTests
         // Modify times
         original.DepartureDateTime = new DateTime(2025, 3, 10, 16, 15, 0);
         original.ArrivalDateTime = new DateTime(2025, 3, 11, 9, 45, 0);
-        original.StartDate = original.ArrivalDateTime;
-        original.EndDate = original.DepartureDateTime;
 
         await service.UpdateTripAsync(original, "user-1");
 
@@ -90,7 +83,5 @@ public class TripTimePersistenceTests
         Assert.NotNull(saved);
         Assert.Equal(new DateTime(2025, 3, 10, 16, 15, 0), saved!.DepartureDateTime);
         Assert.Equal(new DateTime(2025, 3, 11, 9, 45, 0), saved.ArrivalDateTime);
-        Assert.Equal(new DateTime(2025, 3, 11, 9, 45, 0), saved.StartDate);
-        Assert.Equal(new DateTime(2025, 3, 10, 16, 15, 0), saved.EndDate);
     }
 }

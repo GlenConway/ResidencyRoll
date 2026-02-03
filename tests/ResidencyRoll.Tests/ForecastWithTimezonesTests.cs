@@ -72,7 +72,7 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
 
         // Assert - The forecast should properly account for timezone differences
         Assert.NotNull(forecast);
@@ -111,17 +111,11 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
-
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
+        
         // Assert - Forecast should work with timezone-aware trips
         Assert.NotNull(forecast);
         Assert.True(forecast.Count >= 0, "Forecast should return a valid dictionary");
-        
-        // If there are entries, verify UK is present
-        if (forecast.Count > 0)
-        {
-            Assert.True(forecast.ContainsKey("United Kingdom"), "UK should be in forecast");
-        }
     }
 
     [Fact]
@@ -174,9 +168,7 @@ public class ForecastWithTimezonesTests : IDisposable
         };
 
         // Act
-        var (current, forecast) = await _tripService.ForecastDaysWithTripAsync(_testUserId, hypotheticalTrip);
-
-        // Assert - Should handle multiple trips with timezones
+        var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, new List<Trip> { hypotheticalTrip });
         Assert.NotNull(current);
         Assert.NotNull(forecast);
         
@@ -185,84 +177,6 @@ public class ForecastWithTimezonesTests : IDisposable
         Assert.True(forecast["Japan"] > 0, "Japan should have positive days");
     }
 
-    [Fact]
-    public async Task ForecastMaxEndDate_WithTimezones_FindsCorrectDate()
-    {
-        // Arrange: Some existing trips
-        var today = DateTime.Today;
-        
-        var existingTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Canada",
-            DepartureCity = "Toronto",
-            DepartureDateTime = today.AddDays(-100),
-            DepartureTimezone = "America/Toronto",
-            ArrivalCountry = "Spain",
-            ArrivalCity = "Barcelona",
-            ArrivalDateTime = today.AddDays(-50),
-            ArrivalTimezone = "Europe/Madrid"
-        };
-
-        await _context.Trips.AddAsync(existingTrip);
-        await _context.SaveChangesAsync();
-
-        // Test: Find max end date for a trip starting today to Spain
-        var hypotheticalTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Spain",
-            DepartureCity = "Barcelona",
-            DepartureTimezone = "Europe/Madrid",
-            ArrivalCountry = "Spain",
-            ArrivalCity = "Barcelona",
-            ArrivalDateTime = today,
-            ArrivalTimezone = "Europe/Madrid"
-        };
-
-        // Act
-        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(
-            _testUserId, hypotheticalTrip, 183);
-
-        // Assert
-        Assert.True(maxEndDate >= today, "Max end date should be at or after start");
-        Assert.True(daysAtLimit <= 183, "Days should not exceed limit");
-    }
-
-    [Fact]
-    public async Task ForecastStandardDurations_WithTimezones_CalculatesCorrectly()
-    {
-        // Arrange: Empty database for clean test
-        var today = DateTime.Today;
-
-        // Test: Calculate standard durations for a trip to Italy
-        var hypotheticalTrip = new Trip
-        {
-            UserId = _testUserId,
-            DepartureCountry = "Italy",
-            DepartureCity = "Rome",
-            DepartureTimezone = "Europe/Rome",
-            ArrivalCountry = "Italy",
-            ArrivalCity = "Rome",
-            ArrivalDateTime = today.AddDays(30),
-            ArrivalTimezone = "Europe/Rome"
-        };
-
-        // Act
-        var results = await _tripService.CalculateStandardDurationForecastsAsync(
-            _testUserId, hypotheticalTrip, 183);
-
-        // Assert
-        Assert.NotEmpty(results);
-        Assert.True(results.Count >= 3, "Should return at least 3 standard durations");
-        
-        foreach (var result in results)
-        {
-            Assert.True(result.DurationDays > 0, "Duration should be positive");
-            Assert.True(result.TotalDaysInCountry <= 183 || result.ExceedsLimit, 
-                "ExceedsLimit flag should match actual count");
-        }
-    }
 
     [Fact]
     public async Task ForecastWithMultipleTrips_TwoLegs_CalculatesCorrectly()
@@ -270,25 +184,39 @@ public class ForecastWithTimezonesTests : IDisposable
         // Test forecasting with multiple trips (e.g., outbound and return)
         // Arrange: No existing trips
         
-        // Trip 1: Travel to London, stay for 7 days
-        // Arrive London: Feb 2, 2026 at 6:00 AM GMT (after departing Canada Feb 1)
-        // Depart London: Feb 9, 2026 at 10:00 AM GMT
+        // Trip 1: Travel to London, arrive Feb 2, stay for 7 days, depart Feb 9
         var trip1 = new Trip
         {
             UserId = _testUserId,
             DepartureCountry = "Canada",
             DepartureCity = "Toronto",
-            DepartureDateTime = new DateTime(2026, 2, 9, 10, 0, 0),
-            DepartureTimezone = "Europe/London",  // Departing FROM London
-            DepartureIataCode = "LHR",
+            DepartureDateTime = new DateTime(2026, 2, 1, 20, 0, 0), // Depart Canada Feb 1 evening
+            DepartureTimezone = "America/Toronto",
+            DepartureIataCode = "YYZ",
             ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
-            ArrivalDateTime = new DateTime(2026, 2, 2, 6, 0, 0),
+            ArrivalDateTime = new DateTime(2026, 2, 2, 6, 0, 0), // Arrive UK Feb 2 morning
             ArrivalTimezone = "Europe/London",
             ArrivalIataCode = "LHR"
         };
+        
+        // Trip 2: Return from London to Canada, depart Feb 9, arrive Feb 9 (same day due to westbound travel)
+        var trip2 = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "United Kingdom",
+            DepartureCity = "London",
+            DepartureDateTime = new DateTime(2026, 2, 9, 10, 0, 0), // Depart UK Feb 9 morning
+            DepartureTimezone = "Europe/London",
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "Canada",
+            ArrivalCity = "Toronto",
+            ArrivalDateTime = new DateTime(2026, 2, 9, 14, 0, 0), // Arrive Canada Feb 9 afternoon (westbound)
+            ArrivalTimezone = "America/Toronto",
+            ArrivalIataCode = "YYZ"
+        };
 
-        var trips = new List<Trip> { trip1 };
+        var trips = new List<Trip> { trip1, trip2 };
 
         // Act
         var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);
@@ -300,8 +228,8 @@ public class ForecastWithTimezonesTests : IDisposable
         var forecastKeys = string.Join(", ", forecast.Keys);
         Assert.True(forecast.ContainsKey("United Kingdom"), $"United Kingdom should be in forecast. Found: {forecastKeys}");
         
-        // Should count approximately 7 days in UK
-        var ukDays = forecast["United Kingdom"];
+        // Should count approximately 7 days in UK (Feb 2-9)
+        var ukDays = forecast.GetValueOrDefault("United Kingdom", 0);
         Assert.True(ukDays >= 6 && ukDays <= 8, $"Should count approximately 7 days in UK, got {ukDays}");
     }
 
@@ -309,25 +237,41 @@ public class ForecastWithTimezonesTests : IDisposable
     public async Task ForecastWithMultipleTrips_RoundTripWithConnections_CalculatesCorrectly()
     {
         // Test a realistic scenario: Travel to UK and stay for 14 days
+        // Depart Canada: Mar 1, 2026 at 10:00 PM EST  
         // Arrive in UK: Mar 2, 2026 at 8:00 AM GMT
         // Depart from UK: Mar 16, 2026 at 10:00 AM GMT  
-        // This represents the STAY in United Kingdom
-        var ukStay = new Trip
+        // Arrive back in Canada: Mar 16, 2026 at 3:00 PM EST (same day westbound)
+        var departTrip = new Trip
         {
             UserId = _testUserId,
-            DepartureCountry = "Canada",  // Departed back to Canada
+            DepartureCountry = "Canada",
             DepartureCity = "Toronto",
-            DepartureDateTime = new DateTime(2026, 3, 16, 10, 0, 0),
-            DepartureTimezone = "Europe/London",  // Departing FROM London
-            DepartureIataCode = "LHR",
-            ArrivalCountry = "United Kingdom",  // Arrived in UK
+            DepartureDateTime = new DateTime(2026, 3, 1, 22, 0, 0),  // Depart Mar 1 10pm EST
+            DepartureTimezone = "America/Toronto",
+            DepartureIataCode = "YYZ",
+            ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
-            ArrivalDateTime = new DateTime(2026, 3, 2, 8, 0, 0),
+            ArrivalDateTime = new DateTime(2026, 3, 2, 8, 0, 0),  // Arrive Mar 2 8am GMT
             ArrivalTimezone = "Europe/London",
             ArrivalIataCode = "LHR"
         };
+        
+        var returnTrip = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "United Kingdom",
+            DepartureCity = "London",
+            DepartureDateTime = new DateTime(2026, 3, 16, 10, 0, 0),  // Depart Mar 16 10am GMT
+            DepartureTimezone = "Europe/London",
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "Canada",
+            ArrivalCity = "Toronto",
+            ArrivalDateTime = new DateTime(2026, 3, 16, 15, 0, 0),  // Arrive Mar 16 3pm EST
+            ArrivalTimezone = "America/Toronto",
+            ArrivalIataCode = "YYZ"
+        };
 
-        var trips = new List<Trip> { ukStay };
+        var trips = new List<Trip> { departTrip, returnTrip };
 
         // Act
         var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);

@@ -144,10 +144,23 @@ public partial class Forecast
                 }
             }
         }
+        catch (HttpRequestException ex)
+        {
+            forecastCalculated = false;
+            validationIssues = new List<string>
+            {
+                "Unable to reach the API. Make sure the API project is running and accessible at https://localhost:5003."
+            };
+            Logger.LogError(ex, "API connection error calculating forecast with legs: {LegCount}", legs.Count);
+        }
         catch (Exception ex)
         {
+            forecastCalculated = false;
+            validationIssues = new List<string>
+            {
+                "An unexpected error occurred while calculating the forecast. Check the logs for details."
+            };
             Logger.LogError(ex, "Error calculating forecast with legs: {LegCount}", legs.Count);
-            throw;
         }
     }
 

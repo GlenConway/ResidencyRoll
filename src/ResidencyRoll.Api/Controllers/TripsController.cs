@@ -142,11 +142,6 @@ public class TripsController : ControllerBase
             return NotFound();
         }
 
-        // Update legacy fields
-        existing.CountryName = request.CountryName;
-        existing.StartDate = request.StartDate;
-        existing.EndDate = request.EndDate;
-        
         // Update timezone-aware fields
         existing.DepartureCountry = request.DepartureCountry;
         existing.DepartureCity = request.DepartureCity;
@@ -233,76 +228,19 @@ public class TripsController : ControllerBase
     [HttpPost("forecast/max-end-date")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Obsolete("Legacy single-trip forecast endpoint. Use the multi-leg POST /forecast endpoint instead.")]
     public async Task<ActionResult<MaxTripEndDateResponseDto>> CalculateMaxEndDate([FromBody] MaxTripEndDateRequestDto request)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-
-        var userId = GetUserId();
-        
-        // Create a hypothetical trip from the request
-        var hypotheticalTrip = new Trip
-        {
-            UserId = userId,
-            DepartureCountry = request.DepartureCountry,
-            DepartureCity = request.DepartureCity,
-            DepartureTimezone = request.DepartureTimezone,
-            DepartureIataCode = request.DepartureIataCode,
-            ArrivalCountry = request.ArrivalCountry,
-            ArrivalCity = request.ArrivalCity,
-            ArrivalDateTime = request.TripStart,
-            ArrivalTimezone = request.ArrivalTimezone,
-            ArrivalIataCode = request.ArrivalIataCode
-        };
-        
-        var (maxEndDate, daysAtLimit) = await _tripService.CalculateMaxTripEndDateAsync(userId, hypotheticalTrip, request.DayLimit);
-        return Ok(new MaxTripEndDateResponseDto
-        {
-            MaxEndDate = maxEndDate,
-            DaysAtLimit = daysAtLimit
-        });
+        throw new NotSupportedException("The max-end-date forecast endpoint has been removed. Use the multi-leg /forecast endpoint instead.");
     }
 
     [HttpPost("forecast/standard-durations")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Obsolete("Legacy single-trip forecast endpoint. Use the multi-leg POST /forecast endpoint instead.")]
     public async Task<ActionResult<IEnumerable<StandardDurationForecastItemDto>>> GetStandardDurationForecasts([FromBody] StandardDurationForecastRequestDto request)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-
-        var userId = GetUserId();
-        
-        // Create a hypothetical trip from the request
-        var hypotheticalTrip = new Trip
-        {
-            UserId = userId,
-            DepartureCountry = request.DepartureCountry,
-            DepartureCity = request.DepartureCity,
-            DepartureTimezone = request.DepartureTimezone,
-            DepartureIataCode = request.DepartureIataCode,
-            ArrivalCountry = request.ArrivalCountry,
-            ArrivalCity = request.ArrivalCity,
-            ArrivalDateTime = request.TripStart,
-            ArrivalTimezone = request.ArrivalTimezone,
-            ArrivalIataCode = request.ArrivalIataCode
-        };
-        
-        var results = await _tripService.CalculateStandardDurationForecastsAsync(userId, hypotheticalTrip, request.DayLimit, request.Durations);
-
-        var response = results.Select(r => new StandardDurationForecastItemDto
-        {
-            DurationDays = r.DurationDays,
-            EndDate = r.EndDate,
-            TotalDaysInCountry = r.TotalDaysInCountry,
-            ExceedsLimit = r.ExceedsLimit
-        });
-
-        return Ok(response);
+        throw new NotSupportedException("The standard-durations forecast endpoint has been removed. Use the multi-leg /forecast endpoint instead.");
     }
 
     [HttpGet("daily-presence")]
@@ -495,11 +433,7 @@ public class TripsController : ControllerBase
                     ArrivalCity = parts[6],
                     ArrivalDateTime = arrivalDateTime,
                     ArrivalTimezone = parts[8],
-                    ArrivalIataCode = string.IsNullOrWhiteSpace(parts[9]) ? null : parts[9],
-                    // Set legacy fields for compatibility
-                    CountryName = parts[5],
-                    StartDate = arrivalDateTime,
-                    EndDate = departureDateTime
+                    ArrivalIataCode = string.IsNullOrWhiteSpace(parts[9]) ? null : parts[9]
                 });
             }
             // Support old format (v1): DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone
@@ -534,11 +468,7 @@ public class TripsController : ControllerBase
                     ArrivalCountry = parts[4],
                     ArrivalCity = parts[5],
                     ArrivalDateTime = arrivalDateTime,
-                    ArrivalTimezone = parts[7],
-                    // Set legacy fields for compatibility
-                    CountryName = parts[4],
-                    StartDate = arrivalDateTime,
-                    EndDate = departureDateTime
+                    ArrivalTimezone = parts[7]
                 });
             }
             // Legacy format support (for migration): CountryName,StartDate,EndDate
@@ -562,10 +492,7 @@ public class TripsController : ControllerBase
                     ArrivalCountry = parts[0],
                     ArrivalCity = string.Empty,
                     ArrivalDateTime = start,
-                    ArrivalTimezone = "UTC",
-                    CountryName = parts[0],
-                    StartDate = start,
-                    EndDate = end
+                    ArrivalTimezone = "UTC"
                 });
             }
             else
