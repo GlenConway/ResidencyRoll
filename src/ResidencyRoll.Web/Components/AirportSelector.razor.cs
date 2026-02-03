@@ -175,7 +175,8 @@ public partial class AirportSelector
             await SelectedTimezoneChanged.InvokeAsync(SelectedTimezone);
             await IataCodeChanged.InvokeAsync(IataCode);
 
-            await InvokeAsync(StateHasChanged);
+            // Force UI update after all callbacks complete
+            StateHasChanged();
         }
     }
 
