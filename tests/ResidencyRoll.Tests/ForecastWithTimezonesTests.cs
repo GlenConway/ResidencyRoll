@@ -270,25 +270,39 @@ public class ForecastWithTimezonesTests : IDisposable
         // Test forecasting with multiple trips (e.g., outbound and return)
         // Arrange: No existing trips
         
-        // Trip 1: Travel to London, stay for 7 days
-        // Arrive London: Feb 2, 2026 at 6:00 AM GMT (after departing Canada Feb 1)
-        // Depart London: Feb 9, 2026 at 10:00 AM GMT
+        // Trip 1: Travel to London, arrive Feb 2, stay for 7 days, depart Feb 9
         var trip1 = new Trip
         {
             UserId = _testUserId,
             DepartureCountry = "Canada",
             DepartureCity = "Toronto",
-            DepartureDateTime = new DateTime(2026, 2, 9, 10, 0, 0),
-            DepartureTimezone = "Europe/London",  // Departing FROM London
-            DepartureIataCode = "LHR",
+            DepartureDateTime = new DateTime(2026, 2, 1, 20, 0, 0), // Depart Canada Feb 1 evening
+            DepartureTimezone = "America/Toronto",
+            DepartureIataCode = "YYZ",
             ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
-            ArrivalDateTime = new DateTime(2026, 2, 2, 6, 0, 0),
+            ArrivalDateTime = new DateTime(2026, 2, 2, 6, 0, 0), // Arrive UK Feb 2 morning
             ArrivalTimezone = "Europe/London",
             ArrivalIataCode = "LHR"
         };
+        
+        // Trip 2: Return from London to Canada, depart Feb 9, arrive Feb 9 (same day due to westbound travel)
+        var trip2 = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "United Kingdom",
+            DepartureCity = "London",
+            DepartureDateTime = new DateTime(2026, 2, 9, 10, 0, 0), // Depart UK Feb 9 morning
+            DepartureTimezone = "Europe/London",
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "Canada",
+            ArrivalCity = "Toronto",
+            ArrivalDateTime = new DateTime(2026, 2, 9, 14, 0, 0), // Arrive Canada Feb 9 afternoon (westbound)
+            ArrivalTimezone = "America/Toronto",
+            ArrivalIataCode = "YYZ"
+        };
 
-        var trips = new List<Trip> { trip1 };
+        var trips = new List<Trip> { trip1, trip2 };
 
         // Act
         var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);
@@ -300,8 +314,8 @@ public class ForecastWithTimezonesTests : IDisposable
         var forecastKeys = string.Join(", ", forecast.Keys);
         Assert.True(forecast.ContainsKey("United Kingdom"), $"United Kingdom should be in forecast. Found: {forecastKeys}");
         
-        // Should count approximately 7 days in UK
-        var ukDays = forecast["United Kingdom"];
+        // Should count approximately 7 days in UK (Feb 2-9)
+        var ukDays = forecast.GetValueOrDefault("United Kingdom", 0);
         Assert.True(ukDays >= 6 && ukDays <= 8, $"Should count approximately 7 days in UK, got {ukDays}");
     }
 
@@ -309,25 +323,41 @@ public class ForecastWithTimezonesTests : IDisposable
     public async Task ForecastWithMultipleTrips_RoundTripWithConnections_CalculatesCorrectly()
     {
         // Test a realistic scenario: Travel to UK and stay for 14 days
+        // Depart Canada: Mar 1, 2026 at 10:00 PM EST  
         // Arrive in UK: Mar 2, 2026 at 8:00 AM GMT
         // Depart from UK: Mar 16, 2026 at 10:00 AM GMT  
-        // This represents the STAY in United Kingdom
-        var ukStay = new Trip
+        // Arrive back in Canada: Mar 16, 2026 at 3:00 PM EST (same day westbound)
+        var departTrip = new Trip
         {
             UserId = _testUserId,
-            DepartureCountry = "Canada",  // Departed back to Canada
+            DepartureCountry = "Canada",
             DepartureCity = "Toronto",
-            DepartureDateTime = new DateTime(2026, 3, 16, 10, 0, 0),
-            DepartureTimezone = "Europe/London",  // Departing FROM London
-            DepartureIataCode = "LHR",
-            ArrivalCountry = "United Kingdom",  // Arrived in UK
+            DepartureDateTime = new DateTime(2026, 3, 1, 22, 0, 0),  // Depart Mar 1 10pm EST
+            DepartureTimezone = "America/Toronto",
+            DepartureIataCode = "YYZ",
+            ArrivalCountry = "United Kingdom",
             ArrivalCity = "London",
-            ArrivalDateTime = new DateTime(2026, 3, 2, 8, 0, 0),
+            ArrivalDateTime = new DateTime(2026, 3, 2, 8, 0, 0),  // Arrive Mar 2 8am GMT
             ArrivalTimezone = "Europe/London",
             ArrivalIataCode = "LHR"
         };
+        
+        var returnTrip = new Trip
+        {
+            UserId = _testUserId,
+            DepartureCountry = "United Kingdom",
+            DepartureCity = "London",
+            DepartureDateTime = new DateTime(2026, 3, 16, 10, 0, 0),  // Depart Mar 16 10am GMT
+            DepartureTimezone = "Europe/London",
+            DepartureIataCode = "LHR",
+            ArrivalCountry = "Canada",
+            ArrivalCity = "Toronto",
+            ArrivalDateTime = new DateTime(2026, 3, 16, 15, 0, 0),  // Arrive Mar 16 3pm EST
+            ArrivalTimezone = "America/Toronto",
+            ArrivalIataCode = "YYZ"
+        };
 
-        var trips = new List<Trip> { ukStay };
+        var trips = new List<Trip> { departTrip, returnTrip };
 
         // Act
         var (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(_testUserId, trips);

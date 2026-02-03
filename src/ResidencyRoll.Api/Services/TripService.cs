@@ -246,6 +246,40 @@ public class TripService
         DateTime windowStart,
         DateTime windowEnd)
     {
+        var tripsList = trips.ToList();
+        
+        // Use ResidencyCalculationService if trips have complete information (departure/arrival details)
+        // Otherwise, fall back to simple date range calculation
+        bool allTripsComplete = tripsList.All(t => 
+            !string.IsNullOrWhiteSpace(t.DepartureCountry) && 
+            !string.IsNullOrWhiteSpace(t.ArrivalCountry) &&
+            !string.IsNullOrWhiteSpace(t.DepartureTimezone) &&
+            !string.IsNullOrWhiteSpace(t.ArrivalTimezone));
+        
+        if (allTripsComplete)
+        {
+            // Use ResidencyCalculationService for accurate calculations with timezone handling
+            var presenceLog = _residencyService.GenerateDailyPresenceLog(tripsList);
+            var windowStartDate = DateOnly.FromDateTime(windowStart.Date);
+            var windowEndDate = DateOnly.FromDateTime(windowEnd.Date);
+            return _residencyService.CalculateResidencyDays(presenceLog, windowStartDate, windowEndDate);
+        }
+        else
+        {
+            // Fall back to simple date range calculation for incomplete trip data
+            return CalculateDaysPerCountrySimpleDateRange(tripsList, windowStart, windowEnd);
+        }
+    }
+    
+    /// <summary>
+    /// Simple date range calculation for backward compatibility with incomplete trip data.
+    /// This is a fallback when trips don't have complete departure/arrival information.
+    /// </summary>
+    private Dictionary<string, int> CalculateDaysPerCountrySimpleDateRange(
+        IEnumerable<Trip> trips,
+        DateTime windowStart,
+        DateTime windowEnd)
+    {
         var windowStartDate = DateOnly.FromDateTime(windowStart.Date);
         var windowEndDate = DateOnly.FromDateTime(windowEnd.Date);
         var daysByDate = new Dictionary<DateOnly, string>();
