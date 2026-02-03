@@ -15,6 +15,10 @@
     --color-text-primary: #1D1D1F;
     --color-text-secondary: #86868B;
     --color-border: rgba(0, 0, 0, 0.08);
+
+    /* Radzen hover variables (light mode) */
+    --rz-dropdown-item-hover-background-color: rgba(0, 113, 227, 0.12);
+    --rz-dropdown-item-hover-color: #005BB5;
     
     /* 2026 Liquid Glass - Light Mode - MORE TRANSLUCENT */
     --glass-light: rgba(255, 255, 255, 0.25);
@@ -62,6 +66,10 @@
         --color-text-primary: #F5F5F7;
         --color-text-secondary: #98989D;
         --color-border: rgba(255, 255, 255, 0.12);
+
+        /* Radzen hover variables (dark mode) */
+        --rz-dropdown-item-hover-background-color: rgba(0, 113, 227, 0.35);
+        --rz-dropdown-item-hover-color: #FFFFFF;
         
         /* Dark Glass with enhanced depth */
         --glass-light: rgba(255, 255, 255, 0.08);
@@ -612,7 +620,7 @@ div.rz-panel:hover {
 ::deep .rz-button-light,
 .rz-button-light,
 button.rz-button {
-    background: rgba(255, 255, 255, 0.4) !important;
+    background: rgba(255, 255, 255, 0.85) !important;
     backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
     border: var(--border-width) solid var(--glass-light-catcher) !important;
@@ -702,20 +710,16 @@ button.rz-button:hover {
 }
 
 
-/* ========== INPUTS & FORMS - ACCESSIBLE LIQUID GLASS ========== */
+/* ========== INPUTS & FORMS - SOLID BACKGROUND ========== */
 
 ::deep .rz-textbox,
 .rz-textbox,
 ::deep input.rz-inputtext,
 input.rz-inputtext,
-::deep .rz-dropdown,
-.rz-dropdown,
 ::deep textarea,
 textarea {
-    background: var(--glass-light) !important;
-    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
-    border: var(--border-width) solid var(--glass-light-catcher) !important;
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
     border-radius: var(--border-radius-sm) !important;
     padding: 0.875rem 1.25rem !important;
     color: var(--color-text-primary) !important;
@@ -726,15 +730,86 @@ textarea {
                 inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
+/* Dropdown specific styling with solid background */
+::deep .rz-dropdown,
+.rz-dropdown {
+    background: var(--color-surface) !important;
+    color: var(--color-text-primary) !important;
+    border: var(--border-width) solid var(--color-border) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* AutoComplete input styling with solid background */
+::deep .rz-autocomplete,
+.rz-autocomplete,
+::deep .rz-autocomplete-input,
+.rz-autocomplete-input,
+::deep .rz-autocomplete input,
+.rz-autocomplete input,
+::deep input.rz-autocomplete-input,
+input.rz-autocomplete-input {
+    background: var(--color-surface) !important;
+    color: var(--color-text-primary) !important;
+    border: var(--border-width) solid var(--color-border) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    transition: all var(--animation-duration) var(--animation-timing) !important;
+    box-shadow: var(--glass-shadow-sm),
+                inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* AutoComplete dropdown list styling */
+::deep .rz-autocomplete-items,
+.rz-autocomplete-items {
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
+}
+
+::deep .rz-autocomplete-item,
+.rz-autocomplete-item,
+::deep .rz-autocomplete-items .rz-autocomplete-item,
+.rz-autocomplete-items .rz-autocomplete-item {
+    background: var(--color-surface) !important;
+    color: var(--color-text-primary) !important;
+    padding: 0.75rem 1rem !important;
+    border-bottom: var(--border-width) solid var(--color-border) !important;
+}
+
+::deep .rz-autocomplete-item:hover,
+.rz-autocomplete-item:hover,
+::deep .rz-autocomplete-items .rz-autocomplete-item:hover {
+    background: rgba(0, 113, 227, 0.12) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+}
+
+::deep .rz-autocomplete-item.rz-state-highlight,
+.rz-autocomplete-item.rz-state-highlight {
+    background: rgba(0, 113, 227, 0.18) !important;
+    color: var(--color-accent-active, #005BB5) !important;
+    font-weight: 500 !important;
+}
+
 /* Focus State - Enhanced Accessibility */
 ::deep .rz-textbox:focus,
 .rz-textbox:focus,
 ::deep input.rz-inputtext:focus,
 input.rz-inputtext:focus,
+::deep textarea:focus,
+textarea:focus,
 ::deep .rz-dropdown:focus,
 .rz-dropdown:focus,
-::deep textarea:focus,
-textarea:focus {
+::deep .rz-autocomplete:focus,
+.rz-autocomplete:focus,
+::deep .rz-autocomplete-input:focus,
+.rz-autocomplete-input:focus {
     border-color: var(--color-accent) !important;
     box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15),
                 var(--glass-shadow-sm),
@@ -761,6 +836,7 @@ textarea::placeholder {
 .rz-listbox-item {
     padding: 0.5rem 1rem !important;
     color: var(--color-text-primary) !important;
+    background: var(--color-surface) !important;
     transition: all 0.2s ease !important;
 }
 
@@ -768,17 +844,24 @@ textarea::placeholder {
 .rz-dropdown-item:hover,
 ::deep .rz-listbox-item:hover,
 .rz-listbox-item:hover {
-    background: rgba(0, 113, 227, 0.12) !important;
-    color: var(--color-accent-active, #005BB5) !important;
+    background: var(--color-accent) !important;
+    color: white !important;
 }
 
 ::deep .rz-dropdown-item.rz-state-highlight,
 .rz-dropdown-item.rz-state-highlight,
 ::deep .rz-listbox-item.rz-state-highlight,
 .rz-listbox-item.rz-state-highlight {
-    background: rgba(0, 113, 227, 0.18) !important;
-    color: var(--color-accent-active, #005BB5) !important;
+    background: var(--color-accent) !important;
+    color: white !important;
     font-weight: 500 !important;
+}
+
+/* Dropdown panel background */
+::deep .rz-dropdown-panel,
+.rz-dropdown-panel {
+    background: var(--color-surface) !important;
+    border: var(--border-width) solid var(--color-border) !important;
 }
 
 
