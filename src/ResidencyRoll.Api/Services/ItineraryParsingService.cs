@@ -114,19 +114,21 @@ For each flight leg, return ONLY a valid JSON array with the following structure
   {{
     ""departure_airport"": ""IATA CODE"",
     ""departure_datetime_local"": ""ISO 8601 format (e.g., 2026-01-23T16:40)"",
-    ""arrival_airport"": ""IATA CODE""
+    ""arrival_airport"": ""IATA CODE"",
+    ""arrival_datetime_local"": ""ISO 8601 format (e.g., 2026-01-23T18:40)""
   }}
 ]
 
 Rules:
-1. Extract ONLY the essential flight information (departure airport, departure time, arrival airport)
+1. Extract ALL essential flight information: departure airport, departure time, arrival airport, and arrival time
 2. Ignore non-flight data such as seat numbers, passenger names, cabin class, and airline branding
 3. Use IATA airport codes (e.g., YHZ, JFK, YUL, LHR)
-4. Use ISO 8601 format for departure time in local timezone (e.g., 2026-01-23T16:40)
-5. If required fields are missing for a leg, omit that leg entirely
-6. Return ONLY the JSON array, with no explanatory text before or after
-7. Legs should be in chronological order
-8. If no valid flight legs can be extracted, return an empty array: []
+4. Use ISO 8601 format for times in local timezone (e.g., 2026-01-23T16:40)
+5. Infer arrival time if not explicitly stated (typical flight duration for the route, or next day if overnight)
+6. If required fields are missing for a leg, omit that leg entirely
+7. Return ONLY the JSON array, with no explanatory text before or after
+8. Legs should be in chronological order
+9. If no valid flight legs can be extracted, return an empty array: []
 
 Itinerary text:
 {itineraryText}";
@@ -196,6 +198,11 @@ Itinerary text:
                 ? arrAirport.GetString()?.ToUpperInvariant()
                 : null;
 
+            // Extract optional arrival datetime
+            var arrivalDateTime = element.TryGetProperty("arrival_datetime_local", out var arrTime)
+                ? arrTime.GetString()
+                : null;
+
             // Validate required fields
             if (string.IsNullOrWhiteSpace(departureAirport) ||
                 string.IsNullOrWhiteSpace(departureDateTime) ||
@@ -218,11 +225,21 @@ Itinerary text:
                 return null;
             }
 
+            // Validate arrival datetime if provided
+            if (!string.IsNullOrWhiteSpace(arrivalDateTime) && !IsValidISO8601DateTime(arrivalDateTime))
+            {
+                Log.ForContext<ItineraryParsingService>().Debug(
+                    "Invalid arrival datetime format (will use placeholder): {DateTime}",
+                    arrivalDateTime);
+                arrivalDateTime = null; // Will let UI provide a default if needed
+            }
+
             return new ItineraryFlightLegDto
             {
                 DepartureAirport = departureAirport,
                 DepartureDatetimeLocal = departureDateTime,
-                ArrivalAirport = arrivalAirport
+                ArrivalAirport = arrivalAirport,
+                ArrivalDatetimeLocal = arrivalDateTime
             };
         }
         catch (Exception ex)

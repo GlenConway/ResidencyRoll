@@ -98,12 +98,14 @@ Content-Type: application/json
     {
       "departure_airport": "YHZ",
       "departure_datetime_local": "2026-01-23T16:40",
-      "arrival_airport": "YUL"
+      "arrival_airport": "YUL",
+      "arrival_datetime_local": "2026-01-23T18:40"
     },
     {
       "departure_airport": "YUL",
       "departure_datetime_local": "2026-01-24T10:30",
-      "arrival_airport": "LHR"
+      "arrival_airport": "LHR",
+      "arrival_datetime_local": "2026-01-24T21:15"
     }
   ],
   "error": null
@@ -143,12 +145,14 @@ Content-Type: application/json
     {
       "departure_airport": "YHZ",
       "departure_datetime_local": "2026-01-23T16:40",
-      "arrival_airport": "YUL"
+      "arrival_airport": "YUL",
+      "arrival_datetime_local": "2026-01-23T18:40"
     },
     {
       "departure_airport": "YUL",
       "departure_datetime_local": "2026-01-30T14:15",
-      "arrival_airport": "YHZ"
+      "arrival_airport": "YHZ",
+      "arrival_datetime_local": "2026-01-30T16:15"
     }
   ],
   "error": null
@@ -175,22 +179,26 @@ Content-Type: application/json
     {
       "departure_airport": "YHZ",
       "departure_datetime_local": "2026-01-23T16:40",
-      "arrival_airport": "YUL"
+      "arrival_airport": "YUL",
+      "arrival_datetime_local": "2026-01-23T18:40"
     },
     {
       "departure_airport": "YUL",
       "departure_datetime_local": "2026-01-24T10:30",
-      "arrival_airport": "LHR"
+      "arrival_airport": "LHR",
+      "arrival_datetime_local": "2026-01-24T21:15"
     },
     {
       "departure_airport": "LHR",
       "departure_datetime_local": "2026-01-25T14:45",
-      "arrival_airport": "CDG"
+      "arrival_airport": "CDG",
+      "arrival_datetime_local": "2026-01-25T16:45"
     },
     {
       "departure_airport": "CDG",
       "departure_datetime_local": "2026-02-02T11:00",
-      "arrival_airport": "YHZ"
+      "arrival_airport": "YHZ",
+      "arrival_datetime_local": "2026-02-02T13:00"
     }
   ],
   "error": null
@@ -220,11 +228,13 @@ Content-Type: application/json
 
 The service uses a carefully crafted prompt that:
 
-1. **Guides the model** to extract only flight information
-2. **Specifies the exact JSON format** for the response
-3. **Ignores non-flight data** (seat numbers, passenger names, cabin class, etc.)
-4. **Validates required fields** and omits incomplete legs
-5. **Enforces JSON-only output** with no explanatory text
+1. **Guides the model** to extract complete flight information
+2. **Specifies the exact JSON format** for the response with all required fields
+3. **Requests both departure and arrival times** in ISO 8601 format
+4. **Instructs the model to infer arrival time** if not explicitly stated (typical flight duration, or next day if overnight)
+5. **Ignores non-flight data** (seat numbers, passenger names, cabin class, etc.)
+6. **Validates required fields** and omits incomplete legs
+7. **Enforces JSON-only output** with no explanatory text
 
 ### Processing Flow
 

@@ -114,22 +114,41 @@ public partial class Forecast
                 };
 
                 // Parse the ISO 8601 departure datetime
+                DateTime departureDate = DateTime.Today.AddMonths(1);
+                DateTime departureTime = new DateTime(1, 1, 1, 12, 0, 0);
+                
                 if (DateTime.TryParseExact(parsedLeg.DepartureDatetimeLocal, "yyyy-MM-ddTHH:mm", 
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var departureDateTime))
                 {
-                    leg.DepartureDate = departureDateTime.Date;
-                    leg.DepartureTime = departureDateTime;
+                    departureDate = departureDateTime.Date;
+                    departureTime = departureDateTime;
                 }
                 else
                 {
                     Logger.LogWarning("Could not parse departure datetime: {DateTime}", parsedLeg.DepartureDatetimeLocal);
-                    leg.DepartureDate = DateTime.Today.AddMonths(1);
-                    leg.DepartureTime = new DateTime(1, 1, 1, 12, 0, 0);
                 }
 
-                // For arrival, use the same date as departure (or next day if time is earlier)
-                leg.ArrivalDate = leg.DepartureDate;
-                leg.ArrivalTime = new DateTime(1, 1, 1, 14, 0, 0); // Default 2:00 PM
+                leg.DepartureDate = departureDate;
+                leg.DepartureTime = departureTime;
+
+                // Parse the ISO 8601 arrival datetime
+                DateTime arrivalDate = departureDate;
+                DateTime arrivalTime = new DateTime(1, 1, 1, 14, 0, 0); // Default 2:00 PM
+
+                if (!string.IsNullOrEmpty(parsedLeg.ArrivalDatetimeLocal) &&
+                    DateTime.TryParseExact(parsedLeg.ArrivalDatetimeLocal, "yyyy-MM-ddTHH:mm", 
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var arrivalDateTime))
+                {
+                    arrivalDate = arrivalDateTime.Date;
+                    arrivalTime = arrivalDateTime;
+                }
+                else if (!string.IsNullOrEmpty(parsedLeg.ArrivalDatetimeLocal))
+                {
+                    Logger.LogWarning("Could not parse arrival datetime: {DateTime}", parsedLeg.ArrivalDatetimeLocal);
+                }
+
+                leg.ArrivalDate = arrivalDate;
+                leg.ArrivalTime = arrivalTime;
                 
                 legs.Add(leg);
             }

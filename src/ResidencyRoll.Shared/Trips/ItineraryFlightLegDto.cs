@@ -26,4 +26,11 @@ public class ItineraryFlightLegDto
     /// </summary>
     [JsonPropertyName("arrival_airport")]
     public required string ArrivalAirport { get; set; }
+
+    /// <summary>
+    /// ISO 8601 local arrival date and time (e.g., "2026-01-23T18:40").
+    /// Does not include timezone information - represents local time.
+    /// </summary>
+    [JsonPropertyName("arrival_datetime_local")]
+    public string? ArrivalDatetimeLocal { get; set; }
 }
