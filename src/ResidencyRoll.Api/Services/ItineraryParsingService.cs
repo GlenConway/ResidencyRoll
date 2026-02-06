@@ -121,14 +121,18 @@ For each flight leg, return ONLY a valid JSON array with the following structure
 
 Rules:
 1. Extract ALL essential flight information: departure airport, departure time, arrival airport, and arrival time
-2. Ignore non-flight data such as seat numbers, passenger names, cabin class, and airline branding
-3. Use IATA airport codes (e.g., YHZ, JFK, YUL, LHR)
+2. Ignore non-flight data such as seat numbers, passenger names, cabin class, and airline branding, and column headers
+3. Use IATA airport codes (e.g., YHZ, JFK, YUL, LHR) - extract from parentheses like (YHZ)
 4. Use ISO 8601 format for times in local timezone (e.g., 2026-01-23T16:40)
-5. Infer arrival time if not explicitly stated (typical flight duration for the route, or next day if overnight)
-6. If required fields are missing for a leg, omit that leg entirely
-7. Return ONLY the JSON array, with no explanatory text before or after
-8. Legs should be in chronological order
-9. If no valid flight legs can be extracted, return an empty array: []
+5. Dates can appear before or after the airport name on separate lines - look for patterns like ""Friday, January 23"" or ""Saturday, January 24""
+6. Times can be suffixed with ""local time"" or other timezone indicators - extract the time portion (HH:MM format)
+7. Combine date + time into ISO 8601 format: if date is ""Friday, January 23"" and time is ""16:40"", convert to ""2026-01-23T16:40""
+8. Look for arrival time immediately after arrival airport, potentially on following lines
+9. Infer arrival time ONLY if it's truly missing (typical flight duration for the route, or common practice)
+10. If required fields are missing for a leg, omit that leg entirely
+11. Return ONLY the JSON array, with no explanatory text before or after
+12. Legs should be in chronological order
+13. If no valid flight legs can be extracted, return an empty array: []
 
 Itinerary text:
 {itineraryText}";
