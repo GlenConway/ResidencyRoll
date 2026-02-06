@@ -45,14 +45,14 @@ public class ItineraryParsingService
             Logger.Information("Starting itinerary parsing for text of length {Length}", itineraryText.Length);
 
             // Create the Semantic Kernel instance with OpenAI chat completion
-            #pragma warning disable SKEXP0010
+#pragma warning disable SKEXP0010
             var kernel = Kernel.CreateBuilder()
                 .AddOpenAIChatCompletion(
                     modelId: _options.OpenAIModel,
                     endpoint: new Uri(_options.OpenAIEndpoint),
                     apiKey: _options.OpenAIApiKey)
                 .Build();
-            #pragma warning restore SKEXP0010
+#pragma warning restore SKEXP0010
 
             // Get the chat completion service
             var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
@@ -109,7 +109,7 @@ public class ItineraryParsingService
     {
         return $@"Extract flight leg information from the following itinerary text.
 
-For each flight leg, return ONLY a valid JSON array with the following structure:
+Return ONLY a valid JSON array with the structure:
 [
   {{
     ""departure_airport"": ""IATA CODE"",
@@ -119,20 +119,33 @@ For each flight leg, return ONLY a valid JSON array with the following structure
   }}
 ]
 
-Rules:
-1. Extract ALL essential flight information: departure airport, departure time, arrival airport, and arrival time
-2. Ignore non-flight data such as seat numbers, passenger names, cabin class, and airline branding, and column headers
-3. Use IATA airport codes (e.g., YHZ, JFK, YUL, LHR) - extract from parentheses like (YHZ)
-4. Use ISO 8601 format for times in local timezone (e.g., 2026-01-23T16:40)
-5. Dates can appear before or after the airport name on separate lines - look for patterns like ""Friday, January 23"" or ""Saturday, January 24""
-6. Times can be suffixed with ""local time"" or other timezone indicators - extract the time portion (HH:MM format)
-7. Combine date + time into ISO 8601 format: if date is ""Friday, January 23"" and time is ""16:40"", convert to ""2026-01-23T16:40""
-8. Look for arrival time immediately after arrival airport, potentially on following lines
-9. Infer arrival time ONLY if it's truly missing (typical flight duration for the route, or common practice)
-10. If required fields are missing for a leg, omit that leg entirely
-11. Return ONLY the JSON array, with no explanatory text before or after
-12. Legs should be in chronological order
-13. If no valid flight legs can be extracted, return an empty array: []
+CRITICAL EXTRACTION RULES:
+1. Each flight leg MUST include:
+   - departure airport
+   - departure date and time
+   - arrival airport
+   - arrival date and time
+2. Arrival time MUST be explicitly extracted from the text.
+   - DO NOT infer or estimate arrival time.
+   - DO NOT guess based on flight duration.
+3. If arrival date or arrival time cannot be explicitly found in the text, OMIT THE ENTIRE LEG.
+
+PARSING RULES:
+4. Ignore non-flight data such as seat numbers, passenger names, cabin class, airline branding, and column headers.
+5. Use IATA airport codes extracted from parentheses (e.g., ""(YHZ)"", ""(LHR)"").
+6. Dates may appear on their own line before or after the airport name
+   (e.g., ""Friday, January 23"" or ""Saturday, January 24"").
+7. Times may appear on a separate line and may include text like ""local time"".
+   Extract the HH:MM portion only.
+8. Combine date + time into ISO 8601 local datetime:
+   - Example: ""Friday, January 23"" + ""16:40"" → ""2026-01-23T16:40"".
+9. Arrival date and arrival time usually appear immediately after the arrival airport,
+   possibly separated by blank lines — continue scanning until found.
+10. Preserve the chronological order of legs.
+
+OUTPUT RULES:
+11. Return ONLY the JSON array — no markdown, no explanations.
+12. If no valid flight legs are found, return: [].
 
 Itinerary text:
 {itineraryText}";
