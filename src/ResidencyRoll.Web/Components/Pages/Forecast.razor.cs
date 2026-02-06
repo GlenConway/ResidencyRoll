@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Web.Helpers;
+using System.Globalization;
 
 namespace ResidencyRoll.Web.Components.Pages;
 
@@ -19,6 +20,12 @@ public partial class Forecast
     private Dictionary<string, int> forecastDaysPerCountry = new();
     private List<StandardDurationForecastItemDto> standardDurationForecasts = new();
     private List<string> validationIssues = new();
+    
+    // Itinerary parsing state
+    private string itineraryText = string.Empty;
+    private string itineraryParsingError = string.Empty;
+    private bool parsingSuccess = false;
+    private int parsedLegsCount = 0;
     
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
@@ -42,6 +49,95 @@ public partial class Forecast
             legs.Add(newLeg);
         }
         await Task.CompletedTask;
+    }
+
+    private async Task ParseItinerary()
+    {
+        try
+        {
+            parsingSuccess = false;
+            itineraryParsingError = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(itineraryText))
+            {
+                itineraryParsingError = "Please paste some itinerary text first.";
+                return;
+            }
+
+            Logger.LogInformation("Parsing itinerary text");
+
+            var response = await ApiClient.ParseItineraryAsync(itineraryText);
+
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                itineraryParsingError = response.Error;
+                Logger.LogWarning("Itinerary parsing error: {Error}", response.Error);
+                return;
+            }
+
+            if (response.Legs.Count == 0)
+            {
+                itineraryParsingError = "No flight legs could be extracted from the provided itinerary text. Please check the format and try again.";
+                Logger.LogWarning("No legs parsed from itinerary");
+                return;
+            }
+
+            Logger.LogInformation("Successfully parsed {LegCount} flight legs", response.Legs.Count);
+
+            // Clear existing legs and add parsed ones
+            legs.Clear();
+            nextLegId = 0;
+
+            foreach (var parsedLeg in response.Legs)
+            {
+                // Try to extract country/city info using airport code (this is a simplified approach)
+                // In a real scenario, you'd have an airport database lookup
+                var (departureDummy, arrivalDummy) = ("", "");
+
+                var leg = new TripLegEditModel
+                {
+                    Id = nextLegId++,
+                    DepartureCity = departureDummy,
+                    DepartureCountry = departureDummy,
+                    DepartureTimezone = "UTC",
+                    DepartureIataCode = parsedLeg.DepartureAirport,
+                    ArrivalCity = arrivalDummy,
+                    ArrivalCountry = arrivalDummy,
+                    ArrivalTimezone = "UTC",
+                    ArrivalIataCode = parsedLeg.ArrivalAirport
+                };
+
+                // Parse the ISO 8601 departure datetime
+                if (DateTime.TryParseExact(parsedLeg.DepartureDatetimeLocal, "yyyy-MM-ddTHH:mm", 
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var departureDateTime))
+                {
+                    leg.DepartureDate = departureDateTime.Date;
+                    leg.DepartureTime = departureDateTime;
+                }
+                else
+                {
+                    Logger.LogWarning("Could not parse departure datetime: {DateTime}", parsedLeg.DepartureDatetimeLocal);
+                    leg.DepartureDate = DateTime.Today.AddMonths(1);
+                    leg.DepartureTime = new DateTime(1, 1, 1, 12, 0, 0);
+                }
+
+                // For arrival, use the same date as departure (or next day if time is earlier)
+                leg.ArrivalDate = leg.DepartureDate;
+                leg.ArrivalTime = new DateTime(1, 1, 1, 14, 0, 0); // Default 2:00 PM
+                
+                legs.Add(leg);
+            }
+
+            parsedLegsCount = response.Legs.Count;
+            parsingSuccess = true;
+            itineraryText = string.Empty; // Clear textarea after successful parse
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            itineraryParsingError = $"Error parsing itinerary: {ex.Message}";
+            Logger.LogError(ex, "Exception while parsing itinerary");
+        }
     }
 
     private void AddLeg()

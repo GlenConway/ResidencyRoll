@@ -231,6 +231,26 @@ public class TripsApiClient
         return (result?.Imported ?? 0, result?.Message ?? string.Empty, result?.Errors ?? 0);
     }
 
+    public async Task<ItineraryParsingResponseDto> ParseItineraryAsync(string itineraryText)
+    {
+        var request = new ItineraryParsingRequestDto
+        {
+            ItineraryText = itineraryText
+        };
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/parse-itinerary", request);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<ItineraryParsingResponseDto>();
+            return result ?? new ItineraryParsingResponseDto { Error = "Empty response from server" };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new ItineraryParsingResponseDto { Error = $"API error: {ex.Message}" };
+        }
+    }
+
     private class ImportResultDto
     {
         public int Imported { get; set; }
