@@ -135,7 +135,36 @@ Itinerary text:
     }
 
     /// <summary>
+    /// Cleans the JSON response by removing markdown code block formatting.
+    /// Handles patterns like ```json ... ``` or ``` ... ```
+    /// </summary>
+    private static string CleanJsonResponse(string responseText)
+    {
+        // Remove markdown code block markers
+        var cleaned = responseText.Trim();
+
+        // Remove ```json or ``` at the start
+        if (cleaned.StartsWith("```json"))
+        {
+            cleaned = cleaned[7..].Trim();
+        }
+        else if (cleaned.StartsWith("```"))
+        {
+            cleaned = cleaned[3..].Trim();
+        }
+
+        // Remove ``` at the end
+        if (cleaned.EndsWith("```"))
+        {
+            cleaned = cleaned[..^3].Trim();
+        }
+
+        return cleaned;
+    }
+
+    /// <summary>
     /// Parses the JSON response from the OpenAI model.
+    /// Handles responses wrapped in markdown code blocks.
     /// </summary>
     private static ItineraryParsingResponseDto ParseJsonResponse(string responseText)
     {
@@ -143,8 +172,11 @@ Itinerary text:
 
         try
         {
+            // Clean the response text (remove markdown code blocks if present)
+            var cleanedJson = CleanJsonResponse(responseText);
+
             // Try to parse the response as a JSON array
-            using (var jsonDoc = JsonDocument.Parse(responseText))
+            using (var jsonDoc = JsonDocument.Parse(cleanedJson))
             {
                 var root = jsonDoc.RootElement;
 

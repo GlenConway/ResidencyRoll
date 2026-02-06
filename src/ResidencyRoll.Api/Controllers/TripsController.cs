@@ -626,4 +626,5 @@ public class TripsController : ControllerBase
 
         var result = await _itineraryParsingService.ParseItineraryAsync(request.ItineraryText);
         return Ok(result);
-    }}
+    }
+}
