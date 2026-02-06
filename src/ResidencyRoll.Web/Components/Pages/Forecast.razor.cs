@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Web.Helpers;
+using ResidencyRoll.Web.Data;
 using System.Globalization;
 
 namespace ResidencyRoll.Web.Components.Pages;
@@ -90,20 +91,20 @@ public partial class Forecast
 
             foreach (var parsedLeg in response.Legs)
             {
-                // Try to extract country/city info using airport code (this is a simplified approach)
-                // In a real scenario, you'd have an airport database lookup
-                var (departureDummy, arrivalDummy) = ("", "");
+                // Look up airport information by IATA code
+                var departureAirport = AirportDatabase.FindByIataCode(parsedLeg.DepartureAirport);
+                var arrivalAirport = AirportDatabase.FindByIataCode(parsedLeg.ArrivalAirport);
 
                 var leg = new TripLegEditModel
                 {
                     Id = nextLegId++,
-                    DepartureCity = departureDummy,
-                    DepartureCountry = departureDummy,
-                    DepartureTimezone = "UTC",
+                    DepartureCity = departureAirport?.City ?? string.Empty,
+                    DepartureCountry = departureAirport?.Country ?? string.Empty,
+                    DepartureTimezone = departureAirport?.IanaTimezone ?? "UTC",
                     DepartureIataCode = parsedLeg.DepartureAirport,
-                    ArrivalCity = arrivalDummy,
-                    ArrivalCountry = arrivalDummy,
-                    ArrivalTimezone = "UTC",
+                    ArrivalCity = arrivalAirport?.City ?? string.Empty,
+                    ArrivalCountry = arrivalAirport?.Country ?? string.Empty,
+                    ArrivalTimezone = arrivalAirport?.IanaTimezone ?? "UTC",
                     ArrivalIataCode = parsedLeg.ArrivalAirport
                 };
 
