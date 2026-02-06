@@ -27,6 +27,7 @@ public partial class Forecast
     private string itineraryParsingError = string.Empty;
     private bool parsingSuccess = false;
     private int parsedLegsCount = 0;
+    private bool isParsing = false;
     
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
@@ -58,10 +59,12 @@ public partial class Forecast
         {
             parsingSuccess = false;
             itineraryParsingError = string.Empty;
+            isParsing = true;
 
             if (string.IsNullOrWhiteSpace(itineraryText))
             {
                 itineraryParsingError = "Please paste some itinerary text first.";
+                isParsing = false;
                 return;
             }
 
@@ -73,6 +76,7 @@ public partial class Forecast
             {
                 itineraryParsingError = response.Error;
                 Logger.LogWarning("Itinerary parsing error: {Error}", response.Error);
+                isParsing = false;
                 return;
             }
 
@@ -80,6 +84,7 @@ public partial class Forecast
             {
                 itineraryParsingError = "No flight legs could be extracted from the provided itinerary text. Please check the format and try again.";
                 Logger.LogWarning("No legs parsed from itinerary");
+                isParsing = false;
                 return;
             }
 
@@ -138,6 +143,10 @@ public partial class Forecast
         {
             itineraryParsingError = $"Error parsing itinerary: {ex.Message}";
             Logger.LogError(ex, "Exception while parsing itinerary");
+        }
+        finally
+        {
+            isParsing = false;
         }
     }
 

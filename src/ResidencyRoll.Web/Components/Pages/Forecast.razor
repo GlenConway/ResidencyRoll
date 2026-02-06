@@ -25,12 +25,31 @@
 
             <RadzenTextArea @bind-Value="itineraryText" 
                            Placeholder="Paste your flight itinerary here... (e.g., AC099 YHZ to YUL Jan 23 2026 4:40 PM, AC100 YUL to YHZ Jan 30 2026 2:15 PM)"
+                           Disabled="@isParsing"
                            Style="width: 100%; min-height: 100px; margin-bottom: 1rem;" />
 
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                <RadzenButton Icon="flight" Text="Parse Itinerary" Click="@ParseItinerary" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" />
-                <RadzenButton Icon="clear" Text="Clear" Click="@(() => itineraryText = string.Empty)" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" />
+                <RadzenButton Icon="@(isParsing ? "schedule" : "flight")" 
+                             Text="@(isParsing ? "Parsing..." : "Parse Itinerary")" 
+                             Click="@ParseItinerary" 
+                             ButtonStyle="ButtonStyle.Info" 
+                             Size="ButtonSize.Small"
+                             Disabled="@isParsing" />
+                <RadzenButton Icon="clear" 
+                             Text="Clear" 
+                             Click="@(() => itineraryText = string.Empty)" 
+                             ButtonStyle="ButtonStyle.Light" 
+                             Size="ButtonSize.Small"
+                             Disabled="@isParsing" />
             </RadzenStack>
+
+            @if (isParsing)
+            {
+                <div style="margin-top: 1rem; padding: 1rem; background-color: #e7f1ff; border-radius: 4px; display: flex; align-items: center; gap: 1rem;">
+                    <RadzenProgressBar Value="100" ShowValue="false" Style="width: 40px; height: 20px;" />
+                    <RadzenText TextStyle="TextStyle.Body2"><em>Analyzing your itinerary with AI...</em></RadzenText>
+                </div>
+            }
 
             @if (!string.IsNullOrEmpty(itineraryParsingError))
             {
