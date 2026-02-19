@@ -1,7 +1,7 @@
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace ResidencyRoll.Api.Configuration;
@@ -36,18 +36,11 @@ internal sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOpti
             Description = "JWT Authorization header using the Bearer scheme"
         });
 
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
             {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                Array.Empty<string>()
+                new OpenApiSecuritySchemeReference("Bearer", document, null),
+                new List<string>()
             }
         });
     }
