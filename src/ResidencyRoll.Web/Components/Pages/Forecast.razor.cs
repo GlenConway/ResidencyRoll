@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Radzen;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Web.Helpers;
 using ResidencyRoll.Web.Data;
 using System.Globalization;
+using ResidencyRoll.Web.Components.Dialogs;
 
 namespace ResidencyRoll.Web.Components.Pages;
 
@@ -23,14 +25,15 @@ public partial class Forecast
     private List<string> validationIssues = new();
     
     // Itinerary parsing state
-    private string itineraryText = string.Empty;
     private string itineraryParsingError = string.Empty;
     private bool parsingSuccess = false;
     private int parsedLegsCount = 0;
-    private bool isParsing = false;
+    private bool isItineraryParserAvailable = false;
+    private bool isItineraryParserAvailabilityChecked = false;
     
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -50,33 +53,55 @@ public partial class Forecast
             };
             legs.Add(newLeg);
         }
-        await Task.CompletedTask;
+        await CheckItineraryParserAvailability();
     }
 
-    private async Task ParseItinerary()
+    private async Task CheckItineraryParserAvailability()
     {
         try
         {
-            parsingSuccess = false;
-            itineraryParsingError = string.Empty;
-            isParsing = true;
+            isItineraryParserAvailable = await ApiClient.IsItineraryParsingAvailableAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to check itinerary parsing availability");
+            isItineraryParserAvailable = false;
+        }
+        finally
+        {
+            isItineraryParserAvailabilityChecked = true;
+        }
+    }
 
-            if (string.IsNullOrWhiteSpace(itineraryText))
+    private async Task OpenItineraryParserDialog()
+    {
+        parsingSuccess = false;
+        itineraryParsingError = string.Empty;
+
+        var result = await DialogService.OpenAsync<ItineraryParserDialog>(
+            "Quick Itinerary Parser",
+            options: new DialogOptions
             {
-                itineraryParsingError = "Please paste some itinerary text first.";
-                isParsing = false;
-                return;
-            }
+                Width = "680px",
+                Resizable = false,
+                Draggable = false,
+                CloseDialogOnOverlayClick = true
+            });
 
-            Logger.LogInformation("Parsing itinerary text");
+        if (result is ItineraryParsingResponseDto response)
+        {
+            ApplyParsedLegs(response);
+        }
+    }
 
-            var response = await ApiClient.ParseItineraryAsync(itineraryText);
-
+    private void ApplyParsedLegs(ItineraryParsingResponseDto response)
+    {
+        try
+        {
             if (!string.IsNullOrEmpty(response.Error))
             {
                 itineraryParsingError = response.Error;
                 Logger.LogWarning("Itinerary parsing error: {Error}", response.Error);
-                isParsing = false;
                 return;
             }
 
@@ -84,7 +109,6 @@ public partial class Forecast
             {
                 itineraryParsingError = "No flight legs could be extracted from the provided itinerary text. Please check the format and try again.";
                 Logger.LogWarning("No legs parsed from itinerary");
-                isParsing = false;
                 return;
             }
 
@@ -116,8 +140,8 @@ public partial class Forecast
                 // Parse the ISO 8601 departure datetime
                 DateTime departureDate = DateTime.Today.AddMonths(1);
                 DateTime departureTime = new DateTime(1, 1, 1, 12, 0, 0);
-                
-                if (DateTime.TryParseExact(parsedLeg.DepartureDatetimeLocal, "yyyy-MM-ddTHH:mm", 
+
+                if (DateTime.TryParseExact(parsedLeg.DepartureDatetimeLocal, "yyyy-MM-ddTHH:mm",
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var departureDateTime))
                 {
                     departureDate = departureDateTime.Date;
@@ -136,7 +160,7 @@ public partial class Forecast
                 DateTime arrivalTime = new DateTime(1, 1, 1, 14, 0, 0); // Default 2:00 PM
 
                 if (!string.IsNullOrEmpty(parsedLeg.ArrivalDatetimeLocal) &&
-                    DateTime.TryParseExact(parsedLeg.ArrivalDatetimeLocal, "yyyy-MM-ddTHH:mm", 
+                    DateTime.TryParseExact(parsedLeg.ArrivalDatetimeLocal, "yyyy-MM-ddTHH:mm",
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var arrivalDateTime))
                 {
                     arrivalDate = arrivalDateTime.Date;
@@ -149,23 +173,18 @@ public partial class Forecast
 
                 leg.ArrivalDate = arrivalDate;
                 leg.ArrivalTime = arrivalTime;
-                
+
                 legs.Add(leg);
             }
 
             parsedLegsCount = response.Legs.Count;
             parsingSuccess = true;
-            itineraryText = string.Empty; // Clear textarea after successful parse
             StateHasChanged();
         }
         catch (Exception ex)
         {
             itineraryParsingError = $"Error parsing itinerary: {ex.Message}";
             Logger.LogError(ex, "Exception while parsing itinerary");
-        }
-        finally
-        {
-            isParsing = false;
         }
     }
 

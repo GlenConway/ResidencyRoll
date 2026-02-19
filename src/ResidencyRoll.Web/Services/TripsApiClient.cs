@@ -251,6 +251,11 @@ public class TripsApiClient
         }
     }
 
+    public async Task<bool> IsItineraryParsingAvailableAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<bool>($"{BaseRoute}/parse-itinerary/availability");
+    }
+
     private class ImportResultDto
     {
         public int Imported { get; set; }

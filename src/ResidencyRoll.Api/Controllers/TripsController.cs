@@ -627,4 +627,11 @@ public class TripsController : ControllerBase
         var result = await _itineraryParsingService.ParseItineraryAsync(request.ItineraryText);
         return Ok(result);
     }
+
+    [HttpGet("parse-itinerary/availability")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<bool> GetItineraryParsingAvailability()
+    {
+        return Ok(_itineraryParsingService.IsConfigured());
+    }
 }

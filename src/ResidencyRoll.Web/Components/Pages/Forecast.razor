@@ -10,78 +10,48 @@
 
 <PageTitle>Forecast - Residency Roll</PageTitle>
 
-<style>
-    .itinerary-spinner {
-        width: 20px;
-        height: 20px;
-        border: 3px solid #b6d4fe;
-        border-top-color: #0d6efd;
-        border-radius: 50%;
-        animation: itinerary-spin 0.8s linear infinite;
-    }
-
-    @@keyframes itinerary-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-</style>
-
 <h1>Trip Forecast</h1>
 
 <RadzenCard class="rz-mt-4">
     <div style="display: flex; gap: 2rem; flex-direction: column;">
         <!-- Itinerary Parser Section -->
-        <div style="border: 2px solid #007bff; border-radius: 6px; padding: 1.5rem; background-color: #f0f8ff;">
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
-                <strong>✈️ Quick Itinerary Parser</strong>
-            </RadzenText>
-            <RadzenText TextStyle="TextStyle.Caption" style="color: #666; display: block; margin-bottom: 1rem;">
-                Paste flight information from emails, booking confirmations, or any text format. We'll auto-fill your trip legs.
-            </RadzenText>
+        @if (isItineraryParserAvailabilityChecked && isItineraryParserAvailable)
+        {
+            <div style="border: 2px solid #007bff; border-radius: 6px; padding: 1.5rem; background-color: #f0f8ff;">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                    <strong>✈️ Quick Itinerary Parser</strong>
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="color: #666; display: block; margin-bottom: 1rem;">
+                    Paste flight information from emails, booking confirmations, or any text format. We'll auto-fill your trip legs.
+                </RadzenText>
 
-            <RadzenTextArea @bind-Value="itineraryText" 
-                           Placeholder="Paste your flight itinerary here... (e.g., AC099 YHZ to YUL Jan 23 2026 4:40 PM, AC100 YUL to YHZ Jan 30 2026 2:15 PM)"
-                           Disabled="@isParsing"
-                           Style="width: 100%; min-height: 100px; margin-bottom: 1rem;" />
-
-            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                <RadzenButton Icon="@(isParsing ? "schedule" : "flight")" 
-                             Text="@(isParsing ? "Parsing..." : "Parse Itinerary")" 
-                             Click="@ParseItinerary" 
+                <RadzenButton Icon="flight" 
+                             Text="Open Itinerary Parser" 
+                             Click="@OpenItineraryParserDialog" 
                              ButtonStyle="ButtonStyle.Info" 
-                             Size="ButtonSize.Small"
-                             Disabled="@isParsing" />
-                <RadzenButton Icon="clear" 
-                             Text="Clear" 
-                             Click="@(() => itineraryText = string.Empty)" 
-                             ButtonStyle="ButtonStyle.Light" 
-                             Size="ButtonSize.Small"
-                             Disabled="@isParsing" />
-            </RadzenStack>
+                             Size="ButtonSize.Small" />
 
-            @if (isParsing)
-            {
-                <div style="margin-top: 1rem; padding: 1rem; background-color: #e7f1ff; border-radius: 4px; display: flex; align-items: center; gap: 1rem;">
-                    <div class="itinerary-spinner"></div>
-                    <RadzenText TextStyle="TextStyle.Body2"><em>Analyzing your itinerary with AI...</em></RadzenText>
-                </div>
-            }
+                @if (!string.IsNullOrEmpty(itineraryParsingError))
+                {
+                    <RadzenAlert Severity="AlertSeverity.Error" Style="margin-top: 1rem;">
+                        <strong>Parsing Error:</strong> @itineraryParsingError
+                    </RadzenAlert>
+                }
 
-            @if (!string.IsNullOrEmpty(itineraryParsingError))
-            {
-                <RadzenAlert Severity="AlertSeverity.Error" Style="margin-top: 1rem;">
-                    <strong>Parsing Error:</strong> @itineraryParsingError
-                </RadzenAlert>
-            }
-
-            @if (parsingSuccess)
-            {
-                <RadzenAlert Severity="AlertSeverity.Success" Style="margin-top: 1rem;">
-                    <strong>Success!</strong> Parsed @parsedLegsCount flight leg(s). Your trip legs have been updated.
-                </RadzenAlert>
-            }
-        </div>
+                @if (parsingSuccess)
+                {
+                    <RadzenAlert Severity="AlertSeverity.Success" Style="margin-top: 1rem;">
+                        <strong>Success!</strong> Parsed @parsedLegsCount flight leg(s). Your trip legs have been updated.
+                    </RadzenAlert>
+                }
+            </div>
+        }
+        else if (isItineraryParserAvailabilityChecked)
+        {
+            <RadzenAlert Severity="AlertSeverity.Info" Style="margin-bottom: 1rem;">
+                Quick Itinerary Parser is unavailable until OpenAI configuration is set.
+            </RadzenAlert>
+        }
 
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>

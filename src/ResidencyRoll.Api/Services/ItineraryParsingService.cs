@@ -23,6 +23,13 @@ public class ItineraryParsingService
         _options = options.Value;
     }
 
+    public bool IsConfigured()
+    {
+        return !string.IsNullOrWhiteSpace(_options.OpenAIModel) &&
+               !string.IsNullOrWhiteSpace(_options.OpenAIEndpoint) &&
+               !string.IsNullOrWhiteSpace(_options.OpenAIApiKey);
+    }
+
     /// <summary>
     /// Parses a free-form flight itinerary text and extracts structured flight legs.
     /// Uses OpenAI chat completion to understand and extract the flight information.
