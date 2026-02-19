@@ -14,6 +14,45 @@
 
 <RadzenCard class="rz-mt-4">
     <div style="display: flex; gap: 2rem; flex-direction: column;">
+        <!-- Itinerary Parser Section -->
+        @if (isItineraryParserAvailabilityChecked && isItineraryParserAvailable)
+        {
+            <div style="border: 2px solid #007bff; border-radius: 6px; padding: 1.5rem; background-color: #f0f8ff;">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                    <strong>✈️ Quick Itinerary Parser</strong>
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" style="color: #666; display: block; margin-bottom: 1rem;">
+                    Paste flight information from emails, booking confirmations, or any text format. We'll auto-fill your trip legs.
+                </RadzenText>
+
+                <RadzenButton Icon="flight" 
+                             Text="Open Itinerary Parser" 
+                             Click="@OpenItineraryParserDialog" 
+                             ButtonStyle="ButtonStyle.Info" 
+                             Size="ButtonSize.Small" />
+
+                @if (!string.IsNullOrEmpty(itineraryParsingError))
+                {
+                    <RadzenAlert Severity="AlertSeverity.Error" Style="margin-top: 1rem;">
+                        <strong>Parsing Error:</strong> @itineraryParsingError
+                    </RadzenAlert>
+                }
+
+                @if (parsingSuccess)
+                {
+                    <RadzenAlert Severity="AlertSeverity.Success" Style="margin-top: 1rem;">
+                        <strong>Success!</strong> Parsed @parsedLegsCount flight leg(s). Your trip legs have been updated.
+                    </RadzenAlert>
+                }
+            </div>
+        }
+        else if (isItineraryParserAvailabilityChecked)
+        {
+            <RadzenAlert Severity="AlertSeverity.Info" Style="margin-bottom: 1rem;">
+                Quick Itinerary Parser is unavailable until OpenAI configuration is set.
+            </RadzenAlert>
+        }
+
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <RadzenText TextStyle="TextStyle.H6">Plan a Future Trip (Multi-leg Supported)</RadzenText>

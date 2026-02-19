@@ -4,3 +4,46 @@ GET {{ResidencyRoll.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+# Itinerary Parsing - Simple Example
+POST {{ResidencyRoll.Api_HostAddress}}/api/v1/trips/parse-itinerary
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "itineraryText": "Flight Confirmation\n\nAC099 Halifax (YHZ) to Montreal (YUL)\nDeparture: January 23, 2026 - 4:40 PM\nArrival: January 23, 2026 - 6:40 PM"
+}
+
+###
+
+# Itinerary Parsing - Multi-leg Example
+POST {{ResidencyRoll.Api_HostAddress}}/api/v1/trips/parse-itinerary
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "itineraryText": "ROUND TRIP ITINERARY\n\nOutbound Flight:\nAir Canada AC099\nRoute: Halifax (YHZ) -> Montreal (YUL)\nDate: January 23, 2026\nDeparture: 4:40 PM\nArrival: 6:40 PM\nSeat: 12A\nCabin: Economy\n\nReturn Flight:\nAir Canada AC100\nRoute: Montreal (YUL) -> Halifax (YHZ)\nDate: January 30, 2026\nDeparture: 2:15 PM (14:15)\nArrival: 4:15 PM (16:15)\nSeat: 14B\nCabin: Economy"
+}
+
+###
+
+# Itinerary Parsing - International Multi-leg
+POST {{ResidencyRoll.Api_HostAddress}}/api/v1/trips/parse-itinerary
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "itineraryText": "MULTI-CITY ITINERARY\n\nLeg 1:\nAC099 YHZ->YUL 2026-01-23 16:40\n\nLeg 2:\nAC865 YUL->LHR (London Heathrow) 2026-01-24 10:30\n\nLeg 3:\nBA308 LHR->CDG (Paris) Jan 25, 2026 2:45pm\n\nLeg 4 (Return):\nAF358 CDG->YHZ 2026-02-02 11:00"
+}
+
+###
+
+# Itinerary Parsing - Minimal/Empty Test
+POST {{ResidencyRoll.Api_HostAddress}}/api/v1/trips/parse-itinerary
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "itineraryText": ""
+}
+
+###

@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Radzen;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Web.Helpers;
+using ResidencyRoll.Web.Data;
+using System.Globalization;
+using ResidencyRoll.Web.Components.Dialogs;
 
 namespace ResidencyRoll.Web.Components.Pages;
 
@@ -20,8 +24,16 @@ public partial class Forecast
     private List<StandardDurationForecastItemDto> standardDurationForecasts = new();
     private List<string> validationIssues = new();
     
+    // Itinerary parsing state
+    private string itineraryParsingError = string.Empty;
+    private bool parsingSuccess = false;
+    private int parsedLegsCount = 0;
+    private bool isItineraryParserAvailable = false;
+    private bool isItineraryParserAvailabilityChecked = false;
+    
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -41,7 +53,139 @@ public partial class Forecast
             };
             legs.Add(newLeg);
         }
-        await Task.CompletedTask;
+        await CheckItineraryParserAvailability();
+    }
+
+    private async Task CheckItineraryParserAvailability()
+    {
+        try
+        {
+            isItineraryParserAvailable = await ApiClient.IsItineraryParsingAvailableAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to check itinerary parsing availability");
+            isItineraryParserAvailable = false;
+        }
+        finally
+        {
+            isItineraryParserAvailabilityChecked = true;
+        }
+    }
+
+    private async Task OpenItineraryParserDialog()
+    {
+        parsingSuccess = false;
+        itineraryParsingError = string.Empty;
+
+        var result = await DialogService.OpenAsync<ItineraryParserDialog>(
+            "Quick Itinerary Parser",
+            options: new DialogOptions
+            {
+                Width = "680px",
+                Resizable = false,
+                Draggable = false,
+                CloseDialogOnOverlayClick = true
+            });
+
+        if (result is ItineraryParsingResponseDto response)
+        {
+            ApplyParsedLegs(response);
+        }
+    }
+
+    private void ApplyParsedLegs(ItineraryParsingResponseDto response)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                itineraryParsingError = response.Error;
+                Logger.LogWarning("Itinerary parsing error: {Error}", response.Error);
+                return;
+            }
+
+            if (response.Legs.Count == 0)
+            {
+                itineraryParsingError = "No flight legs could be extracted from the provided itinerary text. Please check the format and try again.";
+                Logger.LogWarning("No legs parsed from itinerary");
+                return;
+            }
+
+            Logger.LogInformation("Successfully parsed {LegCount} flight legs", response.Legs.Count);
+
+            // Clear existing legs and add parsed ones
+            legs.Clear();
+            nextLegId = 0;
+
+            foreach (var parsedLeg in response.Legs)
+            {
+                // Look up airport information by IATA code
+                var departureAirport = AirportDatabase.FindByIataCode(parsedLeg.DepartureAirport);
+                var arrivalAirport = AirportDatabase.FindByIataCode(parsedLeg.ArrivalAirport);
+
+                var leg = new TripLegEditModel
+                {
+                    Id = nextLegId++,
+                    DepartureCity = departureAirport?.City ?? string.Empty,
+                    DepartureCountry = departureAirport?.Country ?? string.Empty,
+                    DepartureTimezone = departureAirport?.IanaTimezone ?? "UTC",
+                    DepartureIataCode = parsedLeg.DepartureAirport,
+                    ArrivalCity = arrivalAirport?.City ?? string.Empty,
+                    ArrivalCountry = arrivalAirport?.Country ?? string.Empty,
+                    ArrivalTimezone = arrivalAirport?.IanaTimezone ?? "UTC",
+                    ArrivalIataCode = parsedLeg.ArrivalAirport
+                };
+
+                // Parse the ISO 8601 departure datetime
+                DateTime departureDate = DateTime.Today.AddMonths(1);
+                DateTime departureTime = new DateTime(1, 1, 1, 12, 0, 0);
+
+                if (DateTime.TryParseExact(parsedLeg.DepartureDatetimeLocal, "yyyy-MM-ddTHH:mm",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var departureDateTime))
+                {
+                    departureDate = departureDateTime.Date;
+                    departureTime = departureDateTime;
+                }
+                else
+                {
+                    Logger.LogWarning("Could not parse departure datetime: {DateTime}", parsedLeg.DepartureDatetimeLocal);
+                }
+
+                leg.DepartureDate = departureDate;
+                leg.DepartureTime = departureTime;
+
+                // Parse the ISO 8601 arrival datetime
+                DateTime arrivalDate = departureDate;
+                DateTime arrivalTime = new DateTime(1, 1, 1, 14, 0, 0); // Default 2:00 PM
+
+                if (!string.IsNullOrEmpty(parsedLeg.ArrivalDatetimeLocal) &&
+                    DateTime.TryParseExact(parsedLeg.ArrivalDatetimeLocal, "yyyy-MM-ddTHH:mm",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var arrivalDateTime))
+                {
+                    arrivalDate = arrivalDateTime.Date;
+                    arrivalTime = arrivalDateTime;
+                }
+                else if (!string.IsNullOrEmpty(parsedLeg.ArrivalDatetimeLocal))
+                {
+                    Logger.LogWarning("Could not parse arrival datetime: {DateTime}", parsedLeg.ArrivalDatetimeLocal);
+                }
+
+                leg.ArrivalDate = arrivalDate;
+                leg.ArrivalTime = arrivalTime;
+
+                legs.Add(leg);
+            }
+
+            parsedLegsCount = response.Legs.Count;
+            parsingSuccess = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            itineraryParsingError = $"Error parsing itinerary: {ex.Message}";
+            Logger.LogError(ex, "Exception while parsing itinerary");
+        }
     }
 
     private void AddLeg()

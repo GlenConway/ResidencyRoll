@@ -37,7 +37,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=residencyroll.db"));
 
 builder.Services.AddScoped<TripService>();
+builder.Services.AddScoped<ItineraryParsingService>();
 builder.Services.AddSingleton<ResidencyCalculationService>();
+
+// Configure OpenAI options for Semantic Kernel
+builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
 
 builder.Services.AddApiVersioning(options =>
 {

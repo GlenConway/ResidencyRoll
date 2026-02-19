@@ -11,7 +11,7 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
-      - 'ResidencyRoll.sln'
+      - 'src/ResidencyRoll.sln'
       - '.github/workflows/tests.yml'
   pull_request:
     branches:
@@ -20,7 +20,7 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
-      - 'ResidencyRoll.sln'
+      - 'src/ResidencyRoll.sln'
       - '.github/workflows/tests.yml'
 
 jobs:
@@ -36,10 +36,10 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore ResidencyRoll.sln
+        run: dotnet restore src/ResidencyRoll.sln
 
       - name: Build
-        run: dotnet build ResidencyRoll.sln --configuration Release --no-restore
+        run: dotnet build src/ResidencyRoll.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test ResidencyRoll.sln --configuration Release --no-build
+        run: dotnet test src/ResidencyRoll.sln --configuration Release --no-build

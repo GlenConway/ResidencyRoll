@@ -19,11 +19,13 @@ public class TripsController : ControllerBase
 {
     private readonly TripService _tripService;
     private readonly ResidencyCalculationService _residencyService;
+    private readonly ItineraryParsingService _itineraryParsingService;
 
-    public TripsController(TripService tripService, ResidencyCalculationService residencyService)
+    public TripsController(TripService tripService, ResidencyCalculationService residencyService, ItineraryParsingService itineraryParsingService)
     {
         _tripService = tripService;
         _residencyService = residencyService;
+        _itineraryParsingService = itineraryParsingService;
     }
 
     private string GetUserId()
@@ -606,5 +608,30 @@ public class TripsController : ControllerBase
 
         values.Add(current.ToString());
         return values.ToArray();
+    }
+
+    [HttpPost("parse-itinerary")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ItineraryParsingResponseDto>> ParseItinerary([FromBody] ItineraryParsingRequestDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.ItineraryText))
+        {
+            return BadRequest(new ItineraryParsingResponseDto 
+            { 
+                Error = "ItineraryText is required" 
+            });
+        }
+
+        var result = await _itineraryParsingService.ParseItineraryAsync(request.ItineraryText);
+        return Ok(result);
+    }
+
+    [HttpGet("parse-itinerary/availability")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<bool> GetItineraryParsingAvailability()
+    {
+        return Ok(_itineraryParsingService.IsConfigured());
     }
 }
