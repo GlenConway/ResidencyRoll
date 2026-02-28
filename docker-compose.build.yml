@@ -23,6 +23,9 @@ services:
       - Jwt__Audience=${JWT_AUDIENCE:-https://your-api-audience}
       - Jwt__RequireHttpsMetadata=${JWT_REQUIRE_HTTPS:-false}
       - Jwt__ClientSecret=${OIDC_CLIENT_SECRET}
+      - OpenAI__OpenAIEndpoint=${OPENAI_ENDPOINT:-}
+      - OpenAI__OpenAIModel=${OPENAI_MODEL:-}
+      - OpenAI__OpenAIApiKey=${OPENAI_API_KEY:-}
       - Cors__AllowedOrigins__0=${CORS_ORIGIN_0:-http://localhost:8080}
       - Cors__AllowedOrigins__1=${CORS_ORIGIN_1:-http://localhost:5001}
       - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
