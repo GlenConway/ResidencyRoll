@@ -414,7 +414,18 @@ button.rz-button-primary:active,
 /* Secondary Button */
 .rz-button-secondary,
 button.rz-button-secondary,
-.rz-button.rz-secondary,
+.rz-button.rz-secondary {
+    background-color: var(--cds-blue-60);
+    color: var(--cds-text-on-color);
+    border: none;
+}
+
+.rz-button-secondary:hover,
+button.rz-button-secondary:hover,
+.rz-button.rz-secondary:hover {
+    background-color: var(--cds-blue-70);
+}
+
 .rz-button-light,
 button.rz-button-light {
     background-color: transparent;
@@ -422,9 +433,6 @@ button.rz-button-light {
     border: 1px solid var(--cds-blue-60);
 }
 
-.rz-button-secondary:hover,
-button.rz-button-secondary:hover,
-.rz-button.rz-secondary:hover,
 .rz-button-light:hover,
 button.rz-button-light:hover {
     background-color: var(--cds-layer-hover-01);
@@ -825,7 +833,7 @@ input.rz-autocomplete-input:focus {
 }
 
 .rz-tabview-panels {
-    padding: var(--cds-spacing-06) 0;
+    padding: 0;
 }
 
 /* ========== RADZEN PANEL/ACCORDION ========== */

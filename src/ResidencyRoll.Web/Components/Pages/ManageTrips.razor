@@ -19,18 +19,34 @@
     <Tabs>
         <RadzenTabsItem Text="Trip List">
             <RadzenRow Gap="1rem" class="rz-mt-3">
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenButton Icon="download" Text="Export Trips (CSV)" ButtonStyle="ButtonStyle.Secondary" Click="@ExportTrips" />
+                <RadzenColumn Size="12" SizeMD="8">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        <RadzenButton Icon="add_circle_outline" Text="Add Trip" Click="@InsertRow" ButtonStyle="ButtonStyle.Success" />
+                    </RadzenStack>
                 </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6" Style="display: flex; gap: 0.5rem; align-items: center;">
-                    <InputFile OnChange="@OnFileSelected" style="flex: 1" />
-                    <RadzenButton Icon="upload" Text="Import" Click="OnImport" Disabled="@(importing || selectedFile is null)" />
-                    @if (!string.IsNullOrEmpty(importMessage))
-                    {
-                        <span style="color: @(importError ? "#dc3545" : "#198754"); font-size: 0.9rem;">@importMessage</span>
-                    }
+                <RadzenColumn Size="12" SizeMD="4" Style="display: flex; justify-content: flex-end;">
+                    <RadzenButton Icon="folder_open" Text="Import / Export" ButtonStyle="ButtonStyle.Secondary" Click="@ToggleImportExport" />
                 </RadzenColumn>
             </RadzenRow>
+
+            @if (showImportExport)
+            {
+                <RadzenCard class="rz-mt-2">
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenButton Icon="download" Text="Export Trips (CSV)" ButtonStyle="ButtonStyle.Secondary" Click="@ExportTrips" />
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="8" Style="display: flex; gap: 0.5rem; align-items: center;">
+                            <InputFile OnChange="@OnFileSelected" style="flex: 1" />
+                            <RadzenButton Icon="upload" Text="Import" Click="OnImport" Disabled="@(importing || selectedFile is null)" />
+                            @if (!string.IsNullOrEmpty(importMessage))
+                            {
+                                <span style="color: @(importError ? "#dc3545" : "#198754"); font-size: 0.9rem;">@importMessage</span>
+                            }
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
+            }
 
             <RadzenCard class="rz-mt-3">
                 <RadzenDataGrid @ref="tripsGrid" Data="@trips" TItem="TripDto"
@@ -108,6 +124,43 @@
                 @if (currentEditTrip != null)
                 {
                     <RadzenStack Gap="1rem" class="rz-mt-3">
+                        @if (isAddingNewTrip)
+                        {
+                            @if (isItineraryParserAvailabilityChecked && isItineraryParserAvailable)
+                            {
+                                <RadzenCard>
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                                        <RadzenText TextStyle="TextStyle.Subtitle2">Quick Itinerary Parser</RadzenText>
+                                        <RadzenButton Icon="flight" Text="Parse Itinerary" ButtonStyle="ButtonStyle.Info" Click="@OpenItineraryParserDialog" />
+                                        @if (parsedDraftTrips.Count > 0)
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption">Parsed legs: @parsedDraftTrips.Count (Leg @(currentParsedDraftIndex + 1) selected)</RadzenText>
+                                        }
+                                    </RadzenStack>
+
+                                    @if (!string.IsNullOrEmpty(itineraryParsingError))
+                                    {
+                                        <RadzenAlert Severity="AlertSeverity.Error" Style="margin-top: 0.75rem;">
+                                            <strong>Parsing Error:</strong> @itineraryParsingError
+                                        </RadzenAlert>
+                                    }
+
+                                    @if (itineraryParsingSuccess)
+                                    {
+                                        <RadzenAlert Severity="AlertSeverity.Success" Style="margin-top: 0.75rem;">
+                                            <strong>Itinerary loaded.</strong> Review each leg before saving.
+                                        </RadzenAlert>
+                                    }
+                                </RadzenCard>
+                            }
+                            else if (isItineraryParserAvailabilityChecked)
+                            {
+                                <RadzenAlert Severity="AlertSeverity.Info">
+                                    Itinerary parser is unavailable until OpenAI configuration is set.
+                                </RadzenAlert>
+                            }
+                        }
+
                         <RadzenText TextStyle="TextStyle.Subtitle1">Departure Information</RadzenText>
                         <AirportSelector Label="Departure Airport" 
                                         @bind-City="currentEditTrip.DepartureCity"
@@ -151,11 +204,23 @@
                                              Style="flex: 1" />
                         </RadzenStack>
 
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
-                            <RadzenButton Icon="check" Text="Save Trip" Click="@(() => SaveDetailedTrip())" ButtonStyle="ButtonStyle.Success" />
-                            <RadzenButton Icon="playlist_add" Text="Save and Add Leg" Click="@(() => SaveDetailedTrip(addLegAfterSave: true))" ButtonStyle="ButtonStyle.Info" />
-                            <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
-                        </RadzenStack>
+                        @if (parsedDraftTrips.Count > 0)
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3" Wrap="FlexWrap.Wrap">
+                                <RadzenButton Icon="navigate_before" Text="Previous Leg" Click="@ShowPreviousParsedDraft" ButtonStyle="ButtonStyle.Light" Disabled="@(currentParsedDraftIndex <= 0)" />
+                                <RadzenButton Icon="navigate_next" Text="Next Leg" Click="@ShowNextParsedDraft" ButtonStyle="ButtonStyle.Light" Disabled="@(currentParsedDraftIndex >= parsedDraftTrips.Count - 1)" />
+                                <RadzenButton Icon="done_all" Text="Save Parsed Legs" Click="@SaveParsedDraftTrips" ButtonStyle="ButtonStyle.Success" />
+                                <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
+                            </RadzenStack>
+                        }
+                        else
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-3">
+                                <RadzenButton Icon="check" Text="Save Trip" Click="@(() => SaveDetailedTrip())" ButtonStyle="ButtonStyle.Success" />
+                                <RadzenButton Icon="playlist_add" Text="Save and Add Leg" Click="@(() => SaveDetailedTrip(addLegAfterSave: true))" ButtonStyle="ButtonStyle.Info" />
+                                <RadzenButton Icon="close" Text="Cancel" Click="@CancelDetailedEdit" ButtonStyle="ButtonStyle.Light" />
+                            </RadzenStack>
+                        }
                         
                         @if (!string.IsNullOrEmpty(validationMessage))
                         {
