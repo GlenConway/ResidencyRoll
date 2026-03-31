@@ -55,7 +55,12 @@
                                     </RadzenText>
                                 </RadzenColumn>
                                 <RadzenColumn Size="6" Style="text-align: right;">
-                                    @if (summary.IsApproachingThreshold)
+                                    @if (IsHomeCountry(summary.CountryName))
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Home Country"
+                                            Style="font-size: 0.7rem;" />
+                                    }
+                                    else if (summary.IsApproachingThreshold)
                                     {
                                         <RadzenBadge BadgeStyle="BadgeStyle.Warning"
                                             Text="@($"⚠️ {summary.DaysUntilThreshold} days left")" Style="font-size: 0.7rem;" />

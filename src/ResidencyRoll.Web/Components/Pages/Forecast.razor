@@ -185,7 +185,7 @@
                             {
                                 var isVisitedCountry = visitedCountries.Contains(kvp.Key);
                                 var daysInCountry = kvp.Value;
-                                var exceedsLimit = daysInCountry > 183;
+                                var exceedsLimit = daysInCountry > 183 && !IsHomeCountry(kvp.Key);
                                 var style = isVisitedCountry ? (exceedsLimit ? "background: #f8d7da; border: 2px solid #dc3545;" : "background: #d4edda; border: 2px solid #28a745;") : "background: #f8f9fa;";
                                 var tripDuration = GetTripDurationDays();
                                 
@@ -219,7 +219,7 @@
             {
                 var forecastCountryDays = forecastDaysPerCountry.ContainsKey(primaryCountry) ? forecastDaysPerCountry[primaryCountry] : 0;
                 
-                @if (forecastCountryDays > 183)
+                @if (forecastCountryDays > 183 && !IsHomeCountry(primaryCountry))
                 {
                     <div style="margin-top: 2rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
                         <h3 style="margin-top: 0;">183-Day Limit Warning</h3>

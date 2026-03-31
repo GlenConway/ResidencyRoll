@@ -10,11 +10,14 @@ public partial class ResidencyStatusDashboard
 {
     private List<ResidencySummaryDto> summaries = new();
     private bool loading = false;
+    private string? homeCountry;
 
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
+    [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
+        homeCountry = await LocalStorage.GetItemAsync("residencyroll_home_country");
         await LoadData();
     }
 
@@ -45,9 +48,13 @@ public partial class ResidencyStatusDashboard
 
     private string GetCardStyle(ResidencySummaryDto summary)
     {
-        if (summary.TotalDays >= summary.ThresholdDays)
+        if (summary.TotalDays >= summary.ThresholdDays && !IsHomeCountry(summary.CountryName))
         {
             return "border-left: 4px solid #f44336;"; // Red for over threshold
+        }
+        else if (IsHomeCountry(summary.CountryName))
+        {
+            return "border-left: 4px solid #4caf50;"; // Home country over-threshold is expected
         }
         else if (summary.IsApproachingThreshold)
         {
@@ -71,10 +78,16 @@ public partial class ResidencyStatusDashboard
 
     private ProgressBarStyle GetProgressBarStyle(ResidencySummaryDto summary)
     {
-        if (summary.TotalDays >= summary.ThresholdDays)
+        if (summary.TotalDays >= summary.ThresholdDays && !IsHomeCountry(summary.CountryName))
             return ProgressBarStyle.Danger;
         if (summary.IsApproachingThreshold)
             return ProgressBarStyle.Warning;
         return ProgressBarStyle.Success;
+    }
+
+    private bool IsHomeCountry(string countryName)
+    {
+        return !string.IsNullOrWhiteSpace(homeCountry)
+            && string.Equals(countryName, homeCountry, StringComparison.OrdinalIgnoreCase);
     }
 }

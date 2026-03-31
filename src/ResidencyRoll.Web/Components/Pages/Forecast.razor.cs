@@ -23,6 +23,7 @@ public partial class Forecast
     private Dictionary<string, int> forecastDaysPerCountry = new();
     private List<StandardDurationForecastItemDto> standardDurationForecasts = new();
     private List<string> validationIssues = new();
+    private string? homeCountry;
     
     // Itinerary parsing state
     private string itineraryParsingError = string.Empty;
@@ -34,9 +35,12 @@ public partial class Forecast
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private ILogger<Forecast> Logger { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
+        homeCountry = await LocalStorage.GetItemAsync("residencyroll_home_country");
+
         if (!hasInitialized && legs.Count == 0)
         {
             hasInitialized = true;
@@ -433,6 +437,12 @@ public partial class Forecast
         {
             return localTime;
         }
+    }
+
+    private bool IsHomeCountry(string countryName)
+    {
+        return !string.IsNullOrWhiteSpace(homeCountry)
+            && string.Equals(countryName, homeCountry, StringComparison.OrdinalIgnoreCase);
     }
     
     private class TripLegEditModel
