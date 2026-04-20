@@ -17,9 +17,13 @@
             <RadzenLabel Text="End Date" Style="display: block; font-size: 0.8rem;" />
             <RadzenDatePicker @bind-Value="endDate" DateFormat="yyyy-MM-dd" Style="width: 100%;" />
         </RadzenColumn>
-        <RadzenColumn Size="12" SizeMD="4">
+        <RadzenColumn Size="12" SizeMD="2">
             <RadzenButton Text="Calculate" Icon="calculate" ButtonStyle="ButtonStyle.Primary"
                 Click="@LoadData" Style="width: 100%;" />
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="2">
+            <RadzenButton Text="Export CSV" Icon="download" ButtonStyle="ButtonStyle.Secondary"
+                Click="@ExportDailyPresence" Style="width: 100%;" />
         </RadzenColumn>
     </RadzenRow>
 

@@ -201,14 +201,34 @@ public class TripsApiClient
         var response = await _httpClient.GetAsync($"{BaseRoute}/export");
         response.EnsureSuccessStatusCode();
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        
+
         // Extract filename from Content-Disposition header
         var filename = "trips.csv";
         if (response.Content.Headers.ContentDisposition?.FileName is not null)
         {
             filename = response.Content.Headers.ContentDisposition.FileName.Trim('"');
         }
-        
+
+        return (bytes, filename);
+    }
+
+    public async Task<(byte[], string)> ExportDailyPresenceAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var queryParams = new List<string>();
+        if (startDate.HasValue)
+            queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+        if (endDate.HasValue)
+            queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+        var query = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
+
+        var response = await _httpClient.GetAsync($"{BaseRoute}/daily-presence-export{query}");
+        response.EnsureSuccessStatusCode();
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+
+        var filename = "daily_presence.csv";
+        if (response.Content.Headers.ContentDisposition?.FileName is not null)
+            filename = response.Content.Headers.ContentDisposition.FileName.Trim('"');
+
         return (bytes, filename);
     }
 

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Radzen;
 using Radzen.Blazor;
 using ResidencyRoll.Shared.Trips;
@@ -16,6 +17,7 @@ public partial class ResidencyStatusDashboard
 
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -91,5 +93,21 @@ public partial class ResidencyStatusDashboard
     {
         return !string.IsNullOrWhiteSpace(homeCountry)
             && string.Equals(countryName, homeCountry, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task ExportDailyPresence()
+    {
+        try
+        {
+            var (csvBytes, filename) = await ApiClient.ExportDailyPresenceAsync(
+                DateOnly.FromDateTime(startDate),
+                DateOnly.FromDateTime(endDate));
+            var base64 = Convert.ToBase64String(csvBytes);
+            await JS.InvokeVoidAsync("downloadFile", filename, "text/csv", base64);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Export failed: {ex.Message}");
+        }
     }
 }

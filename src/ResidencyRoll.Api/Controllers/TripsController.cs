@@ -345,6 +345,42 @@ public class TripsController : ControllerBase
         return File(bytes, "text/csv", filename);
     }
 
+    [HttpGet("daily-presence-export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportDailyPresence(
+        [FromQuery] DateOnly? startDate = null,
+        [FromQuery] DateOnly? endDate = null)
+    {
+        var userId = GetUserId();
+        var trips = await _tripService.GetAllTripsAsync(userId);
+        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
+
+        var filteredPresence = dailyPresence.AsEnumerable();
+        if (startDate.HasValue)
+            filteredPresence = filteredPresence.Where(dp => dp.Date >= startDate.Value);
+        if (endDate.HasValue)
+            filteredPresence = filteredPresence.Where(dp => dp.Date <= endDate.Value);
+
+        var csvLines = new List<string> { "date,primary_country,secondary_country" };
+
+        foreach (var dp in filteredPresence.OrderBy(dp => dp.Date))
+        {
+            var primary = dp.LocationAtMidnight;
+            var secondary = string.Join(";", dp.LocationsDuringDay
+                .Where(l => !string.Equals(l, primary, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(l => l));
+
+            csvLines.Add(string.Join(',',
+                dp.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                EscapeCsv(primary),
+                EscapeCsv(secondary)));
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(string.Join('\n', csvLines));
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        return File(bytes, "text/csv", $"daily_presence_{timestamp}.csv");
+    }
+
     [HttpPost("import")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
