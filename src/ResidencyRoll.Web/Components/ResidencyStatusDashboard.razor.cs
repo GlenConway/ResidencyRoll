@@ -11,12 +11,16 @@ public partial class ResidencyStatusDashboard
     private List<ResidencySummaryDto> summaries = new();
     private bool loading = false;
     private string? homeCountry;
+    private DateTime startDate;
+    private DateTime endDate;
 
     [Inject] private TripsApiClient ApiClient { get; set; } = default!;
     [Inject] private LocalStorageService LocalStorage { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
+        endDate = DateTime.Today;
+        startDate = endDate.AddDays(-365);
         homeCountry = await LocalStorage.GetItemAsync("residencyroll_home_country");
         await LoadData();
     }
@@ -28,11 +32,9 @@ public partial class ResidencyStatusDashboard
 
         try
         {
-            // Get last 365 days
-            var endDate = DateOnly.FromDateTime(DateTime.Today);
-            var startDate = endDate.AddDays(-365);
-            
-            summaries = await ApiClient.GetResidencySummaryAsync(startDate, endDate);
+            summaries = await ApiClient.GetResidencySummaryAsync(
+                DateOnly.FromDateTime(startDate),
+                DateOnly.FromDateTime(endDate));
         }
         catch (Exception ex)
         {

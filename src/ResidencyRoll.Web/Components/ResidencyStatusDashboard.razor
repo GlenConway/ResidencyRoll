@@ -5,8 +5,23 @@
 <RadzenCard Style="height: 100%;">
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Residency Status Dashboard</RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">
-        Last 365 days residency calculation based on midnight and partial-day rules
+        Residency calculation based on midnight and partial-day rules
     </RadzenText>
+
+    <RadzenRow Gap="0.5rem" class="rz-mt-3 rz-mb-1" AlignItems="AlignItems.End">
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenLabel Text="Start Date" Style="display: block; font-size: 0.8rem;" />
+            <RadzenDatePicker @bind-Value="startDate" DateFormat="yyyy-MM-dd" Style="width: 100%;" />
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenLabel Text="End Date" Style="display: block; font-size: 0.8rem;" />
+            <RadzenDatePicker @bind-Value="endDate" DateFormat="yyyy-MM-dd" Style="width: 100%;" />
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenButton Text="Calculate" Icon="calculate" ButtonStyle="ButtonStyle.Primary"
+                Click="@LoadData" Style="width: 100%;" />
+        </RadzenColumn>
+    </RadzenRow>
 
     @if (loading)
     {
