@@ -4,8 +4,8 @@
 
 <RadzenStack Gap="0.5rem">
     <RadzenLabel Text="@Label" />
-    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Start">
-        <RadzenStack Gap="0.25rem" Style="flex: 1;">
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Start" Wrap="FlexWrap.Wrap">
+        <RadzenStack Gap="0.25rem" Style="flex: 1 1 14rem; min-width: 0;">
             <RadzenAutoComplete @bind-Value="@searchText" 
                                 Data="@filteredAirports" 
                                 TextProperty="DisplayName"
@@ -22,7 +22,17 @@
                 </RadzenText>
             }
         </RadzenStack>
-        
+
+        @ChildContent
+
+        @if (ShowManualOverride && !string.IsNullOrEmpty(SelectedTimezone))
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Style="flex: none; min-height: 40px;">
+                <RadzenCheckBox @bind-Value="@manualOverride" Name="manualOverride" />
+                <RadzenLabel Text="Manual timezone" Component="manualOverride" Style="font-size: 0.875rem; white-space: nowrap;" />
+            </RadzenStack>
+        }
+
         @if (!string.IsNullOrEmpty(SelectedTimezone) && ShowTimezoneOffset)
         {
             <RadzenBadge BadgeStyle="BadgeStyle.Info" 
@@ -31,24 +41,16 @@
         }
     </RadzenStack>
     
-    @if (ShowManualOverride && !string.IsNullOrEmpty(SelectedTimezone))
+    @if (ShowManualOverride && !string.IsNullOrEmpty(SelectedTimezone) && manualOverride)
     {
-        <RadzenStack Gap="0.25rem">
-            <RadzenCheckBox @bind-Value="@manualOverride" Name="manualOverride" />
-            <RadzenLabel Text="Manual timezone override" Component="manualOverride" Style="font-size: 0.875rem;" />
-            
-            @if (manualOverride)
-            {
-                <RadzenDropDown @bind-Value="@SelectedTimezone" 
-                                Data="@allTimezones" 
-                                TextProperty="DisplayName"
-                                ValueProperty="TimezoneId"
-                                AllowFiltering="true"
-                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                Placeholder="Select timezone manually"
-                                Style="width: 100%; margin-top: 0.5rem;"
-                                Change="@OnManualTimezoneChanged" />
-            }
-        </RadzenStack>
+        <RadzenDropDown @bind-Value="@SelectedTimezone" 
+                        Data="@allTimezones" 
+                        TextProperty="DisplayName"
+                        ValueProperty="TimezoneId"
+                        AllowFiltering="true"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                        Placeholder="Select timezone manually"
+                        Style="width: 100%;"
+                        Change="@OnManualTimezoneChanged" />
     }
 </RadzenStack>

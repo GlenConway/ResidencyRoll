@@ -17,6 +17,7 @@ public partial class AirportSelector
     [Parameter] public EventCallback<string?> IataCodeChanged { get; set; }
     [Parameter] public bool ShowManualOverride { get; set; } = true;
     [Parameter] public bool ShowTimezoneOffset { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private string searchText = string.Empty;
     private List<AirportData> filteredAirports = new();

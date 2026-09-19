@@ -97,20 +97,18 @@
                                         @bind-SelectedTimezone="leg.DepartureTimezone"
                                         @bind-IataCode="leg.DepartureIataCode"
                                         ShowTimezoneOffset="true"
-                                        ShowManualOverride="true" />
-                        
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
-                            <RadzenDatePicker @bind-Value="leg.DepartureDate"
+                                        ShowManualOverride="true">
+                                    <RadzenDatePicker @bind-Value="leg.DepartureDate"
                                              Placeholder="Departure Date"
                                              DateFormat="yyyy-MM-dd"
                                              Change="@(args => OnDepartureDateChanged(leg, args))"
-                                             Style="flex: 1" />
-                            <RadzenDatePicker @bind-Value="leg.DepartureTime"
+                                             Style="width: 10rem; flex: none;" />
+                                    <RadzenDatePicker @bind-Value="leg.DepartureTime"
                                              TimeOnly="true" ShowTime="true"
                                              DateFormat="HH:mm"
                                              Placeholder="Departure Time"
-                                             Style="flex: 1" />
-                        </RadzenStack>
+                                             Style="width: 7rem; flex: none;" />
+                                </AirportSelector>
                     </div>
 
                     <div>
@@ -121,19 +119,17 @@
                                         @bind-SelectedTimezone="leg.ArrivalTimezone"
                                         @bind-IataCode="leg.ArrivalIataCode"
                                         ShowTimezoneOffset="true"
-                                        ShowManualOverride="true" />
-                        
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
-                            <RadzenDatePicker @bind-Value="leg.ArrivalDate"
+                                        ShowManualOverride="true">
+                                    <RadzenDatePicker @bind-Value="leg.ArrivalDate"
                                              Placeholder="Arrival Date"
                                              DateFormat="yyyy-MM-dd"
-                                             Style="flex: 1" />
-                            <RadzenDatePicker @bind-Value="leg.ArrivalTime"
+                                             Style="width: 10rem; flex: none;" />
+                                    <RadzenDatePicker @bind-Value="leg.ArrivalTime"
                                              TimeOnly="true" ShowTime="true"
                                              DateFormat="HH:mm"
                                              Placeholder="Arrival Time"
-                                             Style="flex: 1" />
-                        </RadzenStack>
+                                             Style="width: 7rem; flex: none;" />
+                                </AirportSelector>
                     </div>
                 </div>
             </RadzenCard>
