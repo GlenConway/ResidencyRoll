@@ -81,3 +81,12 @@ public partial class Component
 - Easier to navigate and test
 - Cleaner version control diffs
 - Better IDE support for code refactoring
+
+## Documentation structure
+
+- All project docs live under `docs/`. See `docs/README.md` for the index.
+- **ADRs** are in `docs/adr/`. Read relevant ADRs before making significant design or architecture changes.
+- **Milestones** are in `docs/development-plan/`.
+- **Guides** are in `docs/guides/`.
+- When adding an ADR, follow `docs/adr/README.md` and increment the number.
+- Update the milestone list when a milestone starts or completes.
