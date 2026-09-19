@@ -5,27 +5,20 @@
 <RadzenCard>
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3">Daily Presence Timeline</RadzenText>
     
-    <RadzenRow Gap="1rem" class="rz-mt-3">
-        <RadzenColumn Size="12" SizeMD="6">
-            <RadzenDatePicker @bind-Value="@startDate" Placeholder="Start Date" 
-                            DateFormat="yyyy-MM-dd" Change="@LoadData" />
-        </RadzenColumn>
-        <RadzenColumn Size="12" SizeMD="6">
-            <RadzenDatePicker @bind-Value="@endDate" Placeholder="End Date" 
-                            DateFormat="yyyy-MM-dd" Change="@LoadData" />
-        </RadzenColumn>
-    </RadzenRow>
-
-    @if (availableCountries.Count > 0)
-    {
-        <RadzenRow Gap="1rem" class="rz-mt-3">
-            <RadzenColumn Size="12" SizeMD="6">
-                <RadzenLabel Text="Home Country" for="homeCountry" />
-                <RadzenDropDown @bind-Value="@homeCountry" Data="@availableCountries" 
-                               id="homeCountry" Placeholder="Select home country" />
-            </RadzenColumn>
-        </RadzenRow>
-    }
+    <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mt-3">
+        <RadzenDatePicker @bind-Value="@startDate" Placeholder="Start Date"
+                        DateFormat="yyyy-MM-dd" Change="@LoadData" Style="width: 10rem;" />
+        <RadzenDatePicker @bind-Value="@endDate" Placeholder="End Date"
+                        DateFormat="yyyy-MM-dd" Change="@LoadData" Style="width: 10rem;" />
+        @if (availableCountries.Count > 0)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenLabel Text="Home Country" Component="homeCountry" Style="white-space: nowrap;" />
+                <RadzenDropDown @bind-Value="@homeCountry" Data="@availableCountries"
+                               Name="homeCountry" Placeholder="Select home country" Style="width: 14rem;" />
+            </RadzenStack>
+        }
+    </RadzenStack>
 
     @if (loading)
     {
