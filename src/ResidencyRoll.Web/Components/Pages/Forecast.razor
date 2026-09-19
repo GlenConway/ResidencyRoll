@@ -106,7 +106,7 @@
                                              Change="@(args => OnDepartureDateChanged(leg, args))"
                                              Style="flex: 1" />
                             <RadzenDatePicker @bind-Value="leg.DepartureTime"
-                                             TimeOnly="true"
+                                             TimeOnly="true" ShowTime="true"
                                              DateFormat="HH:mm"
                                              Placeholder="Departure Time"
                                              Style="flex: 1" />
@@ -129,7 +129,7 @@
                                              DateFormat="yyyy-MM-dd"
                                              Style="flex: 1" />
                             <RadzenDatePicker @bind-Value="leg.ArrivalTime"
-                                             TimeOnly="true"
+                                             TimeOnly="true" ShowTime="true"
                                              DateFormat="HH:mm"
                                              Placeholder="Arrival Time"
                                              Style="flex: 1" />
