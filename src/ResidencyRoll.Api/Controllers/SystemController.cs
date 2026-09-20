@@ -68,8 +68,7 @@ public class SystemController : ControllerBase
             return NotFound();
         }
 
-        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return File(stream, "application/vnd.sqlite3", fileName);
+        return PhysicalFile(path, "application/vnd.sqlite3", fileName);
     }
 
     [HttpPost("backup")]
