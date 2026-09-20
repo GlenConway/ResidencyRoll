@@ -11,7 +11,7 @@ ResidencyRoll tracks international travel and calculates days spent in each coun
 ```
 src/
 ├── ResidencyRoll.Api/      ASP.NET Core Web API: EF Core + SQLite, residency engine, itinerary parsing
-│   ├── Controllers/        TripsController (/api/v1/trips, versioned)
+│   ├── Controllers/        TripsController (/api/v1/trips), SystemController (/api/v1/system/info)
 │   ├── Services/           TripService, ResidencyCalculationService, ItineraryParsingService
 │   ├── Models/             Trip, DailyPresence, CountryResidencyRule, ResidencyRuleType
 │   ├── Configuration/      OpenAIOptions, ConfigureSwaggerOptions

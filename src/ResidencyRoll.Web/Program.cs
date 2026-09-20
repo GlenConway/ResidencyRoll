@@ -185,6 +185,13 @@ builder.Services.AddHttpClient<TripsApiClient>(client =>
 })
 .AddHttpMessageHandler<ApiAuthenticationHandler>();
 
+builder.Services.AddHttpClient<SystemApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.AddHttpMessageHandler<ApiAuthenticationHandler>();
+
 // Register utility services
 builder.Services.AddScoped<CountryColorService>();
 builder.Services.AddScoped<LocalStorageService>();

@@ -1124,3 +1124,22 @@ input.rz-autocomplete-input:focus {
         padding: var(--cds-spacing-05);
     }
 }
+
+/* SYSTEM INFO PAGE */
+.system-info-table {
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+.system-info-table th {
+  text-align: left;
+  padding: 0.5rem 2rem 0.5rem 0;
+  font-weight: 600;
+  color: var(--cds-text-secondary);
+  white-space: nowrap;
+}
+
+.system-info-table td {
+  padding: 0.5rem 0;
+  word-break: break-all;
+}
