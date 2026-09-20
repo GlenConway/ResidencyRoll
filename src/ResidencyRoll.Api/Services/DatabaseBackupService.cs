@@ -94,7 +94,7 @@ public class DatabaseBackupService : BackgroundService
         var dbPath = Path.GetFullPath(new SqliteConnectionStringBuilder(connectionString).DataSource);
         var configured = _options.Value.Directory;
         var directory = string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(Path.GetDirectoryName(dbPath)!, "backups")
+            ? Path.Join(Path.GetDirectoryName(dbPath)!, "backups")
             : Path.GetFullPath(configured);
         return (dbPath, directory);
     }
@@ -135,7 +135,7 @@ public class DatabaseBackupService : BackgroundService
             return null;
         }
 
-        var path = Path.Combine(ResolvePaths().Directory, fileName);
+        var path = Path.Join(ResolvePaths().Directory, fileName);
         return File.Exists(path) ? path : null;
     }
 
@@ -148,7 +148,7 @@ public class DatabaseBackupService : BackgroundService
             Directory.CreateDirectory(directory);
 
             var stamp = _timeProvider.GetUtcNow().ToString(TimestampFormat);
-            var finalPath = Path.Combine(directory, $"{FilePrefix}{stamp}{FileExtension}");
+            var finalPath = Path.Join(directory, $"{FilePrefix}{stamp}{FileExtension}");
             var tempPath = finalPath + ".tmp";
 
             using (var sourceConnection = new SqliteConnection(new SqliteConnectionStringBuilder

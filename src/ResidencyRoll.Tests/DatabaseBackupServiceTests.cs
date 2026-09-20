@@ -40,11 +40,11 @@ public class DatabaseBackupServiceTests
     [Fact]
     public void Backup_MoreThanRetainCount_ShouldKeepOnlyNewestBackups()
     {
-        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var root = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
-            var dbPath = Path.Combine(root, "test.db");
+            var dbPath = Path.Join(root, "test.db");
             using (var conn = new SqliteConnection($"Data Source={dbPath};Pooling=False"))
             {
                 conn.Open();
@@ -65,7 +65,7 @@ public class DatabaseBackupServiceTests
 
             for (var week = 0; week < 6; week++)
             {
-                time.Now = new DateTimeOffset(2026, 9, 7, 4, 0, 0, TimeSpan.Zero).AddDays(7 * week);
+                time.Now = new DateTimeOffset(2026, 9, 7, 4, 0, 0, TimeSpan.Zero).AddDays(7.0 * week);
                 service.Backup();
             }
 
@@ -73,7 +73,7 @@ public class DatabaseBackupServiceTests
             Assert.Equal(4, backups.Count);
             Assert.Equal("residencyroll-20261012-040000.db", backups[0].FileName);
             Assert.Equal("residencyroll-20260921-040000.db", backups[3].FileName);
-            Assert.Empty(Directory.GetFiles(Path.Combine(root, "backups"), "*.tmp"));
+            Assert.Empty(Directory.GetFiles(Path.Join(root, "backups"), "*.tmp"));
         }
         finally
         {
