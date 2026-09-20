@@ -50,6 +50,8 @@ public class ItineraryParsingService
         try
         {
             Logger.Information("Starting itinerary parsing for text of length {Length}", itineraryText.Length);
+            // Debug only: the text can contain booking details, so it stays out of the default logs
+            Logger.Debug("Itinerary text submitted for parsing: {ItineraryText}", itineraryText);
 
             // Create the Semantic Kernel instance with OpenAI chat completion
 #pragma warning disable SKEXP0010
