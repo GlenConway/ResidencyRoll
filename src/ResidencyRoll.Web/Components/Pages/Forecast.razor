@@ -154,13 +154,13 @@
                             @foreach (var kvp in currentDaysPerCountry.OrderByDescending(x => x.Value))
                             {
                                 <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">
-                                    <span><strong>@kvp.Key</strong></span>
+                                    <span><strong>@kvp.Key</strong>@if (IsHomeCountry(kvp.Key)) { <span style="font-size: 0.9rem; margin-left: 0.5rem;">(home)</span> }</span>
                                     <span>@kvp.Value days</span>
                                 </div>
                             }
                             <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
-                                <span>Total Away</span>
-                                <span>@currentDaysPerCountry.Values.Sum() days</span>
+                                <span>Total Away@(string.IsNullOrWhiteSpace(homeCountry) ? "" : " (excl. home)")</span>
+                                <span>@currentDaysPerCountry.Where(x => !IsHomeCountry(x.Key)).Sum(x => x.Value) days</span>
                             </div>
                         }
                     </div>
@@ -188,6 +188,10 @@
                                 <div style="display: flex; justify-content: space-between; padding: 0.75rem; @style border-radius: 4px;">
                                     <span>
                                         <strong>@kvp.Key</strong>
+                                        @if (IsHomeCountry(kvp.Key))
+                                        {
+                                            <span style="font-size: 0.9rem; margin-left: 0.5rem;">(home)</span>
+                                        }
                                         @if (isVisitedCountry && tripDuration > 0)
                                         {
                                             <span style="font-size: 0.9rem; margin-left: 0.5rem;">
@@ -203,8 +207,8 @@
                                 </div>
                             }
                             <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #e7f1ff; border-radius: 4px; font-weight: 600; margin-top: 0.5rem;">
-                                <span>Total Away</span>
-                                <span>@forecastDaysPerCountry.Values.Sum() days</span>
+                                <span>Total Away@(string.IsNullOrWhiteSpace(homeCountry) ? "" : " (excl. home)")</span>
+                                <span>@forecastDaysPerCountry.Where(x => !IsHomeCountry(x.Key)).Sum(x => x.Value) days</span>
                             </div>
                         }
                     </div>
