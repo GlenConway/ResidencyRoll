@@ -183,6 +183,14 @@ Itinerary text:
             cleaned = cleaned[..^3].Trim();
         }
 
+        // The model sometimes adds prose around the array; keep only the array itself
+        var start = cleaned.IndexOf('[');
+        var end = cleaned.LastIndexOf(']');
+        if (start >= 0 && end > start)
+        {
+            cleaned = cleaned[start..(end + 1)];
+        }
+
         return cleaned;
     }
 
@@ -198,6 +206,14 @@ Itinerary text:
         {
             // Clean the response text (remove markdown code blocks if present)
             var cleanedJson = CleanJsonResponse(responseText);
+
+            // No array in the reply means the model answered in prose (a refusal or a question)
+            if (!cleanedJson.StartsWith('['))
+            {
+                Log.ForContext<ItineraryParsingService>().Warning("Model returned no JSON array: {Response}", responseText);
+                result.Error = "The model could not extract flights from this text. Check that it includes airports, dates and times.";
+                return result;
+            }
 
             // Try to parse the response as a JSON array
             using (var jsonDoc = JsonDocument.Parse(cleanedJson))
