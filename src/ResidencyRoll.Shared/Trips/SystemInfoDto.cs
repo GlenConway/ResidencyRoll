@@ -9,4 +9,6 @@ public class SystemInfoDto
     public int TripCount { get; set; }
     public string ApplicationVersion { get; set; } = string.Empty;
     public string Environment { get; set; } = string.Empty;
+    public List<BackupInfoDto> Backups { get; set; } = new();
+    public DateTimeOffset? NextBackupUtc { get; set; }
 }

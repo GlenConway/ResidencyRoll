@@ -32,6 +32,47 @@ else if (info != null)
     </RadzenCard>
 
     <RadzenCard class="rz-mt-3">
+        <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H2">Backups</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="system-backups-summary">
+            @(info.NextBackupUtc is { } next
+                ? $"Next scheduled backup: {next:yyyy-MM-dd HH:mm} UTC (weekly, Mondays)"
+                : "Scheduled backups are disabled.")
+        </RadzenText>
+        <RadzenButton Text="Backup now" Click="BackupNowAsync" Disabled="backingUp" IsBusy="backingUp" />
+        @if (backupMessage != null)
+        {
+            <RadzenAlert class="rz-mt-3" AlertStyle="@(backupFailed ? AlertStyle.Danger : AlertStyle.Success)" Variant="Variant.Flat" AllowClose="false">@backupMessage</RadzenAlert>
+        }
+        @if (info.Backups.Count == 0)
+        {
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-mt-4">No backups yet.</RadzenText>
+        }
+        else
+        {
+            <table class="system-backups-table">
+                <thead>
+                    <tr><th>File</th><th>Created (UTC)</th><th>Size</th><th><span class="rz-sr-only">Download</span></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var backup in info.Backups)
+                    {
+                        <tr>
+                            <td><code>@backup.FileName</code></td>
+                            <td>@backup.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@FormatSize(backup.SizeBytes)</td>
+                            <td>
+                                <a class="rz-button rz-button-sm rz-variant-filled rz-light rz-shadow-0" href="/app/system/backups/@Uri.EscapeDataString(backup.FileName)" download="@backup.FileName" data-enhance-nav="false" target="_top">
+                                    <span class="rz-button-box"><span class="rz-button-text">Download</span></span>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </RadzenCard>
+
+    <RadzenCard class="rz-mt-3">
         <RadzenText TextStyle="TextStyle.H6" TagName="TagName.H2">Application</RadzenText>
         <table class="system-info-table">
             <tbody>

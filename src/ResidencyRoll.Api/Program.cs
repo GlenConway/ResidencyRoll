@@ -40,6 +40,12 @@ builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<ItineraryParsingService>();
 builder.Services.AddSingleton<ResidencyCalculationService>();
 
+// Weekly SQLite backup (Mondays 04:00 UTC)
+builder.Services.Configure<DatabaseBackupOptions>(builder.Configuration.GetSection("DatabaseBackup"));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<DatabaseBackupService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseBackupService>());
+
 // Configure OpenAI options for Semantic Kernel
 builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
 

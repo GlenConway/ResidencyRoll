@@ -267,6 +267,20 @@ app.MapPost("/logout", async (HttpContext context) =>
         });
 });
 
+// Streams a database backup from the API to the browser as a file download
+app.MapGet("/app/system/backups/{fileName}", async (string fileName, HttpContext httpContext, SystemApiClient apiClient) =>
+{
+    var response = await apiClient.GetBackupAsync(fileName);
+    if (response == null)
+    {
+        return Results.NotFound();
+    }
+
+    httpContext.Response.RegisterForDispose(response);
+    var stream = await response.Content.ReadAsStreamAsync();
+    return Results.File(stream, "application/vnd.sqlite3", fileName);
+}).RequireAuthorization();
+
 // NOW register Razor components
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

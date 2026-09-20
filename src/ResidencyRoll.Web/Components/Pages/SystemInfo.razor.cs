@@ -12,6 +12,9 @@ public partial class SystemInfo
     private SystemInfoDto? info;
     private bool loading = true;
     private string? errorMessage;
+    private bool backingUp;
+    private bool backupFailed;
+    private string? backupMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -27,6 +30,29 @@ public partial class SystemInfo
         finally
         {
             loading = false;
+        }
+    }
+
+    private async Task BackupNowAsync()
+    {
+        backingUp = true;
+        backupMessage = null;
+        try
+        {
+            var backup = await ApiClient.BackupNowAsync();
+            backupFailed = false;
+            backupMessage = $"Backup created: {backup?.FileName}";
+            info = await ApiClient.GetSystemInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Manual backup failed");
+            backupFailed = true;
+            backupMessage = "Backup failed. Check the API logs.";
+        }
+        finally
+        {
+            backingUp = false;
         }
     }
 

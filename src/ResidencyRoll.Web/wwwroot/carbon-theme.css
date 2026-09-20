@@ -1144,6 +1144,37 @@ input.rz-autocomplete-input:focus {
   word-break: break-all;
 }
 
+.system-backups-summary {
+  margin: 0.5rem 0 1rem;
+}
+
+.system-backups-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.25rem;
+}
+
+.system-backups-table th {
+  text-align: left;
+  padding: 0.75rem 2.5rem 0.75rem 0;
+  font-weight: 600;
+  color: var(--cds-text-secondary);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--cds-border-subtle-00);
+}
+
+.system-backups-table td {
+  padding: 1rem 2.5rem 1rem 0;
+  border-bottom: 1px solid var(--cds-border-subtle-00);
+  vertical-align: middle;
+}
+
+.system-backups-table th:last-child,
+.system-backups-table td:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+
 /* Use the Carbon font for Radzen so the Source Sans 3 font files (~300 KB) are never requested */
 :root {
     --rz-text-font-family: var(--cds-font-family);
