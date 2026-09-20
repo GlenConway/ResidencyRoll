@@ -61,7 +61,6 @@ Local settings: copy `appsettings.Development.json.example` to `appsettings.Deve
 - **Tests:** xUnit with plain `Assert` (no Shouldly or Moq packages are referenced). Name tests `MethodName_Condition_ShouldExpectedBehavior`. Tests live in `src/ResidencyRoll.Tests/`.
 - **EF migrations:** generate with `dotnet ef`. Do not hand-edit migration files or `ApplicationDbContextModelSnapshot.cs`.
 - **Secrets:** never commit client secrets, API keys or `appsettings.Development.json`.
-- **Line endings:** `.gitattributes` enforces CRLF.
 - **Commits:** conventional style (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).
 
 ## Documentation
