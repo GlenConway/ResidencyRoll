@@ -1143,3 +1143,8 @@ input.rz-autocomplete-input:focus {
   padding: 0.5rem 0;
   word-break: break-all;
 }
+
+/* Use the Carbon font for Radzen so the Source Sans 3 font files (~300 KB) are never requested */
+:root {
+    --rz-text-font-family: var(--cds-font-family);
+}
