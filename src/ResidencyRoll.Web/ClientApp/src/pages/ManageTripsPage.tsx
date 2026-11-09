@@ -241,6 +241,7 @@ export function ManageTripsPage() {
             </div>
           ) : null}
           {tripsQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading trips</p> : null}
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -283,7 +284,7 @@ export function ManageTripsPage() {
               ))}
             </TableBody>
           </Table>
-          <Button className="w-fit" onClick={openNew}>Add Trip</Button>
+          </div>
         </TabsContent>
         {draft ? (
           <TabsContent value="editor" className="flex flex-col gap-4">
@@ -375,7 +376,7 @@ export function ManageTripsPage() {
 
 function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: TripDraft) => void }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 rounded-xl border bg-card p-5 shadow-sm md:grid-cols-2">
       <div className="flex flex-col gap-3">
         <h3 className="font-medium">Departure Information</h3>
         <AirportSelector
@@ -395,6 +396,7 @@ function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: T
             })
           }
         />
+        <div className="grid grid-cols-2 gap-3">
         <Field
           id="departure-date"
           label="Departure Date"
@@ -409,6 +411,7 @@ function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: T
           value={draft.departureTime}
           onChange={(event) => onChange({ ...draft, departureTime: event.target.value })}
         />
+        </div>
       </div>
       <div className="flex flex-col gap-3">
         <h3 className="font-medium">Arrival Information</h3>
@@ -429,6 +432,7 @@ function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: T
             })
           }
         />
+        <div className="grid grid-cols-2 gap-3">
         <Field
           id="arrival-date"
           label="Arrival Date"
@@ -443,6 +447,7 @@ function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: T
           value={draft.arrivalTime}
           onChange={(event) => onChange({ ...draft, arrivalTime: event.target.value })}
         />
+        </div>
       </div>
     </div>
   )

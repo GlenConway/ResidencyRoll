@@ -56,7 +56,7 @@ export function AirportSelector({
         <select
           id={id}
           aria-label="Timezone"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+          className="h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs"
           value={timezone}
           onChange={(event) => {
             const place = manualTimezones.find((item) => item.timezoneId === event.target.value)

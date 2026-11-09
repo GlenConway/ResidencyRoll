@@ -78,7 +78,7 @@ export function ForecastPage() {
   const visited = new Set(legs.map((leg) => leg.arrivalCountry).filter(Boolean))
 
   return (
-    <section>
+    <section className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold tracking-tight">Trip Forecast</h1>
       {parserQuery.data ? (
         <div>
@@ -118,9 +118,9 @@ export function ForecastPage() {
         </Alert>
       ) : null}
       {legs.map((leg, index) => (
-        <article key={leg.id} className="my-4 flex flex-col gap-3 rounded-xl border bg-card p-4">
+        <article key={leg.id} className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3>
+            <h3 className="font-medium">
               Leg {index + 1} ({legLabel(index, legs.length)})
             </h3>
             {legs.length > 1 ? (
@@ -129,7 +129,9 @@ export function ForecastPage() {
               </Button>
             ) : null}
           </div>
-          <h4>Departure</h4>
+          <div className="grid gap-6 md:grid-cols-2">
+          <div className="flex flex-col gap-3">
+          <h4 className="text-sm font-medium text-muted-foreground">Departure</h4>
           <AirportSelector
             id={`forecast-departure-${leg.id}`}
             label="Departure Airport"
@@ -147,6 +149,7 @@ export function ForecastPage() {
               })
             }
           />
+          <div className="grid grid-cols-2 gap-3">
           <Field
             id={`forecast-departure-date-${leg.id}`}
             label="Departure Date"
@@ -161,7 +164,10 @@ export function ForecastPage() {
             value={leg.departureTime}
             onChange={(event) => updateLeg(leg.id, { ...leg, departureTime: event.target.value })}
           />
-          <h4>Arrival</h4>
+          </div>
+          </div>
+          <div className="flex flex-col gap-3">
+          <h4 className="text-sm font-medium text-muted-foreground">Arrival</h4>
           <AirportSelector
             id={`forecast-arrival-${leg.id}`}
             label="Arrival Airport"
@@ -179,6 +185,7 @@ export function ForecastPage() {
               })
             }
           />
+          <div className="grid grid-cols-2 gap-3">
           <Field
             id={`forecast-arrival-date-${leg.id}`}
             label="Arrival Date"
@@ -193,11 +200,14 @@ export function ForecastPage() {
             value={leg.arrivalTime}
             onChange={(event) => updateLeg(leg.id, { ...leg, arrivalTime: event.target.value })}
           />
+          </div>
+          </div>
+          </div>
         </article>
       ))}
-      <Button onClick={() => void calculate()}>Calculate Forecast</Button>
+      <Button className="w-fit" onClick={() => void calculate()}>Calculate Forecast</Button>
       {result ? (
-        <div className="mt-6 grid gap-8 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <DayColumn title="Current (Last 365 Days)" rows={sortByDays(result.current)} empty="No trips recorded in the last 365 days." homeCountry={homeCountry} />
           <DayColumn
             title="Forecast (365 Days from Trip End)"
@@ -240,30 +250,31 @@ function DayColumn({
   duration?: number
 }) {
   return (
-    <div>
-      <h3>{title}</h3>
-      {rows.length === 0 ? <p>{empty}</p> : null}
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm">
+      <h3 className="font-medium">{title}</h3>
+      {rows.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : null}
       {rows.map((row) => {
         const seen = visited?.has(row.countryName) ?? false
         const exceeds = seen && row.days > 183 && !isHome(row.countryName, homeCountry)
         return (
           <p
             key={row.countryName}
-            style={{
-              background: !seen ? '#f8f9fa' : exceeds ? '#f8d7da' : '#d4edda',
-              border: !seen ? undefined : `2px solid ${exceeds ? '#dc3545' : '#28a745'}`,
-            }}
+            className={`flex items-baseline justify-between rounded-lg px-3 py-2 text-sm ${
+              exceeds ? 'bg-destructive/10 text-destructive' : seen ? 'bg-primary/10' : 'bg-muted'
+            }`}
           >
-            <strong>{row.countryName}</strong>
-            {isHome(row.countryName, homeCountry) ? ' (home)' : ''}
-            {seen && duration > 0 ? ` (+ ${duration} days)` : ''}
-            {exceeds ? ' ⚠️ Exceeds 183' : ''}
-            <span> {row.days} days</span>
+            <span>
+              <strong>{row.countryName}</strong>
+              {isHome(row.countryName, homeCountry) ? ' (home)' : ''}
+              {seen && duration > 0 ? ` (+ ${duration} days)` : ''}
+              {exceeds ? ' ⚠️ Exceeds 183' : ''}
+            </span>
+            <span>{row.days} days</span>
           </p>
         )
       })}
       {rows.length > 0 ? (
-        <p>
+        <p className="px-1 pt-1 text-sm font-medium">
           Total Away{homeCountry ? ' (excl. home)' : ''}: {totalAway(rows, homeCountry)} days
         </p>
       ) : null}

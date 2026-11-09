@@ -8,12 +8,27 @@
   aspect-ratio: 1;
   width: 4.25rem;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 0.6);
+  border-radius: calc(var(--radius) * 0.5);
+  background: var(--card);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: var(--shadow-xs);
+}
+
+.day-cell:hover {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 .day-cell.transit {
@@ -106,8 +121,8 @@
   --accent: oklch(0.7610 0.2015 149.7403);
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.6257 0.2058 29.0773);
-  --border: oklch(0.9436 0.0051 228.8204);
-  --input: oklch(0.9436 0.0051 228.8204);
+  --border: oklch(0.88 0.012 210);
+  --input: oklch(0.88 0.012 210);
   --ring: oklch(0.7610 0.2015 149.7403);
   --chart-1: oklch(0.7610 0.2015 149.7403);
   --chart-2: oklch(0.4335 0.0754 182.2315);

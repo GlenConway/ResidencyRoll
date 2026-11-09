@@ -52,27 +52,28 @@ export function HomePage() {
   }, [countries, resolvedHome])
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Residency Status Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Residency calculation based on midnight and partial-day rules</p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">Residency Status Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Residency calculation based on midnight and partial-day rules</p>
+      </header>
+      <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
-          <Field id="summary-start" label="Start Date" type="date" value={draftStart} onChange={(event) => setDraftStart(event.target.value)} />
-          <Field id="summary-end" label="End Date" type="date" value={draftEnd} onChange={(event) => setDraftEnd(event.target.value)} />
+          <Field className="w-44" id="summary-start" label="Start Date" type="date" value={draftStart} onChange={(event) => setDraftStart(event.target.value)} />
+          <Field className="w-44" id="summary-end" label="End Date" type="date" value={draftEnd} onChange={(event) => setDraftEnd(event.target.value)} />
           <Button onClick={() => setApplied({ start: draftStart, end: draftEnd })}>Calculate</Button>
           <Button variant="outline" onClick={() => void downloadDailyPresence(applied.start, applied.end)}>
             Export CSV
           </Button>
         </div>
+      </section>
         {summaryQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading residency status</p> : null}
         {summaryQuery.isError ? (
           <Alert variant="destructive">
             <AlertDescription>Unable to load residency status</AlertDescription>
           </Alert>
         ) : null}
-        {!summaryQuery.isLoading && summaries.length === 0 ? (
+        {!summaryQuery.isLoading && !summaryQuery.isError && summaries.length === 0 ? (
           <Alert>
             <AlertDescription>No residency data available. Add trips to see your residency status.</AlertDescription>
           </Alert>
@@ -83,12 +84,12 @@ export function HomePage() {
             ))}
           </div>
         )}
-      </section>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">Daily Presence Timeline</h2>
+      <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
+        <h2 className="text-lg font-semibold">Daily Presence Timeline</h2>
         <div className="flex flex-wrap items-end gap-3">
           <Field
+            className="w-44"
             id="timeline-start"
             label="Start Date"
             type="date"
@@ -99,6 +100,7 @@ export function HomePage() {
             }}
           />
           <Field
+            className="w-44"
             id="timeline-end"
             label="End Date"
             type="date"
@@ -109,11 +111,11 @@ export function HomePage() {
             }}
           />
           {countries.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-52 flex-col gap-1.5">
               <Label htmlFor="home-country">Home Country</Label>
               <select
                 id="home-country"
-                className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                className="h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs"
                 value={resolvedHome ?? ''}
                 onChange={(event) => setHomeCountry(event.target.value)}
               >
