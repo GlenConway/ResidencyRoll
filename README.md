@@ -11,6 +11,7 @@ A travel tracking web application built with ASP.NET Core that helps you track i
 
 - [Architecture](#architecture)
 - [Features](#features)
+- [MCP tools](#mcp-tools)
 - [Tech Stack](#tech-stack)
 - [Quick Start](#quick-start)
   - [Docker Deployment (Recommended)](#docker-deployment-recommended)
@@ -36,35 +37,56 @@ ResidencyRoll uses a modern **API-first architecture** with separated concerns:
   - SQLite database with Entity Framework Core
   
 - **Web Frontend** ([ResidencyRoll.Web](src/ResidencyRoll.Web/)): React SPA served by an ASP.NET Core BFF with:
-  - Carbon UI
+  - Tailwind CSS and shadcn
   - OpenID Connect cookie authentication (tokens stay on the server)
   - A reverse proxy that forwards `/api` with the user's access token, and `/mcp` with the AI client's own token
 
 - **Shared Models** ([ResidencyRoll.Shared](src/ResidencyRoll.Shared/)): Common DTOs, the airport list, and MCP setting helpers used by both projects
 
-This separation allows the API to be consumed by multiple clients (web, mobile, third-party integrations) while maintaining a single source of truth for business logic.
+Trip and residency logic live in the API. The web app and MCP clients both call it.
 
 ## Features
 
-- **Rolling 365-Day Calculations**: Automatically calculates days spent in each country within the last 365 days from today
-- **Visual Dashboard**:
-  - Arc Gauge showing Days Away vs Days at Home
-  - Donut Chart displaying country distribution
-  - Interactive Timeline of all trips
-- **Trip Management**: Add, edit, import, and export trips
-- **Forecast Tool**: Plan future trips and see projected day counts
-- **Authentication**: JWT/OAuth/OpenID Connect support for secure API access
-- **API-First Design**: RESTful API ready for mobile apps and integrations
-- **AI clients**: A Streamable HTTP MCP server at `/mcp` for Claude Code, Cursor, VS Code, and other MCP clients. See [Connect an AI client](docs/guides/MCP_SETUP.md).
-- **Persistent Storage**: SQLite database with Docker volume mapping
-- **Responsive UI**: Built with Carbon React
+- **Residency dashboard**: Country cards for a date range you choose, defaulting to the last 365 days. Each card shows the days counted, whether that country uses the midnight or partial-day rule, the day threshold, and progress toward it. The home country is stored in the browser and changes the days-left and days-over wording.
+- **Daily presence timeline**: One cell per day, grouped by month and coloured by country, including days spent in transit. Select a day to see the midnight location and the countries visited. The same range can be exported as CSV.
+- **Trip management**: Add, edit, and delete flight legs, with airports and local departure and arrival times. Filter the list, import and export trips as CSV, and paste a booking to draft legs when itinerary parsing is configured.
+- **Forecast**: Plan a future trip of one or more legs and compare days in the last 365 days with the projected window. The forecast is not saved.
+- **Backups**: System Info shows the database, user and trip counts, and the next weekly backup. You can take a backup immediately and download it.
+- **Authentication**: An OpenID Connect cookie on the web app and a JWT bearer token on the API. Authentication is off by default for local development.
+- **AI clients**: A Streamable HTTP MCP server at `/mcp`. The tools are listed below. Setup is in [Connect an AI client](docs/guides/MCP_SETUP.md).
+- **Storage**: SQLite, mapped to a Docker volume when the app is run with Docker Compose.
+
+## MCP tools
+
+The server is on the web host at `/mcp`. Read tools need the `read:trips` scope. Write tools need `write:trips`, and write does not include read. When JWT authentication is off, calls run as the local user. The server does not store a home country, so the tools expect you to supply `homeCountry` when days left, days over, or days away depend on it.
+
+| Tool | What it does |
+|---|---|
+| `list_trips` | Flight legs, optionally limited to those that overlap a date range |
+| `get_trip` | One leg by id |
+| `get_days_per_country` | Days per country for the last 365 days, or for the whole log |
+| `get_residency_summary` | Days, threshold status, days left, and days over between two dates |
+| `get_daily_presence` | Midnight location, countries visited, and the transit flag, up to 366 days per call |
+| `get_location_on` | The presence record for a single date |
+| `get_country_rules` | Midnight or partial-day rule and threshold for one country, or for every known country |
+| `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
+| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved |
+| `max_trip_end_date` | Latest departure that keeps the arrival country at or under a day limit (183 by default) |
+| `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days |
+| `parse_itinerary` | Draft legs from pasted booking text. Listed only when an OpenAI model, endpoint, and API key are set. Nothing is saved |
+| `create_trip` | Save one leg |
+| `create_trips` | Save every leg, or none of them, in one transaction |
+| `update_trip` | Replace one leg |
+| `delete_trip` | Delete one leg |
+
+There is also a `residency_check` prompt and a `residencyroll://rules/countries` resource. CSV import, backups, and system administration are not exposed as tools. Connection steps, OAuth, and rate limits are in [Connect an AI client](docs/guides/MCP_SETUP.md).
 
 ## Tech Stack
 
 - **Backend**: ASP.NET Core Web API (.NET 10)
 - **Frontend**: React 19, TypeScript, and Vite, served by ASP.NET Core (.NET 10)
 - **Authentication**: OpenID Connect cookie on the BFF, JWT Bearer on the API
-- **UI Library**: Carbon React
+- **UI**: Tailwind CSS and shadcn
 - **Database**: SQLite with Entity Framework Core
 - **API Documentation**: Swagger/OpenAPI
 - **Deployment**: Docker Compose with multi-container setup
@@ -581,20 +603,17 @@ ResidencyRoll/
 
 ## How It Works
 
-### Rolling 365-Day Calculation
+### Rolling 365-day calculation
 
-The application implements smart overlap detection:
+Each flight leg has a departure airport, an arrival airport, and local times. Those legs become a daily presence record: the country at local midnight, the countries visited during the day, and whether midnight was spent in transit. Gaps between trips stay in the last arrival country.
 
-- If a trip started 370 days ago and ended 350 days ago, only the 15 days within the 365-day window are counted
-- The calculation is relative to "Today" and updates automatically
-- Days are counted inclusively (both start and end dates included)
+A day counts for the country where you were at midnight. Partial-day countries, such as the United States substantial-presence test, also count a day when you were there for only part of it. The usual window is the 365 days ending today, and the usual threshold is 183 days. The home country is chosen in the browser and is not stored with the trips.
 
-### Data Management
+See [Residency midnight logic](docs/guides/RESIDENCY_MIDNIGHT_LOGIC.md) and [Gap filling](docs/guides/GAP_FILLING_RULES.md).
 
-- **Add Trip**: Click "Add Trip" button in the data grid
-- **Edit Trip**: Click the edit icon on any row
-- **Delete Trip**: Click the delete icon on any row
-- All changes are immediately persisted to the SQLite database
+### Data management
+
+Manage Trips lists every saved leg. **Add Trip** opens the editor, **Edit** replaces a leg, and **Delete** asks for confirmation. **Import / Export** downloads a CSV or uploads one. Changes are written to SQLite immediately.
 
 ### Docker Volume
 
