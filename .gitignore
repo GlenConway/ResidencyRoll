@@ -25,6 +25,10 @@ bld/
 *.db-wal
 db/
 
+# Data Protection key ring
+data/keys/
+**/Data/keys/
+
 # Configuration files that may contain secrets
 appsettings.Development.json
 appsettings.*.json

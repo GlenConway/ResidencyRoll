@@ -3,15 +3,21 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Radzen;
 using System.Globalization;
+using ResidencyRoll.Web.Bff;
 using ResidencyRoll.Web.Components;
 using ResidencyRoll.Web.Services;
 using ResidencyRoll.Shared.Trips;
 using ResidencyRoll.Shared.Extensions;
 using Serilog;
 using System.Reflection;
+using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Forwarder;
+using Yarp.ReverseProxy.Transforms;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -21,6 +27,7 @@ Log.Logger = new LoggerConfiguration()
         .Build())
     .CreateLogger();
 
+var hostAborted = false;
 try
 {
     var version = System.Reflection.Assembly.GetExecutingAssembly()
@@ -31,6 +38,34 @@ try
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
+
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (string.IsNullOrWhiteSpace(keysPath))
+{
+    var inContainer = string.Equals(
+        Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+    if (inContainer)
+    {
+        keysPath = "/app/data/keys";
+    }
+    else if (File.Exists(Path.Combine(builder.Environment.ContentRootPath, "Data", "AirportData.cs")))
+    {
+        // Content root is the project folder. "data" and "Data" are the same directory
+        // on a case-insensitive volume, so keep the key ring in the repo data folder.
+        keysPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "keys"));
+    }
+    else
+    {
+        keysPath = Path.Combine(builder.Environment.ContentRootPath, "data", "keys");
+    }
+}
+
+Directory.CreateDirectory(keysPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+    .SetApplicationName("ResidencyRoll.Web");
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -58,6 +93,8 @@ if (oidcEnabled)
             : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
+        options.Events = new CookieAuthenticationEvents();
+        BffEndpointExtensions.ReturnUnauthorizedForApiPaths(options.Events);
     })
     .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
@@ -84,6 +121,13 @@ if (oidcEnabled)
         {
             OnRedirectToIdentityProvider = context =>
             {
+                if (BffEndpointExtensions.IsApiOrBff(context.Request.Path))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.HandleResponse();
+                    return Task.CompletedTask;
+                }
+
                 Log.Information("[OIDC] Redirecting to identity provider. Audience: {Audience}", apiAudience);
                 if (!string.IsNullOrEmpty(apiAudience))
                 {
@@ -141,6 +185,8 @@ else
             options.Cookie.Name = "ResidencyRoll.Auth";
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.LoginPath = "/login";
+            options.Events = new CookieAuthenticationEvents();
+            BffEndpointExtensions.ReturnUnauthorizedForApiPaths(options.Events);
         });
     
     builder.Services.AddAuthorization();
@@ -176,7 +222,49 @@ builder.Services.AddScoped<HttpClient>(sp =>
 });
 
 // Add typed HTTP client for API with authentication
-var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5000";
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5003";
+builder.Services.AddReverseProxy()
+    .AddTransforms(transformBuilder =>
+    {
+        transformBuilder.AddRequestTransform(BffProxy.AttachAccessToken);
+    });
+
+foreach (var descriptor in builder.Services.Where(d => d.ServiceType == typeof(IProxyConfigProvider)).ToList())
+{
+    builder.Services.Remove(descriptor);
+}
+
+// Resolve the destination when the proxy starts so later configuration (tests, env vars) wins.
+builder.Services.AddSingleton<IProxyConfigProvider>(sp =>
+{
+    var configuredBaseUrl = sp.GetRequiredService<IConfiguration>()["Api:BaseUrl"] ?? apiBaseUrl;
+    var apiProxyAddress = configuredBaseUrl.EndsWith('/') ? configuredBaseUrl : configuredBaseUrl + "/";
+    return new InMemoryConfigProvider(
+    [
+        new RouteConfig
+        {
+            RouteId = "api",
+            ClusterId = "api",
+            Match = new RouteMatch { Path = "/api/{**catch-all}" }
+        }
+    ],
+    [
+        new ClusterConfig
+        {
+            ClusterId = "api",
+            HttpRequest = new ForwarderRequestConfig
+            {
+                Version = new Version(1, 1),
+                VersionPolicy = HttpVersionPolicy.RequestVersionExact
+            },
+            Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["api"] = new() { Address = apiProxyAddress }
+            }
+        }
+    ]);
+});
+
 builder.Services.AddScoped<ApiAuthenticationHandler>();
 builder.Services.AddHttpClient<TripsApiClient>(client =>
 {
@@ -211,7 +299,10 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseWhen(
+    context => !BffEndpointExtensions.IsApiOrBff(context.Request.Path)
+        && !context.Request.Path.StartsWithSegments("/auth"),
+    branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
@@ -224,48 +315,27 @@ app.MapStaticAssets();
 // IMPORTANT: API endpoints MUST be registered BEFORE MapRazorComponents
 // because Razor component routing acts as a catch-all for remaining routes.
 
-// Authentication endpoints
+// BFF: auth endpoints, CSRF, and the /api reverse proxy. Blazor still serves the UI.
 app.MapPost("/auth/login", async (HttpContext context) =>
 {
     var oidcEnabled = context.RequestServices.GetRequiredService<IConfiguration>()
         .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
-    
+
     if (!oidcEnabled)
     {
-        // For development without OIDC, redirect to home
         context.Response.Redirect("/");
         return;
     }
-    
+
     await context.ChallengeAsync(
-        Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
-        new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        OpenIdConnectDefaults.AuthenticationScheme,
+        new AuthenticationProperties
         {
             RedirectUri = "/"
         });
 });
 
-app.MapPost("/logout", async (HttpContext context) =>
-{
-    var oidcEnabled = context.RequestServices.GetRequiredService<IConfiguration>()
-        .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
-    
-    if (!oidcEnabled)
-    {
-        // For development without OIDC, redirect to home
-        context.Response.Redirect("/");
-        return;
-    }
-    
-    await context.SignOutAsync(
-        Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
-    await context.SignOutAsync(
-        Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
-        new Microsoft.AspNetCore.Authentication.AuthenticationProperties
-        {
-            RedirectUri = "/"
-        });
-});
+app.MapBff();
 
 // Streams a database backup from the API to the browser as a file download
 app.MapGet("/app/system/backups/{fileName}", async (string fileName, HttpContext httpContext, SystemApiClient apiClient) =>
@@ -396,11 +466,21 @@ tripsProxy.MapPost("/forecast/standard-durations", async (StandardDurationForeca
 
 app.Run();
 }
+catch (HostAbortedException)
+{
+    hostAborted = true;
+    throw;
+}
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
 }
 finally
 {
-    Log.CloseAndFlush();
+    if (!hostAborted)
+    {
+        Log.CloseAndFlush();
+    }
 }
+
+public partial class Program { }
