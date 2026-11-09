@@ -20,6 +20,12 @@
       "http://localhost:5113"
     ]
   },
+  "Mcp": {
+    "Enabled": true,
+    "ResourceUrl": "",
+    "Audience": "",
+    "AllowedOrigins": []
+  },
   "OpenAI": {
     "OpenAIModel": "gpt-4",
     "OpenAIEndpoint": "https://api.openai.com/v1",

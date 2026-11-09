@@ -1,4 +1,4 @@
-import type { CurrentUser, DailyPresence, ForecastResponse, ImportResult, ItineraryParsingResponse, ResidencySummary, SystemInfo, Trip, TripLeg } from './types.ts'
+import type { CurrentUser, DailyPresence, ForecastResponse, ImportResult, ItineraryParsingResponse, McpInfo, ResidencySummary, SystemInfo, Trip, TripLeg } from './types.ts'
 
 export class ApiError extends Error {
   readonly status: number
@@ -153,6 +153,10 @@ export async function forecast(legs: TripLeg[]): Promise<ForecastResponse> {
   return readJson<ForecastResponse>(
     await apiFetch('/api/v1/trips/forecast', { method: 'POST', body: JSON.stringify({ legs }) }),
   )
+}
+
+export async function getMcpInfo(): Promise<McpInfo> {
+  return readJson<McpInfo>(await apiFetch('/bff/mcp-info'))
 }
 
 export async function getSystemInfo(): Promise<SystemInfo> {

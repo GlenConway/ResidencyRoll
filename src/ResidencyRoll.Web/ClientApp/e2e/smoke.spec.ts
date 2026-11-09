@@ -1,5 +1,27 @@
 import { expect, test } from '@playwright/test'
 
+test('mcp initialize answers with the server name', async ({ request }) => {
+  const response = await request.post('/mcp', {
+    headers: {
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json',
+    },
+    data: {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'playwright', version: '1' },
+      },
+    },
+  })
+
+  expect(response.ok()).toBeTruthy()
+  expect(await response.text()).toContain('ResidencyRoll')
+})
+
 test('signed-out local mode renders every route', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Residency Status Dashboard' })).toBeVisible()

@@ -87,6 +87,12 @@ export interface SystemInfo {
   nextBackupUtc: string | null
 }
 
+export interface McpInfo {
+  enabled: boolean
+  oauthRequired: boolean
+  url: string
+}
+
 export interface CurrentUser {
   name: string
   email: string

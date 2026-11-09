@@ -1,14 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DateTime } from 'luxon'
-import { backupNow, downloadBackup, getSystemInfo } from '../api/client.ts'
+import { backupNow, downloadBackup, getMcpInfo, getSystemInfo } from '../api/client.ts'
+import type { McpInfo } from '../api/types.ts'
 import { formatSize } from '../lib/formatSize.ts'
+import { claudeCodeCommand, mcpJsonSnippet, mcpUrl } from '../lib/mcpClient.ts'
 
 export function SystemInfoPage() {
   const queryClient = useQueryClient()
   const infoQuery = useQuery({ queryKey: ['system-info'], queryFn: getSystemInfo })
+  const mcpQuery = useQuery({ queryKey: ['mcp-info'], queryFn: getMcpInfo })
   const backup = useMutation({
     mutationFn: backupNow,
     onSuccess: async (created) => {
@@ -112,6 +116,8 @@ export function SystemInfoPage() {
       ) : null}
       </div>
 
+      <McpConnectPanel query={mcpQuery} />
+
       <div className="rounded-lg border bg-card p-4">
       <h2 className="mb-3 text-lg font-medium">Application</h2>
       <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
@@ -122,5 +128,60 @@ export function SystemInfoPage() {
       </dl>
       </div>
     </section>
+  )
+}
+
+function McpConnectPanel({ query }: { query: { isLoading: boolean; isError: boolean; data?: McpInfo } }) {
+  const [copied, setCopied] = useState<'claude' | 'json' | 'failed' | null>(null)
+  const url = mcpUrl(window.location.origin)
+  const command = claudeCodeCommand(url)
+  const snippet = mcpJsonSnippet(url)
+
+  async function copy(value: string, which: 'claude' | 'json') {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(which)
+    } catch {
+      setCopied('failed')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+      <h2 className="text-lg font-medium">Connect an AI client</h2>
+      {query.isLoading ? <p>Loading connection details.</p> : null}
+      {query.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>Unable to load MCP connection details.</AlertDescription>
+        </Alert>
+      ) : null}
+      {query.data && !query.data.enabled ? <p>MCP is turned off.</p> : null}
+      {query.data?.enabled ? (
+        <>
+          <p className="text-sm">
+            {query.data.oauthRequired
+              ? 'OAuth is required. The client signs you in and sends a token issued for this server.'
+              : 'OAuth is off. This endpoint is open and runs as the local user. Use it only on a trusted network.'}
+          </p>
+          <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
+            <dt className="text-muted-foreground">MCP URL</dt>
+            <dd>
+              <code>{url}</code>
+            </dd>
+          </dl>
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{command}</pre>
+          <Button className="w-fit" variant="outline" onClick={() => void copy(command, 'claude')}>
+            Copy Claude Code command
+          </Button>
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{snippet}</pre>
+          <Button className="w-fit" variant="outline" onClick={() => void copy(snippet, 'json')}>
+            Copy JSON snippet
+          </Button>
+          {copied === 'claude' ? <p>Copied the Claude Code command.</p> : null}
+          {copied === 'json' ? <p>Copied the JSON snippet.</p> : null}
+          {copied === 'failed' ? <p>Copy failed. Select the text and copy it manually.</p> : null}
+        </>
+      ) : null}
+    </div>
   )
 }

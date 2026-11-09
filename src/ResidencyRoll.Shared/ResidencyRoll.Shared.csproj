@@ -10,4 +10,10 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Airports\airports.json">
+      <LogicalName>ResidencyRoll.Shared.Airports.airports.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

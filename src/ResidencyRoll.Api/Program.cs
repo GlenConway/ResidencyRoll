@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using ResidencyRoll.Api.Authentication;
 using ResidencyRoll.Api.Configuration;
 using ResidencyRoll.Api.Data;
+using ResidencyRoll.Api.Mcp;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Extensions;
 using Serilog;
@@ -42,6 +43,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<ItineraryParsingService>();
 builder.Services.AddSingleton<ResidencyCalculationService>();
+builder.AddResidencyMcp();
 
 // Weekly SQLite backup (Mondays 04:00 UTC)
 builder.Services.Configure<DatabaseBackupOptions>(builder.Configuration.GetSection("DatabaseBackup"));
@@ -68,16 +70,17 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
     {
-        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
-        policy.WithOrigins(origins)
+        var origins = McpUrls.AllowedOrigins(builder.Configuration);
+        policy.WithOrigins(origins.ToArray())
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .WithExposedHeaders("WWW-Authenticate", "Mcp-Session-Id", "MCP-Protocol-Version");
     });
 });
 
 // Only require JWT authentication if Authority is configured
 var jwtAuthority = builder.Configuration["Jwt:Authority"];
-var jwtEnabled = !string.IsNullOrEmpty(jwtAuthority) && jwtAuthority != "https://your-identity-provider.com";
+var jwtEnabled = McpEndpointExtensions.IsJwtEnabled(builder.Configuration);
 
 if (jwtEnabled)
 {
@@ -104,6 +107,7 @@ if (jwtEnabled)
                     // Use client secret for decrypting JWE tokens
                     TokenDecryptionKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(clientSecret))
                 };
+                McpEndpointExtensions.ApplyAudiences(builder.Configuration, options.TokenValidationParameters);
             }
             else
             {
@@ -115,6 +119,7 @@ if (jwtEnabled)
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true
                 };
+                McpEndpointExtensions.ApplyAudiences(builder.Configuration, options.TokenValidationParameters);
             }
 
             // Add diagnostic logging to understand 401 causes during development
@@ -132,24 +137,26 @@ if (jwtEnabled)
                 OnChallenge = context =>
                 {
                     Log.Warning("[JWT] Challenge issued. Error: {Error}, Description: {Description}", context.Error, context.ErrorDescription);
+                    if (context.Request.Path.StartsWithSegments("/mcp"))
+                    {
+                        var metadata = McpUrls.Metadata(context.Request, context.HttpContext.RequestServices.GetRequiredService<IConfiguration>());
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.Headers.WWWAuthenticate =
+                            $"Bearer resource_metadata=\"{metadata}\", scope=\"read:trips\"";
+                    }
+
                     return Task.CompletedTask;
                 },
                 OnMessageReceived = context =>
                 {
-                    // Log when Authorization header is missing or present
-                    var hasAuth = context.Request.Headers.ContainsKey("Authorization");
-                    Log.Information("[JWT] Authorization header present: {HasAuth}", hasAuth);
-                    if (hasAuth)
-                    {
-                        var authHeader = context.Request.Headers["Authorization"].ToString();
-                        Log.Debug("[JWT] Authorization header value: {AuthHeader}", authHeader.Length > 30 ? authHeader.Substring(0, 30) + "..." : authHeader);
-                    }
+                    Log.Debug("[JWT] Authorization header present: {HasAuth}", context.Request.Headers.ContainsKey("Authorization"));
                     return Task.CompletedTask;
                 },
                 OnTokenValidated = context =>
                 {
-                    var claims = string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}:{c.Value}") ?? Array.Empty<string>());
-                    Log.Information("[JWT] Token validated. Claims: {Claims}", claims);
+                    var claimNames = string.Join(", ", context.Principal?.Claims.Select(c => c.Type).Distinct() ?? Array.Empty<string>());
+                    Log.Debug("[JWT] Token validated. Claim types: {ClaimTypes}", claimNames);
                     return Task.CompletedTask;
                 }
             };
@@ -202,7 +209,9 @@ app.UseCors(FrontendCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseResidencyMcpGuards();
 
+app.MapResidencyMcp();
 app.MapControllers();
 
 app.Run();

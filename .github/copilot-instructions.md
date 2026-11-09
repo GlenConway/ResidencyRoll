@@ -16,3 +16,7 @@ The UI is a React SPA in `src/ResidencyRoll.Web/ClientApp`. The ASP.NET Core pro
 - xUnit tests use plain `Assert`. Name them `MethodName_Condition_ShouldExpectedBehavior`.
 - Do not hand-edit EF Core migrations or `ApplicationDbContextModelSnapshot.cs`.
 - Never commit secrets, API keys, or `appsettings.Development.json`.
+
+## MCP
+
+AI clients call a stateless Streamable HTTP server at `/mcp` (ADR-016, `docs/guides/MCP_SETUP.md`). Tool classes live in `src/ResidencyRoll.Api/Mcp` and call the same services as REST. The Web host proxies `/mcp` and the OAuth protected-resource metadata without attaching the cookie token or requiring CSRF. The System Info page shows `window.location.origin + "/mcp"`. Do not add personal access tokens unless a new ADR says to.

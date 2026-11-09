@@ -110,7 +110,7 @@ if (oidcEnabled)
         {
             OnRedirectToIdentityProvider = context =>
             {
-                if (BffEndpointExtensions.IsApiOrBff(context.Request.Path))
+                if (BffEndpointExtensions.IsApiOrBff(context.Request.Path) || BffEndpointExtensions.IsMcpPassThrough(context.Request.Path))
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     context.HandleResponse();
@@ -185,7 +185,12 @@ var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5003
 builder.Services.AddReverseProxy()
     .AddTransforms(transformBuilder =>
     {
-        transformBuilder.AddRequestTransform(BffProxy.AttachAccessToken);
+        // The cookie token is attached only for the browser's /api calls.
+        // /mcp keeps the Authorization header the MCP client sent.
+        if (string.Equals(transformBuilder.Route.RouteId, "api", StringComparison.Ordinal))
+        {
+            transformBuilder.AddRequestTransform(BffProxy.AttachAccessToken);
+        }
     });
 
 foreach (var descriptor in builder.Services.Where(d => d.ServiceType == typeof(IProxyConfigProvider)).ToList())
@@ -205,6 +210,30 @@ builder.Services.AddSingleton<IProxyConfigProvider>(sp =>
             RouteId = "api",
             ClusterId = "api",
             Match = new RouteMatch { Path = "/api/{**catch-all}" }
+        },
+        new RouteConfig
+        {
+            RouteId = "mcp",
+            ClusterId = "api",
+            Match = new RouteMatch { Path = "/mcp" }
+        },
+        new RouteConfig
+        {
+            RouteId = "mcp-rest",
+            ClusterId = "api",
+            Match = new RouteMatch { Path = "/mcp/{**rest}" }
+        },
+        new RouteConfig
+        {
+            RouteId = "oauth-metadata",
+            ClusterId = "api",
+            Match = new RouteMatch { Path = "/.well-known/oauth-protected-resource" }
+        },
+        new RouteConfig
+        {
+            RouteId = "oauth-metadata-rest",
+            ClusterId = "api",
+            Match = new RouteMatch { Path = "/.well-known/oauth-protected-resource/{**rest}" }
         }
     ],
     [
@@ -213,6 +242,7 @@ builder.Services.AddSingleton<IProxyConfigProvider>(sp =>
             ClusterId = "api",
             HttpRequest = new ForwarderRequestConfig
             {
+                ActivityTimeout = TimeSpan.FromMinutes(5),
                 Version = new Version(1, 1),
                 VersionPolicy = HttpVersionPolicy.RequestVersionExact
             },

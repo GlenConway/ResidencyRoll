@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using ResidencyRoll.Shared.Mcp;
 using Serilog;
 using Yarp.ReverseProxy.Forwarder;
 
@@ -24,6 +25,12 @@ public static class BffEndpointExtensions
         app.Use(async (context, next) =>
         {
             var path = context.Request.Path;
+            if (IsMcpPassThrough(path))
+            {
+                await next();
+                return;
+            }
+
             var isApi = path.StartsWithSegments("/api");
             var isBff = path.StartsWithSegments("/bff");
             var isAuthLogout = path.StartsWithSegments("/auth/logout");
@@ -94,6 +101,17 @@ public static class BffEndpointExtensions
             return Results.Ok(new { name, email, isAuthenticated = true });
         });
 
+        app.MapGet("/bff/mcp-info", (HttpContext context, IConfiguration configuration) =>
+        {
+            var oauthRequired = configuration.GetValue<bool>("Authentication:OpenIdConnect:Enabled");
+            return Results.Ok(new
+            {
+                enabled = McpConfiguration.IsEnabled(configuration),
+                oauthRequired,
+                url = $"{context.Request.Scheme}://{context.Request.Host}/mcp"
+            });
+        });
+
         app.MapReverseProxy(pipeline =>
         {
             pipeline.Use(async (context, next) =>
@@ -114,7 +132,7 @@ public static class BffEndpointExtensions
     {
         events.OnRedirectToLogin = context =>
         {
-            if (IsApiOrBff(context.Request.Path))
+            if (IsApiOrBff(context.Request.Path) || IsMcpPassThrough(context.Request.Path))
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return Task.CompletedTask;
@@ -127,6 +145,10 @@ public static class BffEndpointExtensions
 
     public static bool IsApiOrBff(PathString path) =>
         path.StartsWithSegments("/api") || path.StartsWithSegments("/bff");
+
+    public static bool IsMcpPassThrough(PathString path) =>
+        path.StartsWithSegments("/mcp")
+        || path.StartsWithSegments("/.well-known/oauth-protected-resource");
 
     public static bool IsLocalReturnUrl(string returnUrl)
     {

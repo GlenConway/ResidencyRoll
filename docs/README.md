@@ -13,6 +13,7 @@
 - [Flight Itinerary Parsing](guides/ITINERARY_PARSING.md)
 - [JWT Token Encryption (JWE)](guides/JWT_TOKEN_ENCRYPTION.md)
 - [Forwarded Headers Behind a Reverse Proxy](guides/FORWARDED_HEADERS_SETUP.md)
+- [Connect an AI client (MCP)](guides/MCP_SETUP.md)
 
 ## Source hosting
 

@@ -18,6 +18,11 @@ services:
       - OpenAI__OpenAIApiKey=${OPENAI_API_KEY}
       - Cors__AllowedOrigins__0=${CORS_ORIGIN_0}
       - Cors__AllowedOrigins__1=${CORS_ORIGIN_1}
+      - Mcp__Enabled=${MCP_ENABLED:-}
+      - Mcp__ResourceUrl=${MCP_RESOURCE_URL:-}
+      - Mcp__Audience=${MCP_AUDIENCE:-}
+      - Mcp__AllowedOrigins__0=${MCP_ALLOWED_ORIGIN_0:-}
+      - Mcp__AllowedOrigins__1=${MCP_ALLOWED_ORIGIN_1:-}
       - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
       - ForwardedHeaders__KnownProxies__1=${FORWARDED_HEADERS_KNOWN_PROXY_1}
       - ForwardedHeaders__KnownNetworks__0=${FORWARDED_HEADERS_KNOWN_NETWORK_0}
@@ -44,6 +49,7 @@ services:
       - Authentication__OpenIdConnect__RequireHttpsMetadata=${OIDC_REQUIRE_HTTPS}
       - Authentication__OpenIdConnect__ApiAudience=${OIDC_API_AUDIENCE}
       - Authentication__OpenIdConnect__ApiScope=${OIDC_API_SCOPE}
+      - Mcp__Enabled=${MCP_ENABLED:-}
       - ForwardedHeaders__KnownProxies__0=${FORWARDED_HEADERS_KNOWN_PROXY_0}
       - ForwardedHeaders__KnownProxies__1=${FORWARDED_HEADERS_KNOWN_PROXY_1}
       - ForwardedHeaders__KnownNetworks__0=${FORWARDED_HEADERS_KNOWN_NETWORK_0}

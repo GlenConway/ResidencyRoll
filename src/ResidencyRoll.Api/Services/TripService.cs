@@ -36,6 +36,31 @@ public class TripService
         return trip;
     }
 
+    /// <summary>
+    /// Saves every trip or none of them. A failure rolls the batch back.
+    /// </summary>
+    public async Task<List<Trip>> CreateTripsAsync(IReadOnlyList<Trip> trips)
+    {
+        if (trips.Count == 0)
+        {
+            return [];
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            _context.Trips.AddRange(trips);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return trips.ToList();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<Trip> UpdateTripAsync(Trip trip, string userId)
     {
         var existing = await GetTripByIdAsync(trip.Id, userId);
@@ -82,11 +107,21 @@ public class TripService
 
     public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(string userId, List<Trip> hypotheticalTrips)
     {
+        var trips = await _context.Trips
+            .Where(t => t.UserId == userId)
+            .ToListAsync();
+        return ForecastDays(trips, hypotheticalTrips);
+    }
+
+    public (Dictionary<string, int> Current, Dictionary<string, int> Forecast) ForecastDays(
+        IReadOnlyList<Trip> existingTrips,
+        IReadOnlyList<Trip> hypotheticalTrips)
+    {
         if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
         {
             return (new Dictionary<string, int>(), new Dictionary<string, int>());
         }
-        
+
         var today = DateTime.Today;
         var currentWindowStart = today.AddDays(-365);
 
@@ -96,15 +131,9 @@ public class TripService
         var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
         var forecastWindowStart = forecastWindowEnd.AddDays(-365);
 
-        var trips = await _context.Trips
-            .Where(t => t.UserId == userId)
-            .ToListAsync();
+        var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(existingTrips, currentWindowStart, today);
 
-        // Calculate current window (last 365 days from today)
-        var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(trips, currentWindowStart, today);
-
-        // For forecast, include all hypothetical trips
-        var tripsWithHypothetical = new List<Trip>(trips);
+        var tripsWithHypothetical = new List<Trip>(existingTrips);
         tripsWithHypothetical.AddRange(hypotheticalTrips);
 
         var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);

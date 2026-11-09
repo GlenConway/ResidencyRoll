@@ -21,10 +21,15 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    fs: {
+      allow: [fileURLToPath(new URL('.', import.meta.url)), fileURLToPath(new URL('../..', import.meta.url))],
+    },
     proxy: {
       '/api': webHost,
       '/auth': webHost,
       '/bff': webHost,
+      '/mcp': webHost,
+      '/.well-known': webHost,
       '/signin-oidc': webHost,
       '/signout-callback-oidc': webHost,
     },

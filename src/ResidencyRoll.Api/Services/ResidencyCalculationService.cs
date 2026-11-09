@@ -77,6 +77,18 @@ public class ResidencyCalculationService
     }
 
     /// <summary>
+    /// Known country rules, without alias entries such as "UK" or "USA".
+    /// </summary>
+    public IReadOnlyList<CountryResidencyRule> ListCountryRules()
+    {
+        return _countryRules
+            .Where(pair => string.Equals(pair.Key, pair.Value.CountryName, StringComparison.OrdinalIgnoreCase))
+            .Select(pair => pair.Value)
+            .OrderBy(rule => rule.CountryName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
     /// Get the residency rule for a country. Defaults to Midnight Rule if not found.
     /// </summary>
     public CountryResidencyRule GetCountryRule(string countryName)

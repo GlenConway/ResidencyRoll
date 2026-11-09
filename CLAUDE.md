@@ -12,14 +12,15 @@ ResidencyRoll tracks international travel and calculates days spent in each coun
 src/
 ├── ResidencyRoll.Api/      ASP.NET Core Web API: EF Core + SQLite, residency engine, itinerary parsing
 │   ├── Controllers/        TripsController (/api/v1/trips), SystemController (/api/v1/system/info)
-│   ├── Services/           TripService, ResidencyCalculationService, ItineraryParsingService
+│   ├── Mcp/                Streamable HTTP MCP server at /mcp (tools, OAuth metadata, guards)
+│   ├── Services/           TripService, ResidencyCalculationService, ResidencyQueryService, AirportCatalog, ItineraryParsingService
 │   ├── Models/             Trip, DailyPresence, CountryResidencyRule, ResidencyRuleType
 │   ├── Configuration/      OpenAIOptions, ConfigureSwaggerOptions
 │   └── Migrations/         EF Core migrations
 ├── ResidencyRoll.Web/      BFF and static host for the React SPA
-│   ├── Bff/                YARP /api proxy, cookie auth, CSRF, /bff/user
+│   ├── Bff/                YARP /api and /mcp proxy, cookie auth, CSRF, /bff/user, /bff/mcp-info
 │   └── ClientApp/          Vite + React 19 + TypeScript UI (Carbon)
-├── ResidencyRoll.Shared/   DTOs (Trips/) and Extensions (ForwardedHeadersExtensions)
+├── ResidencyRoll.Shared/   DTOs (Trips/), airport JSON (Airports/airports.json), MCP config helpers, Extensions (ForwardedHeadersExtensions)
 ├── ResidencyRoll.Tests/    xUnit tests
 └── ResidencyRoll.sln
 ```
@@ -52,7 +53,8 @@ Local settings: copy `appsettings.Development.json.example` to `appsettings.Deve
 - **Timezones:** all leg maths uses IANA timezones resolved from IATA codes. Check midnight in both departure and arrival zones (International Date Line cases).
 - **Auth:** the browser signs in through the Web BFF (OpenID Connect cookie, Auth0 in the reference setup). Tokens stay on the server. The API validates JWT bearer tokens and scopes trips to the user. `Jwt:ClientSecret` enables decryption of JWE tokens. With OIDC disabled, `/bff/user` returns a local user and `/api` is proxied without a bearer token.
 - **Itinerary parsing:** Semantic Kernel with OpenAI, configured through `OpenAIOptions`. Optional feature.
-- **Home country** is stored in browser localStorage and drives days left/over and timeline emphasis.
+- **Home country** is stored in browser localStorage and drives days left/over and timeline emphasis. MCP tools take an optional `homeCountry` and tell the model to ask.
+- **MCP:** the API hosts a stateless Streamable HTTP server at `/mcp` (`ModelContextProtocol.AspNetCore` 2.4.0). The Web host proxies it without attaching the cookie token and without a CSRF check. With JWT off, `/mcp` runs as the local user. With JWT on, clients use OAuth 2.1 (Auth0) and the `read:trips` / `write:trips` scopes. See `docs/guides/MCP_SETUP.md` and ADR-016. Personal access tokens (M10.8) are not implemented.
 - **Reverse proxy:** `UseConfiguredForwardedHeaders()` (Shared) is used by both hosts.
 
 ## Conventions

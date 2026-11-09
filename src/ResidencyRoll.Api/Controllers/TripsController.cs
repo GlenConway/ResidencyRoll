@@ -18,13 +18,16 @@ namespace ResidencyRoll.Api.Controllers;
 public class TripsController : ControllerBase
 {
     private readonly TripService _tripService;
-    private readonly ResidencyCalculationService _residencyService;
+    private readonly ResidencyQueryService _queryService;
     private readonly ItineraryParsingService _itineraryParsingService;
 
-    public TripsController(TripService tripService, ResidencyCalculationService residencyService, ItineraryParsingService itineraryParsingService)
+    public TripsController(
+        TripService tripService,
+        ResidencyQueryService queryService,
+        ItineraryParsingService itineraryParsingService)
     {
         _tripService = tripService;
-        _residencyService = residencyService;
+        _queryService = queryService;
         _itineraryParsingService = itineraryParsingService;
     }
 
@@ -187,8 +190,6 @@ public class TripsController : ControllerBase
         }
 
         var userId = GetUserId();
-        
-        // Convert legs to Trip objects
         var hypotheticalTrips = request.Legs.Select(leg => new Trip
         {
             UserId = userId,
@@ -203,28 +204,8 @@ public class TripsController : ControllerBase
             ArrivalTimezone = leg.ArrivalTimezone,
             ArrivalIataCode = leg.ArrivalIataCode
         }).ToList();
-        
-        Dictionary<string, int> current;
-        Dictionary<string, int> forecast;
-        
-        if (hypotheticalTrips.Count > 0)
-        {
-            (current, forecast) = await _tripService.ForecastDaysWithTripsAsync(userId, hypotheticalTrips);
-        }
-        else
-        {
-            // Fall back to empty forecast if no legs provided
-            current = new Dictionary<string, int>();
-            forecast = new Dictionary<string, int>();
-        }
 
-        var response = new ForecastResponseDto
-        {
-            Current = current.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value }).ToList(),
-            Forecast = forecast.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value }).ToList()
-        };
-
-        return Ok(response);
+        return Ok(await _queryService.ForecastAsync(userId, hypotheticalTrips));
     }
 
     [HttpPost("forecast/max-end-date")]
@@ -252,31 +233,7 @@ public class TripsController : ControllerBase
         [FromQuery] DateOnly? endDate = null)
     {
         var userId = GetUserId();
-        var trips = await _tripService.GetAllTripsAsync(userId);
-        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
-        
-        // Filter by date range if provided
-        var filteredPresence = dailyPresence.AsEnumerable();
-        if (startDate.HasValue)
-        {
-            filteredPresence = filteredPresence.Where(dp => dp.Date >= startDate.Value);
-        }
-        if (endDate.HasValue)
-        {
-            filteredPresence = filteredPresence.Where(dp => dp.Date <= endDate.Value);
-        }
-        
-        var presenceList = filteredPresence.OrderBy(d => d.Date).ToList();
-        
-        var result = presenceList.Select(dp => new DailyPresenceDto
-        {
-            Date = dp.Date,
-            LocationAtMidnight = dp.LocationAtMidnight,
-            LocationsDuringDay = dp.LocationsDuringDay.ToList(),
-            IsInTransitAtMidnight = dp.IsInTransitAtMidnight
-        });
-        
-        return Ok(result);
+        return Ok(await _queryService.GetDailyPresenceAsync(userId, startDate, endDate));
     }
 
     [HttpGet("residency-summary")]
@@ -286,29 +243,7 @@ public class TripsController : ControllerBase
         [FromQuery] DateOnly? endDate = null)
     {
         var userId = GetUserId();
-        var trips = await _tripService.GetAllTripsAsync(userId);
-        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
-        var residencyDays = _residencyService.CalculateResidencyDays(dailyPresence, startDate, endDate);
-        
-        var summary = new List<ResidencySummaryDto>();
-        foreach (var kvp in residencyDays.OrderByDescending(x => x.Value))
-        {
-            var rule = _residencyService.GetCountryRule(kvp.Key);
-            var thresholdDays = rule.ResidencyThresholdDays ?? 183;
-            var daysUntilThreshold = thresholdDays - kvp.Value;
-            
-            summary.Add(new ResidencySummaryDto
-            {
-                CountryName = kvp.Key,
-                TotalDays = kvp.Value,
-                RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
-                ThresholdDays = thresholdDays,
-                IsApproachingThreshold = daysUntilThreshold <= 30 && daysUntilThreshold > 0,
-                DaysUntilThreshold = Math.Max(0, daysUntilThreshold)
-            });
-        }
-        
-        return Ok(summary);
+        return Ok(await _queryService.GetResidencySummaryAsync(userId, startDate, endDate));
     }
 
     [HttpGet("export")]
@@ -352,18 +287,11 @@ public class TripsController : ControllerBase
         [FromQuery] DateOnly? endDate = null)
     {
         var userId = GetUserId();
-        var trips = await _tripService.GetAllTripsAsync(userId);
-        var dailyPresence = _residencyService.GenerateDailyPresenceLog(trips);
-
-        var filteredPresence = dailyPresence.AsEnumerable();
-        if (startDate.HasValue)
-            filteredPresence = filteredPresence.Where(dp => dp.Date >= startDate.Value);
-        if (endDate.HasValue)
-            filteredPresence = filteredPresence.Where(dp => dp.Date <= endDate.Value);
+        var presence = await _queryService.GetDailyPresenceAsync(userId, startDate, endDate);
 
         var csvLines = new List<string> { "date,primary_country,secondary_country" };
 
-        foreach (var dp in filteredPresence.OrderBy(dp => dp.Date))
+        foreach (var dp in presence)
         {
             var primary = dp.LocationAtMidnight;
             var secondary = string.Join(";", dp.LocationsDuringDay

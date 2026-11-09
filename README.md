@@ -38,9 +38,9 @@ ResidencyRoll uses a modern **API-first architecture** with separated concerns:
 - **Web Frontend** ([ResidencyRoll.Web](src/ResidencyRoll.Web/)): React SPA served by an ASP.NET Core BFF with:
   - Carbon UI
   - OpenID Connect cookie authentication (tokens stay on the server)
-  - A reverse proxy that forwards `/api` with the user's access token
+  - A reverse proxy that forwards `/api` with the user's access token, and `/mcp` with the AI client's own token
 
-- **Shared Models** ([ResidencyRoll.Shared](src/ResidencyRoll.Shared/)): Common DTOs used by both projects
+- **Shared Models** ([ResidencyRoll.Shared](src/ResidencyRoll.Shared/)): Common DTOs, the airport list, and MCP setting helpers used by both projects
 
 This separation allows the API to be consumed by multiple clients (web, mobile, third-party integrations) while maintaining a single source of truth for business logic.
 
@@ -55,6 +55,7 @@ This separation allows the API to be consumed by multiple clients (web, mobile, 
 - **Forecast Tool**: Plan future trips and see projected day counts
 - **Authentication**: JWT/OAuth/OpenID Connect support for secure API access
 - **API-First Design**: RESTful API ready for mobile apps and integrations
+- **AI clients**: A Streamable HTTP MCP server at `/mcp` for Claude Code, Cursor, VS Code, and other MCP clients. See [Connect an AI client](docs/guides/MCP_SETUP.md).
 - **Persistent Storage**: SQLite database with Docker volume mapping
 - **Responsive UI**: Built with Carbon React
 
@@ -551,6 +552,7 @@ ResidencyRoll/
 │   ├── ResidencyRoll.Api/               # API Backend
 │   │   ├── Controllers/
 │   │   │   └── TripsController.cs       # REST endpoints
+│   │   ├── Mcp/                         # /mcp tools, OAuth metadata, transport guards
 │   │   ├── Services/
 │   │   │   └── TripService.cs           # Business logic
 │   │   ├── Data/

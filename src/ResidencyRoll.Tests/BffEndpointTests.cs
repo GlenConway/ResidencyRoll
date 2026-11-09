@@ -60,6 +60,15 @@ public class BffWebApplicationFactory : WebApplicationFactory<WebEntryPoint>
             Capture.Authorization = context.Request.Headers.Authorization.ToString();
             using var reader = new StreamReader(context.Request.Body);
             Capture.Body = await reader.ReadToEndAsync();
+            if (context.Request.Path.StartsWithSegments("/mcp"))
+            {
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "text/event-stream";
+                await context.Response.WriteAsync("data: {\"ok\":true}\n\n");
+                await context.Response.Body.FlushAsync();
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync("{\"proxied\":true}");
@@ -270,6 +279,54 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     }
 
     [Fact]
+    public async Task McpProxy_ForwardsTheClientToken_WithoutCsrfOrTheCookieToken()
+    {
+        _factory.Capture.Reset();
+        var client = CreateClient();
+        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = new StringContent("{\"jsonrpc\":\"2.0\"}", Encoding.UTF8, "application/json")
+        };
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer client-token");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("data:", await response.Content.ReadAsStringAsync());
+        Assert.Equal("Bearer client-token", _factory.Capture.Authorization);
+        Assert.Equal("/mcp", _factory.Capture.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task McpProxy_AnonymousCall_IsNotChallengedByTheBff()
+    {
+        _factory.Capture.Reset();
+        var client = CreateClient();
+
+        var response = await client.PostAsync("/mcp", new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(string.Empty, _factory.Capture.Authorization);
+    }
+
+    [Fact]
+    public async Task McpInfo_ReportsThatOAuthIsRequired()
+    {
+        var client = CreateClient();
+        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+
+        var response = await client.GetAsync("/bff/mcp-info");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(document.RootElement.GetProperty("enabled").GetBoolean());
+        Assert.True(document.RootElement.GetProperty("oauthRequired").GetBoolean());
+        Assert.EndsWith("/mcp", document.RootElement.GetProperty("url").GetString());
+    }
+
+    [Fact]
     public async Task UserEndpoint_ReturnsSignedInUser()
     {
         var client = CreateClient();
@@ -312,6 +369,19 @@ public class BffOidcDisabledTests : IClassFixture<OidcDisabledBffFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("/api/v1/trips?startDate=2026-01-01", _factory.Capture.PathAndQuery);
         Assert.Equal(string.Empty, _factory.Capture.Authorization);
+    }
+
+    [Fact]
+    public async Task McpInfo_ReportsThatOAuthIsNotRequired()
+    {
+        var client = CreateClient();
+
+        var response = await client.GetAsync("/bff/mcp-info");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(document.RootElement.GetProperty("enabled").GetBoolean());
+        Assert.False(document.RootElement.GetProperty("oauthRequired").GetBoolean());
     }
 
     [Fact]
