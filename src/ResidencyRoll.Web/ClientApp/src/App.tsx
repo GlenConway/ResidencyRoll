@@ -1,9 +1,9 @@
 import { Route, Routes } from 'react-router'
 import { HomePage } from './pages/HomePage.tsx'
 import { ForecastPage } from './pages/ForecastPage.tsx'
+import { SystemInfoPage } from './pages/SystemInfoPage.tsx'
 import { ManageTripsPage } from './pages/ManageTripsPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
-import { PlaceholderPage } from './pages/PlaceholderPage.tsx'
 import { AppShell, PageTitle } from './shell/AppShell.tsx'
 
 export default function App() {
@@ -42,7 +42,7 @@ export default function App() {
           element={
             <>
               <PageTitle title="System Info - Residency Roll" />
-              <PlaceholderPage heading="System Info" message="Database, backups, and application details." />
+              <SystemInfoPage />
             </>
           }
         />
