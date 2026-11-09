@@ -1,10 +1,12 @@
-import { Button, InlineNotification, TextInput } from '@carbon/react'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, forecast, getItineraryParserAvailability } from '../api/client.ts'
 import type { CountryDays, ForecastResponse, ItineraryParsingResponse } from '../api/types.ts'
 import { AirportSelector } from '../components/AirportSelector.tsx'
+import { Field } from '../components/Field.tsx'
 import { ItineraryParserModal } from '../components/ItineraryParserModal.tsx'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   addForecastLeg,
   apiUnreachableMessage,
@@ -77,41 +79,52 @@ export function ForecastPage() {
 
   return (
     <section>
-      <h1>Trip Forecast</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Trip Forecast</h1>
       {parserQuery.data ? (
         <div>
           <h2>Quick Itinerary Parser</h2>
           <p>Paste flight information from emails, booking confirmations, or any text format. We'll auto-fill your trip legs.</p>
-          <Button kind="tertiary" onClick={() => setParserOpen(true)}>
+          <Button variant="outline" onClick={() => setParserOpen(true)}>
             Open Itinerary Parser
           </Button>
-          {parserError ? <InlineNotification kind="error" title={parserError} hideCloseButton /> : null}
+          {parserError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{parserError}</AlertDescription>
+            </Alert>
+          ) : null}
           {parsedCount > 0 ? (
-            <InlineNotification kind="success" title={`Parsed ${parsedCount} flight leg(s). Your trip legs have been updated.`} hideCloseButton />
+            <Alert>
+              <AlertDescription>Parsed {parsedCount} flight leg(s). Your trip legs have been updated.</AlertDescription>
+            </Alert>
           ) : null}
         </div>
       ) : null}
       {parserQuery.isSuccess && !parserQuery.data ? (
-        <InlineNotification kind="info" title="Quick Itinerary Parser is unavailable until OpenAI configuration is set." hideCloseButton />
+        <Alert>
+          <AlertDescription>Quick Itinerary Parser is unavailable until OpenAI configuration is set.</AlertDescription>
+        </Alert>
       ) : null}
-      <div className="home-toolbar">
+      <div className="my-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2>Plan a Future Trip (Multi-leg Supported)</h2>
-          <p>Total legs: {legs.length}</p>
+          <h2 className="text-xl font-semibold">Plan a Future Trip (Multi-leg Supported)</h2>
+          <p className="text-sm text-muted-foreground">Total legs: {legs.length}</p>
         </div>
         <Button onClick={() => setLegs((current) => addForecastLeg(current))}>Add Leg</Button>
       </div>
       {issues.length > 0 ? (
-        <InlineNotification kind="warning" title="Missing information" subtitle={issues.join(' ')} hideCloseButton />
+        <Alert>
+          <AlertTitle>Missing information</AlertTitle>
+          <AlertDescription>{issues.join(' ')}</AlertDescription>
+        </Alert>
       ) : null}
       {legs.map((leg, index) => (
-        <article key={leg.id} className="forecast-leg">
-          <div className="home-toolbar">
+        <article key={leg.id} className="my-4 flex flex-col gap-3 rounded-xl border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3>
               Leg {index + 1} ({legLabel(index, legs.length)})
             </h3>
             {legs.length > 1 ? (
-              <Button kind="danger--ghost" onClick={() => setLegs((current) => current.filter((item) => item.id !== leg.id))}>
+              <Button variant="ghost" className="text-destructive" onClick={() => setLegs((current) => current.filter((item) => item.id !== leg.id))}>
                 Remove
               </Button>
             ) : null}
@@ -134,16 +147,16 @@ export function ForecastPage() {
               })
             }
           />
-          <TextInput
+          <Field
             id={`forecast-departure-date-${leg.id}`}
-            labelText="Departure Date"
+            label="Departure Date"
             type="date"
             value={leg.departureDate}
             onChange={(event) => updateLeg(leg.id, { ...leg, departureDate: event.target.value, arrivalDate: event.target.value })}
           />
-          <TextInput
+          <Field
             id={`forecast-departure-time-${leg.id}`}
-            labelText="Departure Time"
+            label="Departure Time"
             type="time"
             value={leg.departureTime}
             onChange={(event) => updateLeg(leg.id, { ...leg, departureTime: event.target.value })}
@@ -166,16 +179,16 @@ export function ForecastPage() {
               })
             }
           />
-          <TextInput
+          <Field
             id={`forecast-arrival-date-${leg.id}`}
-            labelText="Arrival Date"
+            label="Arrival Date"
             type="date"
             value={leg.arrivalDate}
             onChange={(event) => updateLeg(leg.id, { ...leg, arrivalDate: event.target.value })}
           />
-          <TextInput
+          <Field
             id={`forecast-arrival-time-${leg.id}`}
-            labelText="Arrival Time"
+            label="Arrival Time"
             type="time"
             value={leg.arrivalTime}
             onChange={(event) => updateLeg(leg.id, { ...leg, arrivalTime: event.target.value })}
@@ -184,7 +197,7 @@ export function ForecastPage() {
       ))}
       <Button onClick={() => void calculate()}>Calculate Forecast</Button>
       {result ? (
-        <div className="forecast-columns">
+        <div className="mt-6 grid gap-8 md:grid-cols-2">
           <DayColumn title="Current (Last 365 Days)" rows={sortByDays(result.current)} empty="No trips recorded in the last 365 days." homeCountry={homeCountry} />
           <DayColumn
             title="Forecast (365 Days from Trip End)"
@@ -197,7 +210,7 @@ export function ForecastPage() {
         </div>
       ) : null}
       {result && primary && primaryDays > 183 && !isHome(primary, homeCountry) ? (
-        <div className="forecast-warning">
+        <div className="my-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
           <h3>183-Day Limit Warning</h3>
           <p>
             Your forecasted trip would result in {primaryDays} days in {primary} over a 365-day period, which exceeds the typical

@@ -1,7 +1,11 @@
-import { ComboBox, Checkbox, Tag } from '@carbon/react'
-import { useEffect, useMemo, useState } from 'react'
-import { airportsForQuery, findByIataCode, searchAirports, type Airport } from '../lib/airports.ts'
-import { formatUtcOffset, manualTimezones, type TimezonePlace } from '../lib/timezones.ts'
+import { useState } from 'react'
+import { airportsForQuery } from '../lib/airports.ts'
+import { formatUtcOffset, manualTimezones } from '../lib/timezones.ts'
+import type { Airport } from '../lib/airports.ts'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export interface AirportSelection {
   city: string
@@ -10,7 +14,15 @@ export interface AirportSelection {
   iataCode: string | null
 }
 
-interface AirportSelectorProps {
+export function AirportSelector({
+  id,
+  label,
+  city,
+  country,
+  timezone,
+  iataCode,
+  onChange,
+}: {
   id: string
   label: string
   city: string
@@ -18,93 +30,105 @@ interface AirportSelectorProps {
   timezone: string
   iataCode: string | null
   onChange: (selection: AirportSelection) => void
-}
-
-export function AirportSelector({ id, label, city, country, timezone, iataCode, onChange }: AirportSelectorProps) {
-  const initial = useMemo(() => initialAirport(iataCode, city), [iataCode, city])
-  const [manual, setManual] = useState(false)
+}) {
+  const [manual, setManual] = useState(iataCode == null && city !== '')
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [selected, setSelected] = useState<Airport | null>(initial)
+  const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query), 300)
-    return () => window.clearTimeout(timer)
-  }, [query])
+  const items = airportsForQuery(query)
+  const caption = [city, country].filter(Boolean).join(', ')
 
-  const items = useMemo(() => airportsForQuery(debouncedQuery), [debouncedQuery])
-  const offset = formatUtcOffset(timezone)
+  function selectAirport(airport: Airport) {
+    setQuery(`${airport.city} (${airport.iataCode})`)
+    setOpen(false)
+    onChange({
+      city: airport.city,
+      country: airport.country,
+      timezone: airport.ianaTimezone,
+      iataCode: airport.iataCode,
+    })
+  }
 
   return (
-    <div className="airport-selector">
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{label}</Label>
       {manual ? (
-        <ComboBox
-          id={`${id}-timezone`}
-          titleText={label}
-          placeholder="Search timezones"
-          items={manualTimezones as TimezonePlace[]}
-          itemToString={(item) => item?.displayName ?? ''}
-          onChange={(data: { selectedItem?: TimezonePlace | null }) => {
-            const place = data.selectedItem
-            if (!place) return
-            onChange({ city: place.city, country: place.country, timezone: place.timezoneId, iataCode: null })
-          }}
-        />
-      ) : (
-        <ComboBox
+        <select
           id={id}
-          titleText={label}
-          placeholder="Search by code, city, name, or country"
-          items={items}
-          itemToString={(item) => item?.displayName ?? ''}
-          selectedItem={selected}
-          onInputChange={(value: string) => setQuery(value)}
-          onChange={(data: { selectedItem?: Airport | null }) => {
-            const airport = data.selectedItem
-            if (!airport) return
-            setSelected(airport)
+          aria-label="Timezone"
+          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+          value={timezone}
+          onChange={(event) => {
+            const place = manualTimezones.find((item) => item.timezoneId === event.target.value)
             onChange({
-              city: airport.city,
-              country: airport.country,
-              timezone: airport.ianaTimezone,
-              iataCode: airport.iataCode,
+              city: place?.city ?? city,
+              country: place?.country ?? country,
+              timezone: event.target.value,
+              iataCode: null,
             })
           }}
-        />
+        >
+          {manualTimezones.map((place) => (
+            <option key={place.timezoneId} value={place.timezoneId}>
+              {place.displayName}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div className="relative">
+          <Input
+            id={id}
+            role="combobox"
+            aria-expanded={open && items.length > 0}
+            aria-autocomplete="list"
+            value={query}
+            placeholder="Search by city, country, or IATA code"
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setOpen(true)
+            }}
+          />
+          {open && items.length > 0 ? (
+            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-md">
+              {items.map((airport) => (
+                <li key={airport.iataCode}>
+                  <button
+                    type="button"
+                    role="option"
+                    className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectAirport(airport)}
+                  >
+                    {airport.displayName}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       )}
-      {city && country ? (
-        <p className="airport-caption">
-          {city}, {country}
+      {caption ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{caption}</span>
+          {timezone ? <Badge variant="secondary">{formatUtcOffset(timezone)}</Badge> : null}
         </p>
       ) : null}
-      {offset ? (
-        <Tag type="cool-gray" size="sm">
-          {offset}
-        </Tag>
-      ) : null}
-      <Checkbox
-        id={`${id}-manual`}
-        labelText="Manual timezone"
-        checked={manual}
-        onChange={(_event, data) => {
-          setManual(data.checked)
-          if (data.checked) {
-            onChange({ city, country, timezone, iataCode: null })
-          }
-        }}
-      />
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={manual}
+          onCheckedChange={(checked) => {
+            const enabled = checked === true
+            setManual(enabled)
+            if (enabled) {
+              setQuery('')
+              onChange({ city, country, timezone, iataCode: null })
+            }
+          }}
+        />
+        Manual timezone
+      </label>
     </div>
   )
-}
-
-function initialAirport(iataCode: string | null, city: string): Airport | null {
-  if (iataCode) {
-    return findByIataCode(iataCode) ?? null
-  }
-
-  if (city) {
-    return searchAirports(city).find((airport) => airport.city.toLowerCase() === city.toLowerCase()) ?? null
-  }
-
-  return null
 }
