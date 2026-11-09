@@ -81,6 +81,23 @@ export async function downloadFile(path: string): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+export async function getHomeCountry(): Promise<string | null> {
+  const body = await readJson<{ homeCountry?: string | null }>(await apiFetch('/api/v1/profile/home-country'))
+  const value = body?.homeCountry
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+export async function setHomeCountry(homeCountry: string): Promise<string | null> {
+  const body = await readJson<{ homeCountry?: string | null }>(
+    await apiFetch('/api/v1/profile/home-country', {
+      method: 'PUT',
+      body: JSON.stringify({ homeCountry }),
+    }),
+  )
+  const value = body?.homeCountry
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
 export async function getCurrentUser(): Promise<CurrentUser> {
   return readJson<CurrentUser>(await apiFetch('/bff/user'))
 }

@@ -28,9 +28,10 @@ ADR-001 to ADR-014 are **retrospective**. They were written on 2026-09-19 from t
 | [ADR-011](ADR-011-docker-and-github-actions-delivery.md) | Docker Images Built and Published by GitHub Actions | Accepted |
 | [ADR-012](ADR-012-blazor-server-radzen-code-behind.md) | Blazor Server with Radzen Components and Code-Behind Files | Superseded by ADR-015 |
 | [ADR-013](ADR-013-carbon-design-system-replaces-liquid-glass.md) | Carbon Design System Replaces the Liquid Glass Theme | Accepted |
-| [ADR-014](ADR-014-home-country-in-browser-storage.md) | Keep the Home Country in Browser localStorage | Accepted |
+| [ADR-014](ADR-014-home-country-in-browser-storage.md) | Keep the Home Country in Browser localStorage | Superseded by ADR-017 |
 | [ADR-015](ADR-015-react-spa-replaces-blazor.md) | Replace the Blazor Server UI with a React SPA Served by the Existing Web Host | Accepted |
 | [ADR-016](ADR-016-mcp-server-streamable-http.md) | Expose ResidencyRoll to AI Clients as a Remote MCP Server over Streamable HTTP | Accepted |
+| [ADR-017](ADR-017-home-country-on-the-user-profile.md) | Store the Home Country on the User Profile | Accepted |
 
 ## Adding a new ADR
 

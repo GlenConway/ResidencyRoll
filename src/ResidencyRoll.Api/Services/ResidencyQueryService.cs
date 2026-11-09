@@ -41,6 +41,34 @@ public class ResidencyQueryService
         };
     }
 
+    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips)
+    {
+        var basic = await ForecastAsync(userId, hypotheticalTrips);
+        var current = basic.Current.ToDictionary(row => row.CountryName, row => row.Days);
+        var forecast = basic.Forecast.ToDictionary(row => row.CountryName, row => row.Days);
+        if (hypotheticalTrips.Count == 0)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            return new ForecastBreakdown(today.AddDays(-365), today, current, forecast, new Dictionary<string, PeakCount>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        var window = _trips.GetForecastWindow(hypotheticalTrips);
+        var existing = await _trips.GetAllTripsAsync(userId);
+        var combined = new List<Trip>(existing);
+        combined.AddRange(hypotheticalTrips);
+        var presence = _residency.GenerateDailyPresenceLog(combined);
+        var earliest = hypotheticalTrips.Min(EarliestLocalDate);
+        var todayDate = DateOnly.FromDateTime(DateTime.Today);
+        var periodStart = earliest < todayDate ? earliest : todayDate;
+        if (periodStart > window.End)
+        {
+            periodStart = window.End;
+        }
+
+        var peaks = _residency.PeakRollingCounts(presence, periodStart, window.End);
+        return new ForecastBreakdown(window.Start, window.End, current, forecast, peaks);
+    }
+
     public async Task<List<DailyPresenceDto>> GetDailyPresenceAsync(string userId, DateOnly? startDate, DateOnly? endDate)
     {
         var trips = await _trips.GetAllTripsAsync(userId);
@@ -101,7 +129,7 @@ public class ResidencyQueryService
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
         var existing = await _trips.GetAllTripsAsync(userId);
         var bestEnd = request.TripStart;
-        var daysAtBest = DaysInCountry(existing, request, request.TripStart);
+        var daysAtBest = MeasureStay(existing, request, request.TripStart).PeakDays;
 
         if (daysAtBest > limit)
         {
@@ -115,7 +143,7 @@ public class ResidencyQueryService
         for (var extraDays = 1; extraDays <= limit + 366; extraDays++)
         {
             var candidate = request.TripStart.AddDays(extraDays);
-            var days = DaysInCountry(existing, request, candidate);
+            var days = MeasureStay(existing, request, candidate).PeakDays;
             if (days > limit)
             {
                 break;
@@ -130,6 +158,81 @@ public class ResidencyQueryService
             MaxEndDate = bestEnd,
             DaysAtLimit = daysAtBest
         };
+    }
+
+    public StayMeasure MeasureStay(IReadOnlyList<Trip> existing, MaxTripEndDateRequestDto request, DateTime end)
+    {
+        var hypothetical = Stay(request, end);
+        var combined = new List<Trip>(existing);
+        combined.AddRange(hypothetical);
+        var presence = _residency.GenerateDailyPresenceLog(combined);
+        var window = _trips.GetForecastWindow(hypothetical);
+        var endDays = CountCountry(_residency.CalculateResidencyDays(presence, window.Start, window.End), request.ArrivalCountry);
+        var periodStart = DateOnly.FromDateTime(request.TripStart);
+        if (periodStart > window.End)
+        {
+            periodStart = window.End;
+        }
+
+        var peaks = _residency.PeakRollingCounts(presence, periodStart, window.End);
+        var peakDays = endDays;
+        if (TryGetPeak(peaks, request.ArrivalCountry, out var peak) && peak.Days > peakDays)
+        {
+            peakDays = peak.Days;
+        }
+
+        return new StayMeasure(peakDays, endDays);
+    }
+
+    public async Task<LocationOnDate> GetLocationOnAsync(string userId, DateOnly day)
+    {
+        var trips = await _trips.GetAllTripsAsync(userId);
+        return LocationFrom(trips, day);
+    }
+
+    public async Task<CurrentLocation> GetCurrentLocationAsync(string userId)
+    {
+        var trips = await _trips.GetAllTripsAsync(userId);
+        var now = DateTime.UtcNow;
+        Trip? lastArrival = null;
+        var lastArrivalUtc = DateTime.MinValue;
+        Trip? inTransit = null;
+        foreach (var trip in trips)
+        {
+            var arrivalUtc = ToUtc(trip.ArrivalDateTime, trip.ArrivalTimezone);
+            var departureUtc = ToUtc(trip.DepartureDateTime, trip.DepartureTimezone);
+            if (arrivalUtc <= now && arrivalUtc >= lastArrivalUtc)
+            {
+                lastArrival = trip;
+                lastArrivalUtc = arrivalUtc;
+            }
+
+            if (departureUtc <= now && arrivalUtc > now)
+            {
+                inTransit = trip;
+            }
+        }
+
+        if (lastArrival is null)
+        {
+            return new CurrentLocation(string.Empty, "noData", null, null, null, null, null, null, null);
+        }
+
+        var today = LocationFrom(trips, DateOnly.FromDateTime(DateTime.Today));
+        var status = inTransit is not null ? "inTransit" : today.Status;
+        var country = inTransit is not null
+            ? "IN_TRANSIT"
+            : string.IsNullOrEmpty(today.LocationAtMidnight) ? lastArrival.ArrivalCountry : today.LocationAtMidnight;
+        return new CurrentLocation(
+            country,
+            status,
+            lastArrival.ArrivalIataCode,
+            lastArrival.ArrivalCity,
+            lastArrival.ArrivalCountry,
+            DateOnly.FromDateTime(lastArrival.ArrivalDateTime),
+            inTransit?.ArrivalIataCode,
+            inTransit?.ArrivalCity,
+            inTransit?.ArrivalCountry);
     }
 
     public async Task<List<StandardDurationForecastItemDto>> GetStandardDurationForecastsAsync(
@@ -170,14 +273,117 @@ public class ResidencyQueryService
         return results;
     }
 
-    private int DaysInCountry(IReadOnlyList<Trip> existing, MaxTripEndDateRequestDto request, DateTime end)
+    private int DaysInCountry(IReadOnlyList<Trip> existing, MaxTripEndDateRequestDto request, DateTime end) =>
+        MeasureStay(existing, request, end).EndOfWindowDays;
+
+    private LocationOnDate LocationFrom(IReadOnlyList<Trip> trips, DateOnly day)
     {
-        var hypothetical = Stay(request, end);
-        var (_, forecast) = _trips.ForecastDays(existing, hypothetical);
-        return forecast
-            .Where(pair => string.Equals(pair.Key, request.ArrivalCountry, StringComparison.OrdinalIgnoreCase))
-            .Select(pair => pair.Value)
-            .FirstOrDefault();
+        var presence = _residency.GenerateDailyPresenceLog(trips.ToList());
+        var match = presence.FirstOrDefault(item => item.Date == day && !string.IsNullOrWhiteSpace(item.LocationAtMidnight));
+        if (match is not null)
+        {
+            return new LocationOnDate(
+                day,
+                match.LocationAtMidnight,
+                match.LocationsDuringDay.ToList(),
+                match.IsInTransitAtMidnight,
+                IsTravelDay(trips, day) ? "recorded" : "gapFilled");
+        }
+
+        Trip? lastArrival = null;
+        var lastArrivalUtc = DateTime.MinValue;
+        foreach (var trip in trips)
+        {
+            if (DateOnly.FromDateTime(trip.ArrivalDateTime) > day || string.IsNullOrWhiteSpace(trip.ArrivalCountry))
+            {
+                continue;
+            }
+
+            var arrivalUtc = ToUtc(trip.ArrivalDateTime, trip.ArrivalTimezone);
+            if (lastArrival is null || arrivalUtc >= lastArrivalUtc)
+            {
+                lastArrival = trip;
+                lastArrivalUtc = arrivalUtc;
+            }
+        }
+
+        if (lastArrival is not null)
+        {
+            return new LocationOnDate(day, lastArrival.ArrivalCountry, [lastArrival.ArrivalCountry], false, "projected");
+        }
+
+        return new LocationOnDate(day, string.Empty, [], false, "noData");
+    }
+
+    private static bool IsTravelDay(IEnumerable<Trip> trips, DateOnly day)
+    {
+        foreach (var trip in trips)
+        {
+            var departure = DateOnly.FromDateTime(trip.DepartureDateTime);
+            var arrival = DateOnly.FromDateTime(trip.ArrivalDateTime);
+            var start = departure < arrival ? departure : arrival;
+            var end = departure < arrival ? arrival : departure;
+            if (day >= start && day <= end)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DateOnly EarliestLocalDate(Trip trip)
+    {
+        var departure = DateOnly.FromDateTime(trip.DepartureDateTime);
+        var arrival = DateOnly.FromDateTime(trip.ArrivalDateTime);
+        return departure < arrival ? departure : arrival;
+    }
+
+    private static int CountCountry(Dictionary<string, int> days, string country) =>
+        days.Where(pair => pair.Key.Equals(country, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Value).FirstOrDefault();
+
+    private static bool TryGetPeak(Dictionary<string, PeakCount> peaks, string country, out PeakCount peak)
+    {
+        if (peaks.TryGetValue(country, out peak))
+        {
+            return true;
+        }
+
+        foreach (var pair in peaks)
+        {
+            if (pair.Key.Equals(country, StringComparison.OrdinalIgnoreCase))
+            {
+                peak = pair.Value;
+                return true;
+            }
+        }
+
+        peak = default;
+        return false;
+    }
+
+    private static DateTime ToUtc(DateTime local, string? timezoneId)
+    {
+        if (local.Kind == DateTimeKind.Utc)
+        {
+            return local;
+        }
+
+        var unspecified = local.Kind == DateTimeKind.Unspecified ? local : DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        var zoneId = string.IsNullOrWhiteSpace(timezoneId) ? "UTC" : timezoneId;
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+            return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return DateTime.SpecifyKind(unspecified, DateTimeKind.Utc);
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return DateTime.SpecifyKind(unspecified, DateTimeKind.Utc);
+        }
     }
 
     private static List<Trip> Stay(MaxTripEndDateRequestDto request, DateTime end)
@@ -220,3 +426,30 @@ public class ResidencyQueryService
         ];
     }
 }
+
+public sealed record ForecastBreakdown(
+    DateOnly WindowStart,
+    DateOnly WindowEnd,
+    Dictionary<string, int> Current,
+    Dictionary<string, int> Forecast,
+    Dictionary<string, PeakCount> Peaks);
+
+public readonly record struct StayMeasure(int PeakDays, int EndOfWindowDays);
+
+public sealed record LocationOnDate(
+    DateOnly Date,
+    string LocationAtMidnight,
+    IReadOnlyList<string> LocationsDuringDay,
+    bool IsInTransitAtMidnight,
+    string Status);
+
+public sealed record CurrentLocation(
+    string Country,
+    string Status,
+    string? LastArrivalIataCode,
+    string? LastArrivalCity,
+    string? LastArrivalCountry,
+    DateOnly? LastArrivalDate,
+    string? InTransitArrivalIataCode,
+    string? InTransitArrivalCity,
+    string? InTransitArrivalCountry);

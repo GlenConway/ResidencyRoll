@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-09). Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
+Accepted (2026-11-09). Amended 2026-11-09: MCP structured output uses local wall-clock strings instead of RFC 3339 date-times; `get_days_per_country` includes the country rule; `forecast_trips` and `max_trip_end_date` report the peak inside the window; `get_location_on` projects past the last saved day; `get_current_location` added. Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
 
 ## Context
 
@@ -111,8 +111,11 @@ Tools wrap shared services and are never copies of controller code. Before addin
 | `get_residency_summary(startDate?, endDate?, homeCountry?)` | read | readOnly | `GET /trips/residency-summary`, plus days left/over and threshold status per country (the same rules the Home dashboard uses) |
 | `get_days_per_country(window: "last365" \| "all")` | read | readOnly | `days-per-country`, `days-per-country/last365` |
 | `get_daily_presence(startDate, endDate)` | read | readOnly | `GET /trips/daily-presence`, capped at 366 days per call |
-| `get_location_on(date)` | read | readOnly | one day of daily presence: midnight location, countries visited, transit |
+| `get_location_on(date)` | read | readOnly | one day of daily presence: midnight location, countries visited, transit, and status (`recorded`, `gapFilled`, `projected`, `noData`) |
+| `get_current_location()` | read | readOnly | current country, last arrival airport, and that arrival's local date |
 | `get_country_rules(country?)` | read | readOnly | `ResidencyCalculationService.GetCountryRule` |
+| `get_home_country()` | read | readOnly | saved home country for the signed-in user |
+| `set_home_country(homeCountry)` | write | idempotent | save or clear the home country |
 | `forecast_trips(trips[], homeCountry?)` | read | readOnly | `POST /trips/forecast`: hypothetical legs → current vs forecast days |
 | `max_trip_end_date(...)` | read | readOnly | `POST /trips/forecast/max-end-date` |
 | `standard_duration_forecasts(...)` | read | readOnly | `POST /trips/forecast/standard-durations` |
@@ -125,9 +128,9 @@ Tools wrap shared services and are never copies of controller code. Before addin
 Tool rules:
 
 - Inputs use IATA codes plus local date-times (`yyyy-MM-ddTHH:mm`). The server resolves city, country and IANA timezone from a **server-side airport table**. Move the airport data from `ClientApp/src/lib/airports.ts` into a single JSON file in `ResidencyRoll.Shared`, loaded by the API and imported by the React build, so the two can never drift. Callers may also give `city`, `country` and `timezone` explicitly for airports not in the table. Validate IANA zones with `TimeZoneInfo.FindSystemTimeZoneById`.
-- `homeCountry` is an optional argument wherever days left/over depend on it, because the home country lives in browser storage (ADR-014). Tool descriptions tell the model to ask the user when it is missing.
-- Outputs return `structuredContent` with an `outputSchema`, plus a short text summary for clients that only show text. Dates are ISO 8601. Country names match the existing rules table.
-- Tool descriptions state the residency semantics in a sentence or two: the location-at-midnight model, the rolling 365-day window, partial-day countries. This lets the model explain answers correctly.
+- `homeCountry` is an optional argument wherever days left/over depend on it. When it is omitted, tools use the home country saved on the user profile ([ADR-017](ADR-017-home-country-on-the-user-profile.md)). `get_home_country` and `set_home_country` read and change that value.
+- Outputs return `structuredContent` with an `outputSchema`, plus a short text summary for clients that only show text. Country names match the existing rules table. Local leg times are strings in `yyyy-MM-ddTHH:mm` with no offset, because they are wall-clock times in the airport's timezone. Date-only values use `yyyy-MM-dd`. The shared REST DTOs stay `DateTime`; MCP has its own output records.
+- Tool descriptions state that each country uses either the midnight rule or the partial-day rule, and that `ruleType` in the result says which. `get_days_per_country` includes `ruleType` and `thresholdDays`. `forecast_trips` returns `windowStart`, `windowEnd`, per-country `peakDays` and `peakDate`, and threshold status, with both country lists sorted by days descending. `max_trip_end_date`'s `DaysAtLimit` is the peak rolling count in the window. `get_location_on` projects the last arrival country past the last saved day and marks that `projected`.
 - Write tools validate exactly as REST does (same service methods). Clients ask the user to confirm because of the annotations. The server does not rely on that confirmation for safety.
 - Not exposed: CSV import/export, database backup, system info. These are file and admin operations with no chat use.
 

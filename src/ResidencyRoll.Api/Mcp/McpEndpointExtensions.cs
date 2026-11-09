@@ -59,13 +59,14 @@ public static class McpEndpointExtensions
                     Version = version
                 };
                 options.ServerInstructions =
-                    "Answer residency questions from the signed-in user's trips. Days follow the location at local midnight, except partial-day countries, which count any presence that day. The usual window is the rolling 365 days ending today. The home country is not stored on the server; ask the user when days left, days over, or days away depend on it. Write tools change saved trips, so confirm with the user first. parse_itinerary returns a draft and saves nothing.";
+                    "Answer residency questions from the signed-in user's trips. Each country uses either the midnight rule (location at local midnight) or the partial-day rule (any presence during the day). Tool results include ruleType so you can tell which. The usual window is the rolling 365 days ending today. The home country is saved on the user profile. Call get_home_country, and set_home_country when it is missing, before answering days left, days over, or days away. Use get_current_location for the current country and last arrival airport. forecast_trips reports the window and a peak count that can exceed the count at the end of the window. Leg times are local wall-clock times with no offset. Write tools change saved trips, so confirm with the user first. parse_itinerary returns a draft and saves nothing.";
             })
             .WithHttpTransport(options => options.Stateless = true)
             .WithTools<TripReadTools>()
             .WithTools<ResidencyTools>()
             .WithTools<ForecastTools>()
             .WithTools<TripWriteTools>()
+            .WithTools<ProfileTools>()
             .WithPrompts<ResidencyPrompts>()
             .WithResources<CountryRulesResource>();
 

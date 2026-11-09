@@ -124,21 +124,39 @@ public class TripService
 
         var today = DateTime.Today;
         var currentWindowStart = today.AddDays(-365);
-
-        // Use the latest date (either arrival or departure) as the end of the forecast window
-        var latestArrival = hypotheticalTrips.Max(t => t.ArrivalDateTime);
-        var latestDeparture = hypotheticalTrips.Max(t => t.DepartureDateTime);
-        var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
-        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
+        var window = GetForecastWindow(hypotheticalTrips);
 
         var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(existingTrips, currentWindowStart, today);
 
         var tripsWithHypothetical = new List<Trip>(existingTrips);
         tripsWithHypothetical.AddRange(hypotheticalTrips);
 
-        var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(tripsWithHypothetical, forecastWindowStart, forecastWindowEnd);
+        var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(
+            tripsWithHypothetical,
+            window.Start.ToDateTime(TimeOnly.MinValue),
+            window.End.ToDateTime(TimeOnly.MinValue));
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
+
+    /// <summary>
+    /// Rolling window whose end is the latest local date-time on the hypothetical legs.
+    /// The start is 365 days earlier, matching <see cref="ForecastDays"/>.
+    /// </summary>
+    public ForecastWindow GetForecastWindow(IReadOnlyList<Trip> hypotheticalTrips)
+    {
+        if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
+        {
+            throw new ArgumentException("At least one hypothetical trip is required.", nameof(hypotheticalTrips));
+        }
+
+        var latestArrival = hypotheticalTrips.Max(trip => trip.ArrivalDateTime);
+        var latestDeparture = hypotheticalTrips.Max(trip => trip.DepartureDateTime);
+        var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
+        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
+        return new ForecastWindow(
+            DateOnly.FromDateTime(forecastWindowStart.Date),
+            DateOnly.FromDateTime(forecastWindowEnd.Date));
     }
 
     public async Task<int> GetTotalDaysAwayInLast365DaysAsync(string userId)
@@ -174,3 +192,5 @@ public class TripService
         return _residencyService.CalculateResidencyDays(presenceLog, windowStartDate, windowEndDate);
     }
 }
+
+public readonly record struct ForecastWindow(DateOnly Start, DateOnly End);

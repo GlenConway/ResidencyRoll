@@ -12,10 +12,10 @@ namespace ResidencyRoll.Api.Mcp;
 [McpServerToolType]
 public sealed class TripReadTools
 {
-    private const string Semantics = "Residency uses the location at local midnight. The usual window is the rolling 365 days ending today. Partial-day countries count any presence during the day.";
+    private const string Semantics = McpSemantics.Rules;
 
-    [McpServerTool(Name = "list_trips", Title = "List trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(TripDto[]))]
-    [Description("Lists the signed-in user's flight legs, optionally overlapping a date range. " + Semantics)]
+    [McpServerTool(Name = "list_trips", Title = "List trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTrip[]))]
+    [Description("Lists the signed-in user's flight legs, optionally overlapping a date range. Leg times are local wall-clock times with no offset. " + Semantics)]
     public static async Task<CallToolResult> ListTrips(
         TripService trips,
         ClaimsPrincipal user,
@@ -27,14 +27,17 @@ public sealed class TripReadTools
         var all = await trips.GetAllTripsAsync(userId);
         DateOnly? fromDate = string.IsNullOrWhiteSpace(from) ? null : TripLegResolver.ParseDate(from, "from");
         DateOnly? toDate = string.IsNullOrWhiteSpace(to) ? null : TripLegResolver.ParseDate(to, "to");
-        var selected = all.Where(trip => Overlaps(trip.DepartureDateTime, trip.ArrivalDateTime, fromDate, toDate)).Select(trip => trip.ToDto()).ToList();
+        var selected = all
+            .Where(trip => Overlaps(trip.DepartureDateTime, trip.ArrivalDateTime, fromDate, toDate))
+            .Select(trip => McpTrip.From(trip.ToDto()))
+            .ToList();
         var summary = selected.Count == 0
             ? "No trips."
             : $"{selected.Count} trip{(selected.Count == 1 ? "" : "s")}: " + string.Join("; ", selected.Select(trip => $"{trip.DepartureIataCode ?? trip.DepartureCity} to {trip.ArrivalIataCode ?? trip.ArrivalCity}"));
         return McpResults.Ok(summary, selected);
     }
 
-    [McpServerTool(Name = "get_trip", Title = "Get trip", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(TripDto))]
+    [McpServerTool(Name = "get_trip", Title = "Get trip", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTrip))]
     [Description("Returns one flight leg by id. A leg owned by someone else is reported as not found.")]
     public static async Task<CallToolResult> GetTrip(
         TripService trips,
@@ -48,14 +51,15 @@ public sealed class TripReadTools
             throw new ModelContextProtocol.McpException("Trip not found.");
         }
 
-        var dto = trip.ToDto();
+        var dto = McpTrip.From(trip.ToDto());
         return McpResults.Ok($"{dto.DepartureCity} ({dto.DepartureIataCode}) to {dto.ArrivalCity} ({dto.ArrivalIataCode}).", dto);
     }
 
-    [McpServerTool(Name = "get_days_per_country", Title = "Days per country", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(CountryDaysDto[]))]
-    [Description("Days counted in each country. window is \"last365\" for the rolling 365 days ending today, or \"all\" for the whole log. " + Semantics)]
+    [McpServerTool(Name = "get_days_per_country", Title = "Days per country", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpCountryDays[]))]
+    [Description("Days counted in each country, with ruleType (Midnight or PartialDay) and thresholdDays. window is \"last365\" for the rolling 365 days ending today, or \"all\" for the whole log. " + Semantics)]
     public static async Task<CallToolResult> GetDaysPerCountry(
         TripService trips,
+        ResidencyCalculationService rules,
         ClaimsPrincipal user,
         [Description("last365 or all.")] string window)
     {
@@ -69,13 +73,13 @@ public sealed class TripReadTools
         };
 
         var rows = totals
-            .Select(pair => new CountryDaysDto { CountryName = pair.Key, Days = pair.Value })
+            .Select(pair => McpCountryDays.From(pair.Key, pair.Value, rules))
             .OrderByDescending(row => row.Days)
             .ThenBy(row => row.CountryName, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var summary = rows.Count == 0
             ? $"No days recorded ({window})."
-            : string.Join(" ", rows.Select(row => $"{row.CountryName}: {row.Days}."));
+            : string.Join(" ", rows.Select(row => $"{row.CountryName}: {row.Days} days, {row.RuleType}, threshold {row.ThresholdDays}."));
         return McpResults.Ok(summary, rows);
     }
 
@@ -100,35 +104,38 @@ public sealed class TripReadTools
 [McpServerToolType]
 public sealed class ResidencyTools
 {
-    private const string Semantics = "Residency uses the location at local midnight. The usual window is the rolling 365 days ending today. Partial-day countries count any presence during the day. The home country is stored in the user's browser, so ask for it when days left or days over depend on it.";
+    private const string Semantics = McpSemantics.Rules + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "get_residency_summary", Title = "Residency summary", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ResidencyCountryStatus[]))]
     [Description("Days per country between two dates, plus days left, days over, and threshold status (under, approaching, over, or home). Defaults to the last 365 days. " + Semantics)]
     public static async Task<CallToolResult> GetResidencySummary(
         ResidencyQueryService query,
+        UserProfileService profiles,
         ClaimsPrincipal user,
         [Description("Range start, yyyy-MM-dd. Defaults to 365 days before the end date.")] string? startDate = null,
         [Description("Range end, yyyy-MM-dd. Defaults to today.")] string? endDate = null,
-        [Description("Home country name, matching the country names in the result. Ask the user when it is missing.")] string? homeCountry = null)
+        [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null)
     {
         McpScopes.Require(user, McpScopes.Read);
+        var userId = McpScopes.UserId(user);
+        var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
         var end = string.IsNullOrWhiteSpace(endDate) ? DateOnly.FromDateTime(DateTime.Today) : TripLegResolver.ParseDate(endDate, "endDate");
         var start = string.IsNullOrWhiteSpace(startDate) ? end.AddDays(-365) : TripLegResolver.ParseDate(startDate, "startDate");
-        var summary = await query.GetResidencySummaryAsync(McpScopes.UserId(user), start, end);
-        var rows = summary.Select(item => ResidencyCountryStatus.From(item, homeCountry)).ToList();
+        var summary = await query.GetResidencySummaryAsync(userId, start, end);
+        var rows = summary.Select(item => ResidencyCountryStatus.From(item, home)).ToList();
         var text = rows.Count == 0
             ? $"No residency data from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}."
             : string.Join(" ", rows.Select(row => $"{row.CountryName}: {row.TotalDays} days, {row.ThresholdStatus}, {row.DaysUntilThreshold} left, {row.DaysOverThreshold} over."));
-        if (string.IsNullOrWhiteSpace(homeCountry))
+        if (home is null)
         {
-            text += " Home country was not provided; ask the user before treating a country as home.";
+            text += " No home country is saved. Ask the user, then call set_home_country.";
         }
 
         return McpResults.Ok(text, rows);
     }
 
     [McpServerTool(Name = "get_daily_presence", Title = "Daily presence", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(DailyPresenceDto[]))]
-    [Description("Midnight location, countries visited, and transit flag for each day in a range. At most 366 days per call. " + Semantics)]
+    [Description("Midnight location, countries visited, and transit flag for each day in a range. At most 366 days per call. Days after the last saved trip are omitted; use get_location_on to project those. " + Semantics)]
     public static async Task<CallToolResult> GetDailyPresence(
         ResidencyQueryService query,
         ClaimsPrincipal user,
@@ -153,8 +160,8 @@ public sealed class ResidencyTools
         return McpResults.Ok($"{presence.Count} days from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", presence);
     }
 
-    [McpServerTool(Name = "get_location_on", Title = "Location on a date", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(DailyPresenceDto))]
-    [Description("Where the user was on one date: midnight location, countries visited that day, and whether midnight was in transit. " + Semantics)]
+    [McpServerTool(Name = "get_location_on", Title = "Location on a date", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpLocationOn))]
+    [Description("Where the user was on one date. status is recorded, gapFilled, projected, or noData. A date after the last saved trip is projected from the last arrival country and marked projected. " + Semantics)]
     public static async Task<CallToolResult> GetLocationOn(
         ResidencyQueryService query,
         ClaimsPrincipal user,
@@ -162,17 +169,37 @@ public sealed class ResidencyTools
     {
         McpScopes.Require(user, McpScopes.Read);
         var day = TripLegResolver.ParseDate(date, "date");
-        var presence = await query.GetDailyPresenceAsync(McpScopes.UserId(user), day, day);
-        var match = presence.FirstOrDefault();
-        if (match is null)
+        var location = await query.GetLocationOnAsync(McpScopes.UserId(user), day);
+        var payload = McpLocationOn.From(location);
+        var during = payload.LocationsDuringDay.Count == 0 ? "none" : string.Join(", ", payload.LocationsDuringDay);
+        var text = location.Status switch
         {
-            match = new DailyPresenceDto { Date = day, LocationAtMidnight = string.Empty, LocationsDuringDay = [] };
-            return McpResults.Ok($"No presence recorded for {day:yyyy-MM-dd}.", match);
+            "noData" => $"No presence recorded for {day:yyyy-MM-dd}, and there is no earlier arrival to project from.",
+            "projected" => $"No presence recorded for {day:yyyy-MM-dd}. Projected location is {location.LocationAtMidnight}. Status: projected.",
+            _ => $"On {day:yyyy-MM-dd} the midnight location was {location.LocationAtMidnight}. Countries during the day: {during}. In transit at midnight: {(location.IsInTransitAtMidnight ? "yes" : "no")}. Status: {location.Status}."
+        };
+        return McpResults.Ok(text, payload);
+    }
+
+    [McpServerTool(Name = "get_current_location", Title = "Current location", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpCurrentLocation))]
+    [Description("Country the user is in now, the last arrival airport at or before now, and that arrival's local date. Use the airport as the departure airport when forecasting a future trip. status is recorded, gapFilled, projected, inTransit, or noData. " + Semantics)]
+    public static async Task<CallToolResult> GetCurrentLocation(
+        ResidencyQueryService query,
+        ClaimsPrincipal user)
+    {
+        McpScopes.Require(user, McpScopes.Read);
+        var location = await query.GetCurrentLocationAsync(McpScopes.UserId(user));
+        var payload = McpCurrentLocation.From(location);
+        if (location.Status == "noData")
+        {
+            return McpResults.Ok("No arrival at or before now.", payload);
         }
 
-        var during = match.LocationsDuringDay.Count == 0 ? "none" : string.Join(", ", match.LocationsDuringDay);
-        var text = $"On {day:yyyy-MM-dd} the midnight location was {(string.IsNullOrEmpty(match.LocationAtMidnight) ? "unknown" : match.LocationAtMidnight)}. Countries during the day: {during}. In transit at midnight: {(match.IsInTransitAtMidnight ? "yes" : "no")}.";
-        return McpResults.Ok(text, match);
+        var airport = string.IsNullOrWhiteSpace(location.LastArrivalIataCode) ? location.LastArrivalCity : location.LastArrivalIataCode;
+        var text = location.Status == "inTransit"
+            ? $"In transit toward {location.InTransitArrivalCity} ({location.InTransitArrivalIataCode}), {location.InTransitArrivalCountry}. Last arrival was {airport} in {location.LastArrivalCountry} on {location.LastArrivalDate:yyyy-MM-dd}."
+            : $"Current country is {location.Country} ({location.Status}). Last arrival was {airport} in {location.LastArrivalCountry} on {location.LastArrivalDate:yyyy-MM-dd}.";
+        return McpResults.Ok(text, payload);
     }
 
     [McpServerTool(Name = "get_country_rules", Title = "Country residency rules", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(CountryRuleResult[]))]
@@ -196,7 +223,7 @@ public sealed class ResidencyTools
     }
 }
 
-public sealed class ResidencyCountryStatus
+public class ResidencyCountryStatus
 {
     public string CountryName { get; set; } = string.Empty;
     public int TotalDays { get; set; }

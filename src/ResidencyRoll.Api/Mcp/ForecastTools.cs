@@ -3,6 +3,7 @@ using System.Security.Claims;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using ResidencyRoll.Api.Models;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Trips;
 
@@ -11,46 +12,58 @@ namespace ResidencyRoll.Api.Mcp;
 [McpServerToolType]
 public sealed class ForecastTools
 {
-    private const string Semantics = "The forecast uses the same location-at-midnight rules as saved trips, including partial-day countries and International Date Line crossings. The home country is stored in the user's browser, so ask for it when you need days away from home.";
+    private const string Semantics = McpSemantics.Rules + McpSemantics.Forecast + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "forecast_trips", Title = "Forecast trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ForecastToolResult))]
-    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
+    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. windowStart and windowEnd bound the forecast. Each country includes totalDays at windowEnd, peakDays and peakDate, and thresholdStatus (under, approaching, over, or home). Both lists are sorted by days, descending. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
     public static async Task<CallToolResult> ForecastTrips(
         ResidencyQueryService query,
+        ResidencyCalculationService rules,
+        UserProfileService profiles,
         AirportCatalog airports,
         ClaimsPrincipal user,
         [Description("Hypothetical flight legs, in order.")] List<McpTripLeg> trips,
-        [Description("Home country name. Ask the user when it is missing.")] string? homeCountry = null)
+        [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null)
     {
         McpScopes.Require(user, McpScopes.Read);
         var userId = McpScopes.UserId(user);
+        var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
         var legs = (trips ?? []).Select(leg => TripLegResolver.Resolve(leg, userId, airports)).ToList();
-        var forecast = await query.ForecastAsync(userId, legs);
+        var forecast = await query.ForecastBreakdownAsync(userId, legs);
+        var current = forecast.Current
+            .Select(pair => ToStatus(pair.Key, pair.Value, rules, home))
+            .OrderByDescending(row => row.TotalDays)
+            .ThenBy(row => row.CountryName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var forecastRows = ForecastRows(forecast, rules, home);
         int? awayCurrent = null;
         int? awayForecast = null;
-        if (!string.IsNullOrWhiteSpace(homeCountry))
+        if (home is not null)
         {
-            awayCurrent = DaysAway(forecast.Current, homeCountry);
-            awayForecast = DaysAway(forecast.Forecast, homeCountry);
+            awayCurrent = DaysAway(current, home);
+            awayForecast = DaysAway(forecastRows, home);
         }
 
         var result = new ForecastToolResult
         {
-            Current = forecast.Current,
-            Forecast = forecast.Forecast,
-            HomeCountry = string.IsNullOrWhiteSpace(homeCountry) ? null : homeCountry.Trim(),
+            WindowStart = forecast.WindowStart,
+            WindowEnd = forecast.WindowEnd,
+            Current = current,
+            Forecast = forecastRows,
+            HomeCountry = home,
             DaysAwayCurrent = awayCurrent,
             DaysAwayForecast = awayForecast
         };
-        var text = Summarize("Current", forecast.Current) + " " + Summarize("Forecast", forecast.Forecast);
-        text += string.IsNullOrWhiteSpace(homeCountry)
-            ? " Home country was not provided, so days away from home are not calculated."
-            : $" Days away from {homeCountry.Trim()}: current {awayCurrent}, forecast {awayForecast}.";
+        var text = $"Forecast window {forecast.WindowStart:yyyy-MM-dd} to {forecast.WindowEnd:yyyy-MM-dd}. "
+            + SummarizeCurrent(current) + " " + SummarizeForecast(forecastRows);
+        text += home is null
+            ? " No home country is saved, so days away from home are not calculated. Ask the user, then call set_home_country."
+            : $" Days away from {home} at the end of each window: current {awayCurrent}, forecast {awayForecast}.";
         return McpResults.Ok(text, result);
     }
 
-    [McpServerTool(Name = "max_trip_end_date", Title = "Latest trip end under the day limit", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(MaxTripEndDateResponseDto))]
-    [Description("Latest departure from the arrival country that keeps that country at or under dayLimit (default 183) in the forecast window. " + Semantics)]
+    [McpServerTool(Name = "max_trip_end_date", Title = "Latest trip end under the day limit", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpMaxEndDate))]
+    [Description("Latest departure from the arrival country that keeps that country's peak rolling count at or under dayLimit (default 183). DaysAtLimit is that peak, which can be higher than the count on the end date. MaxEndDate is a local time in the arrival airport's timezone. " + Semantics)]
     public static async Task<CallToolResult> MaxTripEndDate(
         ResidencyQueryService query,
         AirportCatalog airports,
@@ -69,12 +82,13 @@ public sealed class ForecastTools
         McpScopes.Require(user, McpScopes.Read);
         var request = StayRequest(airports, tripStart, dayLimit, departureIataCode, departureCity, departureCountry, departureTimezone, arrivalIataCode, arrivalCity, arrivalCountry, arrivalTimezone);
         var result = await query.CalculateMaxEndDateAsync(McpScopes.UserId(user), request);
+        var payload = McpMaxEndDate.From(result);
         return McpResults.Ok(
-            $"Latest end in {request.ArrivalCountry} is {result.MaxEndDate:yyyy-MM-ddTHH:mm}, with {result.DaysAtLimit} days against a limit of {request.DayLimit}.",
-            result);
+            $"Latest end in {request.ArrivalCountry} is {payload.MaxEndDate}, with a peak of {payload.DaysAtLimit} days against a limit of {request.DayLimit}.",
+            payload);
     }
 
-    [McpServerTool(Name = "standard_duration_forecasts", Title = "Standard duration forecasts", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(StandardDurationForecastItemDto[]))]
+    [McpServerTool(Name = "standard_duration_forecasts", Title = "Standard duration forecasts", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpDurationForecast[]))]
     [Description("Days in the arrival country for a set of stay lengths. Durations default to 7, 14, 30, 60, 90, and 180 days. " + Semantics)]
     public static async Task<CallToolResult> StandardDurationForecasts(
         ResidencyQueryService query,
@@ -108,8 +122,10 @@ public sealed class ForecastTools
             DayLimit = stay.DayLimit,
             Durations = durations
         };
-        var rows = await query.GetStandardDurationForecastsAsync(McpScopes.UserId(user), request);
-        var text = string.Join(" ", rows.Select(row => $"{row.DurationDays} days ends {row.EndDate:yyyy-MM-dd} with {row.TotalDaysInCountry} in {stay.ArrivalCountry}{(row.ExceedsLimit ? " (over the limit)" : "")}."));
+        var rows = (await query.GetStandardDurationForecastsAsync(McpScopes.UserId(user), request))
+            .Select(McpDurationForecast.From)
+            .ToList();
+        var text = string.Join(" ", rows.Select(row => $"{row.DurationDays} days ends {row.EndDate} with {row.TotalDaysInCountry} in {stay.ArrivalCountry}{(row.ExceedsLimit ? " (over the limit)" : "")}."));
         return McpResults.Ok(text, rows);
     }
 
@@ -172,19 +188,108 @@ public sealed class ForecastTools
         };
     }
 
-    private static int DaysAway(IEnumerable<CountryDaysDto> rows, string homeCountry) =>
-        rows.Where(row => !row.CountryName.Equals(homeCountry.Trim(), StringComparison.OrdinalIgnoreCase)).Sum(row => row.Days);
+    private static List<McpForecastCountry> ForecastRows(
+        ForecastBreakdown forecast,
+        ResidencyCalculationService rules,
+        string? homeCountry)
+    {
+        var names = new HashSet<string>(forecast.Forecast.Keys, StringComparer.OrdinalIgnoreCase);
+        foreach (var name in forecast.Peaks.Keys)
+        {
+            names.Add(name);
+        }
 
-    private static string Summarize(string label, IReadOnlyList<CountryDaysDto> rows) =>
+        var rows = new List<McpForecastCountry>();
+        foreach (var name in names)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var endDays = Lookup(forecast.Forecast, name);
+            var peakDays = endDays;
+            var peakDate = forecast.WindowEnd;
+            if (forecast.Peaks.TryGetValue(name, out var peak) && peak.Days >= endDays)
+            {
+                peakDays = peak.Days;
+                peakDate = peak.Date;
+            }
+
+            if (endDays == 0 && peakDays == 0)
+            {
+                continue;
+            }
+
+            var status = ToStatus(name, peakDays, rules, homeCountry);
+            rows.Add(McpForecastCountry.Create(status, endDays, peakDays, peakDate));
+        }
+
+        return rows
+            .OrderByDescending(row => row.TotalDays)
+            .ThenBy(row => row.CountryName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static int Lookup(Dictionary<string, int> counts, string name)
+    {
+        if (counts.TryGetValue(name, out var days))
+        {
+            return days;
+        }
+
+        foreach (var pair in counts)
+        {
+            if (pair.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                return pair.Value;
+            }
+        }
+
+        return 0;
+    }
+
+    private static ResidencyCountryStatus ToStatus(string name, int days, ResidencyCalculationService rules, string? homeCountry)
+    {
+        var rule = rules.GetCountryRule(name);
+        var threshold = rule.ResidencyThresholdDays ?? 183;
+        var until = threshold - days;
+        return ResidencyCountryStatus.From(new ResidencySummaryDto
+        {
+            CountryName = name,
+            TotalDays = days,
+            RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+            ThresholdDays = threshold,
+            IsApproachingThreshold = until <= 30 && until > 0,
+            DaysUntilThreshold = Math.Max(0, until)
+        }, homeCountry);
+    }
+
+    private static int DaysAway(IEnumerable<ResidencyCountryStatus> rows, string homeCountry) =>
+        rows.Where(row => !row.CountryName.Equals(homeCountry.Trim(), StringComparison.OrdinalIgnoreCase)).Sum(row => row.TotalDays);
+
+    private static string SummarizeCurrent(IReadOnlyList<ResidencyCountryStatus> rows) =>
         rows.Count == 0
-            ? $"{label}: no days."
-            : $"{label}: " + string.Join(", ", rows.Select(row => $"{row.CountryName} {row.Days}"));
+            ? "Current: no days."
+            : "Current: " + string.Join(", ", rows.Select(row => $"{row.CountryName} {row.TotalDays} ({row.RuleType}, {row.ThresholdStatus})"));
+
+    private static string SummarizeForecast(IReadOnlyList<McpForecastCountry> rows) =>
+        rows.Count == 0
+            ? "Forecast: no days."
+            : "Forecast: " + string.Join(", ", rows.Select(row =>
+                $"{row.CountryName} {row.TotalDays} at window end, peak {row.PeakDays} on {row.PeakDate:yyyy-MM-dd} ({row.RuleType}, {row.ThresholdStatus})"));
 }
 
 public sealed class ForecastToolResult
 {
-    public List<CountryDaysDto> Current { get; set; } = [];
-    public List<CountryDaysDto> Forecast { get; set; } = [];
+    [Description("First day of the rolling forecast window, yyyy-MM-dd.")]
+    public DateOnly WindowStart { get; set; }
+
+    [Description("Last day of the rolling forecast window. totalDays is the count on this date.")]
+    public DateOnly WindowEnd { get; set; }
+
+    public List<ResidencyCountryStatus> Current { get; set; } = [];
+    public List<McpForecastCountry> Forecast { get; set; } = [];
     public string? HomeCountry { get; set; }
     public int? DaysAwayCurrent { get; set; }
     public int? DaysAwayForecast { get; set; }

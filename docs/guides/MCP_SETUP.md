@@ -86,11 +86,11 @@ MCP Inspector: run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP
 
 ## What the tools can do
 
-Read tools report trips, days per country, the residency summary, one day's location, country rules, and forecasts. `homeCountry` is optional. The server does not store a home country, so ask the user before answering days left, days over, or days away.
+Read tools report trips, days per country, the residency summary, one day's location, country rules, forecasts, and the saved home country. `get_residency_summary` and `forecast_trips` use that saved country when `homeCountry` is omitted. Call `set_home_country` (or set it in the app) before answering days left, days over, or days away when none is saved.
 
 `parse_itinerary` is listed only when an OpenAI model, endpoint, and API key are all set. It returns a draft and saves nothing. `lookup_airport` searches the shared airport list.
 
-`create_trip`, `create_trips`, `update_trip`, and `delete_trip` change saved trips and require `write:trips`. `create_trips` saves every leg or none. Confirm with the user before a write. The server does not treat that confirmation as a security check.
+`create_trip`, `create_trips`, `update_trip`, `delete_trip`, and `set_home_country` change saved data and require `write:trips`. `create_trips` saves every leg or none. Confirm with the user before a write. The server does not treat that confirmation as a security check.
 
 CSV import, backups, and system administration are not exposed.
 

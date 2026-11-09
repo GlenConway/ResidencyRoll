@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-017](ADR-017-home-country-on-the-user-profile.md)
 
 > Retrospective ADR. Written after the fact from the code and git history; the date is when the decision landed in the repo. Landed 2026-01-18 (`persist home country selection in browser localStorage`).
 

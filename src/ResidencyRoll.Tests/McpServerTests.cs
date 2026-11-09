@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Json.Schema;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -53,6 +55,12 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             .ToDictionary(row => row.GetProperty("countryName").GetString()!, row => row.GetProperty("days").GetInt32());
         Assert.Equal(expected, actual);
         Assert.True(actual["United Kingdom"] > 0);
+        var unitedKingdom = structured.EnumerateArray().Single(row => row.GetProperty("countryName").GetString() == "United Kingdom");
+        Assert.Equal("Midnight", unitedKingdom.GetProperty("ruleType").GetString());
+        Assert.Equal(183, unitedKingdom.GetProperty("thresholdDays").GetInt32());
+        var canada = structured.EnumerateArray().Single(row => row.GetProperty("countryName").GetString() == "Canada");
+        Assert.Equal("PartialDay", canada.GetProperty("ruleType").GetString());
+        Assert.Equal(183, canada.GetProperty("thresholdDays").GetInt32());
     }
 
     [Fact]
@@ -94,6 +102,17 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             .Select(row => row.GetProperty("countryName").GetString())
             .ToArray();
         Assert.Contains(countries, country => country is "New Zealand" or "United States");
+        var windowStart = DateOnly.Parse(result.StructuredContent.Value.GetProperty("windowStart").GetString()!);
+        var windowEnd = DateOnly.Parse(result.StructuredContent.Value.GetProperty("windowEnd").GetString()!);
+        Assert.True(windowEnd > windowStart);
+        var totals = result.StructuredContent.Value.GetProperty("forecast").EnumerateArray().Select(row => row.GetProperty("totalDays").GetInt32()).ToArray();
+        Assert.Equal(totals.OrderByDescending(days => days), totals);
+        foreach (var row in result.StructuredContent.Value.GetProperty("forecast").EnumerateArray())
+        {
+            Assert.True(row.GetProperty("peakDays").GetInt32() >= row.GetProperty("totalDays").GetInt32());
+            Assert.False(string.IsNullOrEmpty(row.GetProperty("thresholdStatus").GetString()));
+            Assert.False(string.IsNullOrEmpty(row.GetProperty("ruleType").GetString()));
+        }
     }
 
     [Fact]
@@ -206,6 +225,157 @@ public class McpServerTests : IClassFixture<McpApiFactory>
     }
 
     [Fact]
+    public void DateTimeFormat_ShouldRejectALocalTimeWithoutAnOffset()
+    {
+        var schema = JsonSchema.FromText("""{"type":"string","format":"date-time"}""");
+        var options = new EvaluationOptions { RequireFormatValidation = true };
+        var local = schema.Evaluate(JsonDocument.Parse("\"2026-12-05T21:00:00\"").RootElement, options);
+        var offset = schema.Evaluate(JsonDocument.Parse("\"2026-12-05T21:00:00Z\"").RootElement, options);
+
+        Assert.False(local.IsValid);
+        Assert.True(offset.IsValid);
+    }
+
+    [Fact]
+    public async Task ToolResults_ShouldMatchTheirOutputSchemas()
+    {
+        var http = _factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        foreach (var tool in tools)
+        {
+            Assert.True(tool.ProtocolTool.OutputSchema.HasValue, tool.Name);
+            Assert.DoesNotContain("date-time", tool.ProtocolTool.OutputSchema.Value.GetRawText());
+        }
+
+        var listed = await mcp.CallToolAsync("list_trips", new Dictionary<string, object?>());
+        AssertSchema(tools, "list_trips", listed);
+        var trip = listed.StructuredContent!.Value.EnumerateArray().First();
+        Assert.Matches(LocalTimePattern(), trip.GetProperty("departureDateTime").GetString());
+        Assert.Matches(LocalTimePattern(), trip.GetProperty("arrivalDateTime").GetString());
+        Assert.Contains("yyyy-MM-ddTHH:mm", tools.Single(tool => tool.Name == "list_trips").ProtocolTool.OutputSchema!.Value.GetRawText());
+
+        await AssertCall(mcp, tools, "get_trip", new Dictionary<string, object?> { ["id"] = trip.GetProperty("id").GetInt32() });
+        await AssertCall(mcp, tools, "get_days_per_country", new Dictionary<string, object?> { ["window"] = "last365" });
+        await AssertCall(mcp, tools, "get_days_per_country", new Dictionary<string, object?> { ["window"] = "all" });
+        await AssertCall(mcp, tools, "get_residency_summary", new Dictionary<string, object?> { ["homeCountry"] = "Canada" });
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        await AssertCall(mcp, tools, "get_daily_presence", new Dictionary<string, object?>
+        {
+            ["startDate"] = today.AddDays(-20).ToString("yyyy-MM-dd"),
+            ["endDate"] = today.AddDays(-10).ToString("yyyy-MM-dd")
+        });
+        var future = await AssertCall(mcp, tools, "get_location_on", new Dictionary<string, object?>
+        {
+            ["date"] = today.AddDays(30).ToString("yyyy-MM-dd")
+        });
+        Assert.Equal("projected", future.StructuredContent!.Value.GetProperty("status").GetString());
+        Assert.False(string.IsNullOrEmpty(future.StructuredContent.Value.GetProperty("locationAtMidnight").GetString()));
+        await AssertCall(mcp, tools, "get_location_on", new Dictionary<string, object?>
+        {
+            ["date"] = today.AddDays(-20).ToString("yyyy-MM-dd")
+        });
+        var current = await AssertCall(mcp, tools, "get_current_location", new Dictionary<string, object?>());
+        Assert.Equal("YHZ", current.StructuredContent!.Value.GetProperty("lastArrivalIataCode").GetString());
+        Assert.Equal("Canada", current.StructuredContent.Value.GetProperty("country").GetString());
+        await AssertCall(mcp, tools, "get_country_rules", new Dictionary<string, object?>());
+        var forecast = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+        {
+            ["homeCountry"] = "Canada",
+            ["trips"] = new object[] { Leg("YHZ", today.AddDays(20).ToString("yyyy-MM-dd") + "T09:00", "LHR", today.AddDays(20).ToString("yyyy-MM-dd") + "T18:00") }
+        });
+        var forecastDays = forecast.StructuredContent!.Value.GetProperty("forecast").EnumerateArray().Select(row => row.GetProperty("totalDays").GetInt32()).ToArray();
+        var currentDays = forecast.StructuredContent.Value.GetProperty("current").EnumerateArray().Select(row => row.GetProperty("totalDays").GetInt32()).ToArray();
+        Assert.Equal(forecastDays.OrderByDescending(days => days), forecastDays);
+        Assert.Equal(currentDays.OrderByDescending(days => days), currentDays);
+        var maxEnd = await AssertCall(mcp, tools, "max_trip_end_date", new Dictionary<string, object?>
+        {
+            ["tripStart"] = today.AddDays(40).ToString("yyyy-MM-dd") + "T12:00",
+            ["dayLimit"] = 30,
+            ["departureIataCode"] = "YHZ",
+            ["arrivalIataCode"] = "LHR"
+        });
+        var maxEndDate = maxEnd.StructuredContent!.Value.GetProperty("maxEndDate").GetString();
+        var summary = McpClientConnector.Text(maxEnd);
+        Assert.Matches(LocalTimePattern(), maxEndDate);
+        Assert.Contains($"is {maxEndDate}", summary);
+        var daysAtLimit = maxEnd.StructuredContent.Value.GetProperty("daysAtLimit").GetInt32();
+        Assert.Contains($"with a peak of {daysAtLimit} days", summary);
+        Assert.InRange(daysAtLimit, 0, 30);
+        await AssertCall(mcp, tools, "standard_duration_forecasts", new Dictionary<string, object?>
+        {
+            ["tripStart"] = today.AddDays(40).ToString("yyyy-MM-dd") + "T12:00",
+            ["dayLimit"] = 183,
+            ["durations"] = new[] { 7, 14 },
+            ["departureIataCode"] = "YHZ",
+            ["arrivalIataCode"] = "LHR"
+        });
+        await AssertCall(mcp, tools, "lookup_airport", new Dictionary<string, object?> { ["query"] = "pearson" });
+        await AssertCall(mcp, tools, "get_home_country", new Dictionary<string, object?>());
+        await AssertCall(mcp, tools, "set_home_country", new Dictionary<string, object?> { ["homeCountry"] = "Canada" });
+        await AssertCall(mcp, tools, "set_home_country", new Dictionary<string, object?> { ["homeCountry"] = "" });
+
+        var created = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("YUL", "2026-08-01T09:00", "CDG", "2026-08-01T21:00")
+        });
+        var createdId = created.StructuredContent!.Value.GetProperty("id").GetInt32();
+        Assert.Equal("2026-08-01T09:00", created.StructuredContent.Value.GetProperty("departureDateTime").GetString());
+        var createdMany = await AssertCall(mcp, tools, "create_trips", new Dictionary<string, object?>
+        {
+            ["legs"] = new object[] { Leg("YHZ", "2026-08-10T08:00", "LHR", "2026-08-10T18:00") }
+        });
+        var createdManyId = createdMany.StructuredContent!.Value.EnumerateArray().First().GetProperty("id").GetInt32();
+        await AssertCall(mcp, tools, "update_trip", new Dictionary<string, object?>
+        {
+            ["id"] = createdId,
+            ["changes"] = Leg("YUL", "2026-08-01T09:00", "LHR", "2026-08-01T20:00")
+        });
+        await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdId });
+        await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdManyId });
+    }
+
+    [Fact]
+    public async Task SavedHomeCountry_ShouldApplyWhenTheArgumentIsOmitted()
+    {
+        var http = _factory.CreateClient();
+        var saved = await http.PutAsJsonAsync("/api/v1/profile/home-country", new { homeCountry = "Canada" });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        try
+        {
+            await using var mcp = await McpClientConnector.ConnectAsync(http);
+            var home = await mcp.CallToolAsync("get_home_country", new Dictionary<string, object?>());
+            Assert.NotEqual(true, home.IsError);
+            Assert.Equal("Canada", home.StructuredContent!.Value.GetProperty("homeCountry").GetString());
+
+            var summary = await mcp.CallToolAsync("get_residency_summary", new Dictionary<string, object?>());
+            Assert.NotEqual(true, summary.IsError);
+            var canada = summary.StructuredContent!.Value.EnumerateArray().Single(row => row.GetProperty("countryName").GetString() == "Canada");
+            Assert.True(canada.GetProperty("isHomeCountry").GetBoolean());
+            Assert.Equal("home", canada.GetProperty("thresholdStatus").GetString());
+            Assert.DoesNotContain("No home country is saved", McpClientConnector.Text(summary));
+        }
+        finally
+        {
+            var cleared = await http.PutAsJsonAsync("/api/v1/profile/home-country", new { homeCountry = "" });
+            Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task ParseItineraryOutputSchema_ShouldNotUseDateTimeFormat()
+    {
+        await using var factory = new McpApiFactory { ParserConfigured = true };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var parser = (await mcp.ListToolsAsync()).Single(tool => tool.Name == "parse_itinerary");
+        var schema = parser.ProtocolTool.OutputSchema!.Value.GetRawText();
+        Assert.DoesNotContain("date-time", schema);
+        Assert.Contains("departure_airport", schema);
+    }
+
+    [Fact]
     public async Task ParseItinerary_ShouldBeListedOnlyWhenConfigured()
     {
         await using var factory = new McpApiFactory { ParserConfigured = true };
@@ -216,6 +386,40 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         var parser = Assert.Single(tools, tool => tool.Name == "parse_itinerary");
         Assert.Equal(true, parser.ProtocolTool.Annotations?.OpenWorldHint);
     }
+
+    private static async Task<CallToolResult> AssertCall(
+        McpClient mcp,
+        IReadOnlyList<McpClientTool> tools,
+        string name,
+        Dictionary<string, object?> args)
+    {
+        var result = await mcp.CallToolAsync(name, args);
+        AssertSchema(tools, name, result);
+        return result;
+    }
+
+    private static void AssertSchema(IReadOnlyList<McpClientTool> tools, string name, CallToolResult result)
+    {
+        Assert.NotEqual(true, result.IsError);
+        var schemaElement = tools.Single(tool => tool.Name == name).ProtocolTool.OutputSchema!.Value;
+        var schema = JsonSchema.FromText(schemaElement.GetRawText());
+        var evaluation = schema.Evaluate(result.StructuredContent!.Value, new EvaluationOptions
+        {
+            RequireFormatValidation = true,
+            OutputFormat = OutputFormat.List
+        });
+        if (evaluation.IsValid)
+        {
+            return;
+        }
+
+        var errors = string.Join("; ", (evaluation.Details ?? [])
+            .Where(detail => detail.Errors is { Count: > 0 })
+            .SelectMany(detail => detail.Errors!.Select(error => $"{detail.InstanceLocation} {error.Key}: {error.Value}")));
+        Assert.Fail($"{name} structured content does not match its output schema. {errors}");
+    }
+
+    private static Regex LocalTimePattern() => new(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$");
 
     private static async Task<int> TripCount(HttpClient http)
     {

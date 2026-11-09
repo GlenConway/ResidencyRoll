@@ -12,13 +12,16 @@ public sealed class ResidencyPrompts
 {
     [McpServerPrompt(Name = "residency_check"), Description("Asks for the home country, then reviews the residency summary and an optional forecast.")]
     public static IEnumerable<ChatMessage> ResidencyCheck(
-        [Description("Home country. Ask the user when it is missing.")] string homeCountry)
+        [Description("Home country. Optional. Leave empty to use the saved home country.")] string? homeCountry = null)
     {
+        var home = string.IsNullOrWhiteSpace(homeCountry)
+            ? "Call get_home_country. If none is saved, ask the user and call set_home_country before answering days left or days away."
+            : $"The user's home country is {homeCountry.Trim()}. Call set_home_country if that is not already saved.";
         return
         [
             new ChatMessage(
                 ChatRole.User,
-                $"The user's home country is {homeCountry}. Call get_residency_summary for the last 365 days with this homeCountry. If they describe a future trip, call forecast_trips before saying whether any country crosses its threshold.")
+                $"{home} Call get_current_location for the current country and last arrival airport, then get_residency_summary for the last 365 days. Read ruleType before treating a country as midnight-only; partial-day countries count any presence. If they describe a future trip, call forecast_trips and use peakDays and thresholdStatus, because the count at the end of the window can be lower than the peak.")
         ];
     }
 }

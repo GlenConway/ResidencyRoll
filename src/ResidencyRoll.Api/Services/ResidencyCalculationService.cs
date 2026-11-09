@@ -505,8 +505,7 @@ public class ResidencyCalculationService
     public Dictionary<string, int> CalculateResidencyDays(List<DailyPresence> dailyPresenceLog, DateOnly? startDate = null, DateOnly? endDate = null)
     {
         var residencyDays = new Dictionary<string, int>();
-        
-        // Filter by date range if provided
+
         var filteredLog = dailyPresenceLog;
         if (startDate.HasValue)
         {
@@ -516,34 +515,105 @@ public class ResidencyCalculationService
         {
             filteredLog = filteredLog.Where(dp => dp.Date <= endDate.Value).ToList();
         }
-        
+
         foreach (var presence in filteredLog)
         {
-            // Skip transit days (they count for no country)
-            if (presence.IsInTransitAtMidnight)
+            foreach (var country in CountriesCountedOn(presence))
             {
-                continue;
+                IncrementCountryDays(residencyDays, country);
             }
-            
-            // Check if this country uses Partial Day Rule
-            var rule = GetCountryRule(presence.LocationAtMidnight);
-            
-            if (rule.RuleType == ResidencyRuleType.MidnightRule)
+        }
+
+        return residencyDays;
+    }
+
+    /// <summary>
+    /// Highest rolling count for each country. The window ending on day D is the 366 calendar
+    /// days from D-365 through D, the same span <see cref="CalculateResidencyDays"/> uses.
+    /// The recorded date is the first day that count was reached.
+    /// </summary>
+    public Dictionary<string, PeakCount> PeakRollingCounts(
+        List<DailyPresence> dailyPresenceLog,
+        DateOnly periodStart,
+        DateOnly periodEnd)
+    {
+        var peaks = new Dictionary<string, PeakCount>(StringComparer.OrdinalIgnoreCase);
+        if (periodEnd < periodStart)
+        {
+            return peaks;
+        }
+
+        var contributions = dailyPresenceLog
+            .OrderBy(presence => presence.Date)
+            .Select(presence => (presence.Date, Countries: CountriesCountedOn(presence)))
+            .ToList();
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var nextToAdd = 0;
+        var nextToRemove = 0;
+
+        for (var day = periodStart; day <= periodEnd; day = day.AddDays(1))
+        {
+            var windowStart = day.AddDays(-365);
+            while (nextToAdd < contributions.Count && contributions[nextToAdd].Date <= day)
             {
-                // Midnight Rule: Count based on location at midnight
-                IncrementCountryDays(residencyDays, presence.LocationAtMidnight);
+                Adjust(counts, contributions[nextToAdd].Countries, 1);
+                nextToAdd++;
             }
-            else if (rule.RuleType == ResidencyRuleType.PartialDayRule)
+
+            while (nextToRemove < nextToAdd && contributions[nextToRemove].Date < windowStart)
             {
-                // Partial Day Rule: Count all locations visited during the day
-                foreach (var location in presence.LocationsDuringDay)
+                Adjust(counts, contributions[nextToRemove].Countries, -1);
+                nextToRemove++;
+            }
+
+            foreach (var pair in counts)
+            {
+                if (!peaks.TryGetValue(pair.Key, out var peak) || pair.Value > peak.Days)
                 {
-                    IncrementCountryDays(residencyDays, location);
+                    peaks[pair.Key] = new PeakCount(pair.Value, day);
                 }
             }
         }
-        
-        return residencyDays;
+
+        return peaks;
+    }
+
+    private List<string> CountriesCountedOn(DailyPresence presence)
+    {
+        if (presence.IsInTransitAtMidnight)
+        {
+            return [];
+        }
+
+        var rule = GetCountryRule(presence.LocationAtMidnight);
+        if (rule.RuleType == ResidencyRuleType.MidnightRule)
+        {
+            return [presence.LocationAtMidnight];
+        }
+
+        if (rule.RuleType == ResidencyRuleType.PartialDayRule)
+        {
+            return presence.LocationsDuringDay.ToList();
+        }
+
+        return [];
+    }
+
+    private static void Adjust(Dictionary<string, int> counts, IReadOnlyList<string> countries, int delta)
+    {
+        foreach (var country in countries)
+        {
+            counts.TryGetValue(country, out var current);
+            var next = current + delta;
+            if (next <= 0)
+            {
+                counts.Remove(country);
+            }
+            else
+            {
+                counts[country] = next;
+            }
+        }
     }
 
     /// <summary>
@@ -678,3 +748,5 @@ public class ResidencyCalculationService
         return "UNKNOWN";
     }
 }
+
+public readonly record struct PeakCount(int Days, DateOnly Date);

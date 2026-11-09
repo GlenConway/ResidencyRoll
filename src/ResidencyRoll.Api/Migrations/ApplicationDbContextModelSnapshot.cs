@@ -15,7 +15,7 @@ namespace ResidencyRoll.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("ResidencyRoll.Api.Models.Trip", b =>
                 {
@@ -69,6 +69,21 @@ namespace ResidencyRoll.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Trips");
+                });
+
+            modelBuilder.Entity("ResidencyRoll.Api.Models.UserProfile", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HomeCountry")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserProfiles");
                 });
 #pragma warning restore 612, 618
         }

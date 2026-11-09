@@ -47,7 +47,7 @@ Trip and residency logic live in the API. The web app and MCP clients both call 
 
 ## Features
 
-- **Residency dashboard**: Country cards for a date range you choose, defaulting to the last 365 days. Each card shows the days counted, whether that country uses the midnight or partial-day rule, the day threshold, and progress toward it. The home country is stored in the browser and changes the days-left and days-over wording.
+- **Residency dashboard**: Country cards for a date range you choose, defaulting to the last 365 days. Each card shows the days counted, whether that country uses the midnight or partial-day rule, the day threshold, and progress toward it. The home country is saved on the user profile and changes the days-left and days-over wording.
 - **Daily presence timeline**: One cell per day, grouped by month and coloured by country, including days spent in transit. Select a day to see the midnight location and the countries visited. The same range can be exported as CSV.
 - **Trip management**: Add, edit, and delete flight legs, with airports and local departure and arrival times. Filter the list, import and export trips as CSV, and paste a booking to draft legs when itinerary parsing is configured.
 - **Forecast**: Plan a future trip of one or more legs and compare days in the last 365 days with the projected window. The forecast is not saved.
@@ -58,7 +58,7 @@ Trip and residency logic live in the API. The web app and MCP clients both call 
 
 ## MCP tools
 
-The server is on the web host at `/mcp`. Read tools need the `read:trips` scope. Write tools need `write:trips`, and write does not include read. When JWT authentication is off, calls run as the local user. The server does not store a home country, so the tools expect you to supply `homeCountry` when days left, days over, or days away depend on it.
+The server is on the web host at `/mcp`. Read tools need the `read:trips` scope. Write tools need `write:trips`, and write does not include read. When JWT authentication is off, calls run as the local user. The home country is saved on the user profile. `get_residency_summary` and `forecast_trips` use it when `homeCountry` is omitted.
 
 | Tool | What it does |
 |---|---|
@@ -69,6 +69,8 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `get_daily_presence` | Midnight location, countries visited, and the transit flag, up to 366 days per call |
 | `get_location_on` | The presence record for a single date |
 | `get_country_rules` | Midnight or partial-day rule and threshold for one country, or for every known country |
+| `get_home_country` | The home country saved for the signed-in user |
+| `set_home_country` | Save or clear the home country |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
 | `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved |
 | `max_trip_end_date` | Latest departure that keeps the arrival country at or under a day limit (183 by default) |
