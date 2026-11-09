@@ -22,6 +22,8 @@ env:
 
 jobs:
   build-and-push:
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
     strategy:
       matrix:
         service:
@@ -89,3 +91,42 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+
+  # Actions mail is failure-only for every workflow, and that setting cannot
+  # be limited to this one. An issue comment still notifies the author.
+  confirm-push:
+    name: Confirm the registry push
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Tell the author both images were pushed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            channel=latest
+          elif [ "$GITHUB_REF" = "refs/heads/dev" ]; then
+            channel=dev
+          else
+            channel="$GITHUB_REF_NAME"
+          fi
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          web="${REGISTRY}/${IMAGE_NAME}/web"
+          api="${REGISTRY}/${IMAGE_NAME}/api"
+          title="Docker images pushed to ${REGISTRY}"
+          body=$(printf '@%s Both images were pushed.\n\n- `%s:%s`\n- `%s:%s`\n- `%s:%s`\n- `%s:%s`\n\n%s\n' \
+            "$GITHUB_ACTOR" \
+            "$web" "$channel" "$web" "$VERSION" \
+            "$api" "$channel" "$api" "$VERSION" \
+            "$run_url")
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          number=$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            --jq "[.[] | select(.pull_request == null) | select(.title == \"${title}\")][0].number")
+          if [ -z "$number" ] || [ "$number" = "null" ]; then
+            gh issue create --title "$title" --assignee "$GITHUB_ACTOR" --body "$body"
+          else
+            gh issue comment "$number" --body "$body"
+          fi
