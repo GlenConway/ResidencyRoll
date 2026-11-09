@@ -68,6 +68,14 @@ Days left/over relative to home country, date range picker on the residency stat
 
 ---
 
+### 🚧 M9 — Migrate the Web UI from Blazor to React (Planned, from 2026-11-09)
+
+Replace the Blazor Server UI with a React SPA served by the existing `ResidencyRoll.Web` host acting as a BFF. Sub-milestones M9.1 to M9.7, the UI parity checklist and the deployment contract (same images, ports, env vars and Auth0 settings) are in the ADR.
+
+**ADR:** [ADR-015](../adr/ADR-015-react-spa-replaces-blazor.md)
+
+---
+
 ## Adding a milestone
 
 1. Create a GitHub Milestone and attach issues/PRs to it.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-015](ADR-015-react-spa-replaces-blazor.md) (2026-11-09)
 
 > Retrospective ADR. Written after the fact from the code and git history; the date is when the decision landed in the repo. Radzen chosen 2026-01-01; code-behind convention applied 2026-01-18 (`Refactor Blazor components to use code-behind pattern`).
 

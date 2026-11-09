@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by [ADR-015](ADR-015-react-spa-replaces-blazor.md): the Web frontend becomes a React SPA served by the same Web host.
 
 > Retrospective ADR. Written after the fact from the code and git history; the date is when the decision landed in the repo. Landed 2026-01-11 (`refactor: Split monolithic Blazor app into clean API backend and frontend architecture`).
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by [ADR-015](ADR-015-react-spa-replaces-blazor.md): Carbon comes from `@carbon/react` after the React migration.
 
 > Retrospective ADR. Written after the fact from the code and git history; the date is when the decision landed in the repo. Liquid Glass added 2026-01-23; replaced by Carbon 2026-02-19 (`feat: migrate UI from glass effect to Carbon Design System`).
 

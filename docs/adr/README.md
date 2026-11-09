@@ -26,9 +26,10 @@ ADR-001 to ADR-014 are **retrospective**. They were written on 2026-09-19 from t
 | [ADR-009](ADR-009-forwarded-headers-behind-reverse-proxy.md) | Configurable Forwarded Headers for Reverse-Proxy Deployments | Accepted |
 | [ADR-010](ADR-010-itinerary-parsing-with-semantic-kernel.md) | Parse Pasted Flight Itineraries with Semantic Kernel and OpenAI | Accepted |
 | [ADR-011](ADR-011-docker-and-github-actions-delivery.md) | Docker Images Built and Published by GitHub Actions | Accepted |
-| [ADR-012](ADR-012-blazor-server-radzen-code-behind.md) | Blazor Server with Radzen Components and Code-Behind Files | Accepted |
+| [ADR-012](ADR-012-blazor-server-radzen-code-behind.md) | Blazor Server with Radzen Components and Code-Behind Files | Superseded by ADR-015 |
 | [ADR-013](ADR-013-carbon-design-system-replaces-liquid-glass.md) | Carbon Design System Replaces the Liquid Glass Theme | Accepted |
 | [ADR-014](ADR-014-home-country-in-browser-storage.md) | Keep the Home Country in Browser localStorage | Accepted |
+| [ADR-015](ADR-015-react-spa-replaces-blazor.md) | Replace the Blazor Server UI with a React SPA Served by the Existing Web Host | Accepted |
 
 ## Adding a new ADR
 
