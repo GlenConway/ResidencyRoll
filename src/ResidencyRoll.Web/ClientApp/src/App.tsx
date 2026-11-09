@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { HomePage } from './pages/HomePage.tsx'
+import { ManageTripsPage } from './pages/ManageTripsPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { PlaceholderPage } from './pages/PlaceholderPage.tsx'
 import { AppShell, PageTitle } from './shell/AppShell.tsx'
@@ -22,7 +23,7 @@ export default function App() {
           element={
             <>
               <PageTitle title="Manage Trips" />
-              <PlaceholderPage heading="Manage Trips" message="Add, edit, and import the flights that make up your trips." />
+              <ManageTripsPage />
             </>
           }
         />
