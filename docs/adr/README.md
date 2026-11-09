@@ -30,6 +30,7 @@ ADR-001 to ADR-014 are **retrospective**. They were written on 2026-09-19 from t
 | [ADR-013](ADR-013-carbon-design-system-replaces-liquid-glass.md) | Carbon Design System Replaces the Liquid Glass Theme | Accepted |
 | [ADR-014](ADR-014-home-country-in-browser-storage.md) | Keep the Home Country in Browser localStorage | Accepted |
 | [ADR-015](ADR-015-react-spa-replaces-blazor.md) | Replace the Blazor Server UI with a React SPA Served by the Existing Web Host | Accepted |
+| [ADR-016](ADR-016-mcp-server-streamable-http.md) | Expose ResidencyRoll to AI Clients as a Remote MCP Server over Streamable HTTP | Accepted |
 
 ## Adding a new ADR
 

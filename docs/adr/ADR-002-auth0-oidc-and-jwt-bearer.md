@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by [ADR-016](ADR-016-mcp-server-streamable-http.md): the API also accepts tokens issued for the MCP resource audience.
 
 > Retrospective ADR. Written after the fact from the code and git history; the date is when the decision landed in the repo. Landed 2026-01-11 to 2026-01-12.
 

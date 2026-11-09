@@ -84,6 +84,23 @@ Replace the Blazor Server UI with a React SPA served by the existing `ResidencyR
 
 ---
 
+### 🚧 M10 — MCP Server for AI Clients (Planned, from 2026-11-09)
+
+Expose residency queries, forecasts and trip editing to Claude Code and other MCP clients through a stateless Streamable HTTP endpoint at `/mcp`, hosted in the API and published through the Web host, secured with OAuth 2.1 via Auth0. Design, tool list and "done when" criteria are in the ADR.
+
+- M10.1 — Shared residency query service and server-side airport data
+- M10.2 — MCP endpoint with read tools (auth disabled mode)
+- M10.3 — Forecast and itinerary tools
+- M10.4 — Public `/mcp` route through the Web host, transport hardening
+- M10.5 — OAuth for MCP (protected resource metadata, audiences, scopes, Auth0 guide)
+- M10.6 — Write tools
+- M10.7 — "Connect an AI client" panel and docs
+- M10.8 — (Optional) Personal access tokens
+
+**ADR:** [ADR-016](../adr/ADR-016-mcp-server-streamable-http.md)
+
+---
+
 ## Adding a milestone
 
 1. Create a GitHub Milestone and attach issues/PRs to it.
