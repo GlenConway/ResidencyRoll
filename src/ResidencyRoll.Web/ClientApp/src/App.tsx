@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router'
+import { HomePage } from './pages/HomePage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { PlaceholderPage } from './pages/PlaceholderPage.tsx'
 import { AppShell, PageTitle } from './shell/AppShell.tsx'
@@ -12,7 +13,7 @@ export default function App() {
           element={
             <>
               <PageTitle title="Residency Roll - Travel Tracker" />
-              <PlaceholderPage heading="Residency status" message="Calculate days in each country over the dates you choose." />
+              <HomePage />
             </>
           }
         />

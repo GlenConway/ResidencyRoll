@@ -19,7 +19,7 @@ describe('App shell', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(Response.json({ name: 'Ada Lovelace', email: 'ada@example.com', isAuthenticated: true })),
+      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ name: 'Ada Lovelace', email: 'ada@example.com', isAuthenticated: true }))),
     )
   })
 
