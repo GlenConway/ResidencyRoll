@@ -1,8 +1,10 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authentication;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using ResidencyRoll.Api.Authentication;
 using ResidencyRoll.Api.Configuration;
 using ResidencyRoll.Api.Data;
 using ResidencyRoll.Api.Services;
@@ -18,6 +20,7 @@ Log.Logger = new LoggerConfiguration()
         .Build())
     .CreateLogger();
 
+var hostAborted = false;
 try
 {
     var version = System.Reflection.Assembly.GetExecutingAssembly()
@@ -154,7 +157,9 @@ if (jwtEnabled)
 }
 else
 {
-    Log.Warning("JWT authentication is DISABLED. API endpoints are accessible without authentication.");
+    Log.Warning("JWT authentication is DISABLED. Requests run as the local user.");
+    builder.Services.AddAuthentication(LocalUserAuthenticationHandler.SchemeName)
+        .AddScheme<AuthenticationSchemeOptions, LocalUserAuthenticationHandler>(LocalUserAuthenticationHandler.SchemeName, _ => { });
 }
 
 builder.Services.AddAuthorization();
@@ -202,11 +207,22 @@ app.MapControllers();
 
 app.Run();
 }
+catch (HostAbortedException)
+{
+    hostAborted = true;
+    throw;
+}
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
 }
 finally
 {
-    Log.CloseAndFlush();
+    if (!hostAborted)
+    {
+        Log.CloseAndFlush();
+    }
 }
+
+/// <summary>Marker so tests can boot this host without colliding with the web project's Program class.</summary>
+public sealed class ApiEntryPoint;
