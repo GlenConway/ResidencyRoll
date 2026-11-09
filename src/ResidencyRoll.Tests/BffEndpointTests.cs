@@ -245,6 +245,17 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task LogoutWithFormCsrf_IsAccepted()
+    {
+        var client = CreateClient();
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string> { ["X-CSRF"] = "1" });
+
+        var response = await client.PostAsync("/auth/logout", content);
+
+        Assert.NotEqual(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Theory]
     [InlineData("https://evil.example/phish")]
     [InlineData("//evil.example")]

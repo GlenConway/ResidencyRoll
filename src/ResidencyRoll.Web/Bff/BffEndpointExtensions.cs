@@ -28,7 +28,7 @@ public static class BffEndpointExtensions
             var isBff = path.StartsWithSegments("/bff");
             var isAuthLogout = path.StartsWithSegments("/auth/logout");
 
-            if (RequiresCsrf(context.Request.Method) && (isApi || isAuthLogout) && !HasCsrfHeader(context.Request))
+            if (RequiresCsrf(context.Request.Method) && (isApi || isAuthLogout) && !await HasCsrfAsync(context.Request))
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsync("X-CSRF header required.");
@@ -154,8 +154,23 @@ public static class BffEndpointExtensions
         && !HttpMethods.IsOptions(method)
         && !HttpMethods.IsTrace(method);
 
-    private static bool HasCsrfHeader(HttpRequest request) =>
-        string.Equals(request.Headers[CsrfHeaderName], CsrfHeaderValue, StringComparison.Ordinal);
+    private static async Task<bool> HasCsrfAsync(HttpRequest request)
+    {
+        if (string.Equals(request.Headers[CsrfHeaderName], CsrfHeaderValue, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // A browser form cannot set headers. Logout accepts the same token as a form field
+        // so the navigation can follow the Auth0 end-session redirect.
+        if (request.Path.StartsWithSegments("/auth/logout") && request.HasFormContentType)
+        {
+            var form = await request.ReadFormAsync();
+            return string.Equals(form[CsrfHeaderName], CsrfHeaderValue, StringComparison.Ordinal);
+        }
+
+        return false;
+    }
 
     private static async Task SignOutAsync(HttpContext context)
     {

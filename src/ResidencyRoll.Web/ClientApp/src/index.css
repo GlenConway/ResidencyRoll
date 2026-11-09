@@ -1,0 +1,39 @@
+@import '@carbon/styles/css/styles.css';
+
+html,
+body,
+#root,
+.rr-theme {
+  min-height: 100%;
+}
+
+.rr-theme {
+  min-height: 100vh;
+}
+
+.rr-content {
+  padding: 2rem;
+}
+
+.rr-user-name {
+  align-self: center;
+  margin-right: 0.5rem;
+}
+
+.rr-logout {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 1rem;
+}
+
+.airport-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.airport-caption {
+  margin: 0;
+}

@@ -73,7 +73,7 @@ Days left/over relative to home country, date range picker on the residency stat
 Replace the Blazor Server UI with a React SPA served by the existing `ResidencyRoll.Web` host acting as a BFF. Sub-milestones, the UI parity checklist and the deployment contract (same images, ports, env vars and Auth0 settings) are in the ADR.
 
 - ✅ M9.1 — BFF endpoints in the Web host (Blazor still serves the UI)
-- ⬜ M9.2 — React scaffold, shell and shared building blocks
+- ✅ M9.2 — React scaffold, shell and shared building blocks
 - ⬜ M9.3 — Home page
 - ⬜ M9.4 — Manage Trips
 - ⬜ M9.5 — Forecast
