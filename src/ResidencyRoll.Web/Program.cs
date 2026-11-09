@@ -31,7 +31,7 @@ try
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
-Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "wwwroot"));
+Directory.CreateDirectory(Path.Join(builder.Environment.ContentRootPath, "wwwroot"));
 
 var keysPath = builder.Configuration["DataProtection:KeysPath"];
 if (string.IsNullOrWhiteSpace(keysPath))
@@ -44,15 +44,15 @@ if (string.IsNullOrWhiteSpace(keysPath))
     {
         keysPath = "/app/data/keys";
     }
-    else if (File.Exists(Path.Combine(builder.Environment.ContentRootPath, "ResidencyRoll.Web.csproj")))
+    else if (File.Exists(Path.Join(builder.Environment.ContentRootPath, "ResidencyRoll.Web.csproj")))
     {
         // Content root is the project folder. "data" and "Data" are the same directory
         // on a case-insensitive volume, so keep the key ring in the repo data folder.
-        keysPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "keys"));
+        keysPath = Path.GetFullPath(Path.Join(builder.Environment.ContentRootPath, "..", "..", "data", "keys"));
     }
     else
     {
-        keysPath = Path.Combine(builder.Environment.ContentRootPath, "data", "keys");
+        keysPath = Path.Join(builder.Environment.ContentRootPath, "data", "keys");
     }
 }
 
@@ -314,6 +314,7 @@ catch (HostAbortedException)
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
+    throw;
 }
 finally
 {

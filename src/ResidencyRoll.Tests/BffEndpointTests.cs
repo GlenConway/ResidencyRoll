@@ -92,7 +92,7 @@ public class BffWebApplicationFactory : WebApplicationFactory<WebEntryPoint>
                 ["Authentication:OpenIdConnect:ClientSecret"] = "test-secret",
                 ["Authentication:OpenIdConnect:RequireHttpsMetadata"] = "false",
                 ["Authentication:OpenIdConnect:ApiAudience"] = "https://example.invalid/api",
-                ["DataProtection:KeysPath"] = Path.Combine(Path.GetTempPath(), "residencyroll-tests", Guid.NewGuid().ToString("N"))
+                ["DataProtection:KeysPath"] = Path.Join(Path.GetTempPath(), "residencyroll-tests", Guid.NewGuid().ToString("N"))
             });
         });
 
@@ -199,7 +199,8 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     {
         _factory.Capture.Reset();
         var client = CreateClient();
-        var signIn = await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        using var signInBody = new StringContent(string.Empty);
+        var signIn = await client.PostAsync("/test/signin", signInBody);
         Assert.Equal(HttpStatusCode.NoContent, signIn.StatusCode);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/trips?startDate=2026-01-01")
@@ -236,7 +237,7 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     {
         _factory.Capture.Reset();
         var client = CreateClient();
-        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        await SignInAsync(client);
 
         var response = await client.PostAsJsonAsync("/api/v1/trips", new { hello = "world" });
 
@@ -249,7 +250,8 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     {
         var client = CreateClient();
 
-        var response = await client.PostAsync("/auth/logout", new StringContent(string.Empty));
+        using var logoutBody = new StringContent(string.Empty);
+        var response = await client.PostAsync("/auth/logout", logoutBody);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -283,7 +285,7 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     {
         _factory.Capture.Reset();
         var client = CreateClient();
-        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        await SignInAsync(client);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
         {
             Content = new StringContent("{\"jsonrpc\":\"2.0\"}", Encoding.UTF8, "application/json")
@@ -305,7 +307,8 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
         _factory.Capture.Reset();
         var client = CreateClient();
 
-        var response = await client.PostAsync("/mcp", new StringContent("{}", Encoding.UTF8, "application/json"));
+        using var body = new StringContent("{}", Encoding.UTF8, "application/json");
+        var response = await client.PostAsync("/mcp", body);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(string.Empty, _factory.Capture.Authorization);
@@ -315,7 +318,7 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     public async Task McpInfo_ReportsThatOAuthIsRequired()
     {
         var client = CreateClient();
-        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        await SignInAsync(client);
 
         var response = await client.GetAsync("/bff/mcp-info");
 
@@ -330,7 +333,7 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     public async Task UserEndpoint_ReturnsSignedInUser()
     {
         var client = CreateClient();
-        await client.PostAsync("/test/signin", new StringContent(string.Empty));
+        await SignInAsync(client);
 
         var response = await client.GetAsync("/bff/user");
 
@@ -339,6 +342,13 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
         Assert.Equal("Ada Lovelace", doc.RootElement.GetProperty("name").GetString());
         Assert.Equal("ada@example.com", doc.RootElement.GetProperty("email").GetString());
         Assert.True(doc.RootElement.GetProperty("isAuthenticated").GetBoolean());
+    }
+
+    private static async Task SignInAsync(HttpClient client)
+    {
+        using var content = new StringContent(string.Empty);
+        using var response = await client.PostAsync("/test/signin", content);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     private HttpClient CreateClient() =>

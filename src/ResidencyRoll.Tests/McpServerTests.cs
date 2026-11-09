@@ -234,7 +234,7 @@ public class McpServerTests : IClassFixture<McpApiFactory>
 
 public class McpApiFactory : WebApplicationFactory<ApiEntryPoint>
 {
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"residencyroll-mcp-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Join(Path.GetTempPath(), $"residencyroll-mcp-{Guid.NewGuid():N}.db");
 
     public bool McpEnabled { get; set; } = true;
     public bool ParserConfigured { get; set; }
@@ -321,12 +321,9 @@ public class McpApiFactory : WebApplicationFactory<ApiEntryPoint>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        foreach (var path in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var path in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" }.Where(File.Exists))
         {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
+            File.Delete(path);
         }
     }
 }

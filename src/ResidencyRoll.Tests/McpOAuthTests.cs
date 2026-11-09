@@ -194,7 +194,7 @@ public class McpOAuthTests
 
     private sealed class JwtApiFactory : WebApplicationFactory<ApiEntryPoint>
     {
-        private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"residencyroll-jwt-{Guid.NewGuid():N}.db");
+        private readonly string _databasePath = Path.Join(Path.GetTempPath(), $"residencyroll-jwt-{Guid.NewGuid():N}.db");
 
         public string? ResourceUrl { get; init; }
         public bool TrustForwardedHeaders { get; init; }

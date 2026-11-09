@@ -49,7 +49,7 @@ public class LocalApiAuthenticationTests : IClassFixture<LocalApiFactory>
 
 public class LocalApiFactory : WebApplicationFactory<ApiEntryPoint>
 {
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"residencyroll-local-api-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Join(Path.GetTempPath(), $"residencyroll-local-api-{Guid.NewGuid():N}.db");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
