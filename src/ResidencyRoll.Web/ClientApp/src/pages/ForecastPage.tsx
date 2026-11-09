@@ -118,7 +118,7 @@ export function ForecastPage() {
         </Alert>
       ) : null}
       {legs.map((leg, index) => (
-        <article key={leg.id} className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
+        <article key={leg.id} className="flex flex-col gap-4 rounded-lg border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-medium">
               Leg {index + 1} ({legLabel(index, legs.length)})
@@ -250,7 +250,7 @@ function DayColumn({
   duration?: number
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm">
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-4">
       <h3 className="font-medium">{title}</h3>
       {rows.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : null}
       {rows.map((row) => {

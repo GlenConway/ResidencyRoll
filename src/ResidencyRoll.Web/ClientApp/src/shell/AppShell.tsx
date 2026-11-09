@@ -33,8 +33,8 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
       <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
-        <div className="flex items-center gap-3 border-b px-4 py-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">RR</span>
+        <div className="flex h-14 items-center gap-3 border-b px-4">
+          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">RR</span>
           <p className="text-sm font-semibold leading-tight">Residency Roll</p>
           <span className="sr-only">Residency Roll - Residency Status Dashboard</span>
         </div>
@@ -70,7 +70,7 @@ export function AppShell() {
           </form>
         </header>
         <main className="min-w-0 flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-6xl px-6 py-8">
+          <div className="w-full max-w-6xl px-5 py-6">
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>
@@ -91,7 +91,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() {
     if (this.state.failed) {
       return (
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-lg border bg-card p-6">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <p className="mt-2 text-sm text-muted-foreground">Reload the page and try again.</p>
         </section>

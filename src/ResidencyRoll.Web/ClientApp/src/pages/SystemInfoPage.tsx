@@ -43,7 +43,7 @@ export function SystemInfoPage() {
   return (
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">System Info</h1>
-      <div className="rounded-xl border bg-card p-4">
+      <div className="rounded-lg border bg-card p-4">
         <h2 className="mb-3 text-lg font-medium">Database</h2>
         <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
           <dt className="text-muted-foreground">Location</dt>
@@ -61,7 +61,7 @@ export function SystemInfoPage() {
         </dl>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
       <h2 className="text-lg font-medium">Backups</h2>
       <p>
         {nextBackup?.isValid
@@ -112,7 +112,7 @@ export function SystemInfoPage() {
       ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card p-4">
+      <div className="rounded-lg border bg-card p-4">
       <h2 className="mb-3 text-lg font-medium">Application</h2>
       <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
         <dt className="text-muted-foreground">API version</dt>

@@ -57,7 +57,7 @@ export function HomePage() {
         <h1 className="text-2xl font-semibold tracking-tight">Residency Status Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">Residency calculation based on midnight and partial-day rules</p>
       </header>
-      <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
+      <section className="flex flex-col gap-4 rounded-lg border bg-card p-5">
         <div className="flex flex-wrap items-end gap-3">
           <Field className="w-44" id="summary-start" label="Start Date" type="date" value={draftStart} onChange={(event) => setDraftStart(event.target.value)} />
           <Field className="w-44" id="summary-end" label="End Date" type="date" value={draftEnd} onChange={(event) => setDraftEnd(event.target.value)} />
@@ -85,7 +85,7 @@ export function HomePage() {
           </div>
         )}
 
-      <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
+      <section className="flex flex-col gap-4 rounded-lg border bg-card p-5">
         <h2 className="text-lg font-semibold">Daily Presence Timeline</h2>
         <div className="flex flex-wrap items-end gap-3">
           <Field
@@ -145,7 +145,7 @@ export function HomePage() {
 export function CountryCard({ summary, homeCountry }: { summary: ResidencySummary; homeCountry: string | null }) {
   const status = cardStatus(summary, homeCountry)
   return (
-    <Card style={{ borderLeft: `4px solid ${status.borderColor}` }}>
+    <Card className="shadow-none" style={{ borderLeft: `3px solid ${status.borderColor}` }}>
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-base font-medium">{summary.countryName}</h3>

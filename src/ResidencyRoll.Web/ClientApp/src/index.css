@@ -79,7 +79,7 @@ html.dark {
   --radius-4xl: calc(var(--radius) * 2.6);
   --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-serif: Georgia, serif;
-  --radius: 1rem;
+  --radius: 0.5rem;
   --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
   --tracking-tight: calc(var(--tracking-normal) - 0.025em);
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
@@ -121,15 +121,15 @@ html.dark {
   --accent: oklch(0.7610 0.2015 149.7403);
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.6257 0.2058 29.0773);
-  --border: oklch(0.88 0.012 210);
-  --input: oklch(0.88 0.012 210);
+  --border: oklch(0.93 0.006 220);
+  --input: oklch(0.93 0.006 220);
   --ring: oklch(0.7610 0.2015 149.7403);
   --chart-1: oklch(0.7610 0.2015 149.7403);
   --chart-2: oklch(0.4335 0.0754 182.2315);
   --chart-3: oklch(0.5762 0.0995 182.3964);
   --chart-4: oklch(0.7356 0.1370 232.8053);
   --chart-5: oklch(0.6509 0.1283 170.4258);
-  --radius: 1rem;
+  --radius: 0.5rem;
   --sidebar: oklch(1.0000 0 0);
   --sidebar-foreground: oklch(0.2153 0.0187 235.1251);
   --sidebar-primary: oklch(0.4335 0.0754 182.2315);
@@ -194,7 +194,7 @@ html.dark {
   --sidebar-border: oklch(0.3351 0.0253 234.8586);
   --sidebar-ring: oklch(0.6509 0.1283 170.4258);
   --destructive-foreground: oklch(0.9436 0.0051 228.8204);
-  --radius: 1rem;
+  --radius: 0.5rem;
   --font-sans: Segoe UI, Helvetica Neue, Helvetica, Lucida Grande, Arial, Ubuntu, Cantarell, Fira Sans, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;

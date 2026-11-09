@@ -241,7 +241,7 @@ export function ManageTripsPage() {
             </div>
           ) : null}
           {tripsQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading trips</p> : null}
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
@@ -376,7 +376,7 @@ export function ManageTripsPage() {
 
 function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: TripDraft) => void }) {
   return (
-    <div className="grid gap-4 rounded-xl border bg-card p-5 shadow-sm md:grid-cols-2">
+    <div className="grid gap-4 rounded-lg border bg-card p-5 md:grid-cols-2">
       <div className="flex flex-col gap-3">
         <h3 className="font-medium">Departure Information</h3>
         <AirportSelector
