@@ -9,6 +9,10 @@ const webHost = {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: '../wwwroot',
+    emptyOutDir: true,
+  },
   server: {
     proxy: {
       '/api': webHost,

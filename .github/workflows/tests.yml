@@ -74,3 +74,47 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Compose the API and web host
+        run: docker compose -f docker-compose.build.yml up -d --build
+        env:
+          OIDC_ENABLED: "false"
+          OIDC_CLIENT_SECRET: ci-placeholder
+
+      - name: Wait for the web host
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/bff/user >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.build.yml logs
+          exit 1
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/ResidencyRoll.Web/ClientApp/package-lock.json
+
+      - name: Install Playwright
+        working-directory: src/ResidencyRoll.Web/ClientApp
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Smoke
+        working-directory: src/ResidencyRoll.Web/ClientApp
+        run: npx playwright test e2e/smoke.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8080
+
+      - name: Stop
+        if: always()
+        run: docker compose -f docker-compose.build.yml down -v

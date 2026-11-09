@@ -35,11 +35,10 @@ ResidencyRoll uses a modern **API-first architecture** with separated concerns:
   - OpenAPI/Swagger documentation
   - SQLite database with Entity Framework Core
   
-- **Web Frontend** ([ResidencyRoll.Web](src/ResidencyRoll.Web/)): Blazor Server application with:
-  - Interactive UI using Radzen components
-  - OpenID Connect authentication
-  - Typed HTTP client for API communication
-  - Token forwarding to backend API
+- **Web Frontend** ([ResidencyRoll.Web](src/ResidencyRoll.Web/)): React SPA served by an ASP.NET Core BFF with:
+  - Carbon UI
+  - OpenID Connect cookie authentication (tokens stay on the server)
+  - A reverse proxy that forwards `/api` with the user's access token
 
 - **Shared Models** ([ResidencyRoll.Shared](src/ResidencyRoll.Shared/)): Common DTOs used by both projects
 
@@ -52,19 +51,19 @@ This separation allows the API to be consumed by multiple clients (web, mobile, 
   - Arc Gauge showing Days Away vs Days at Home
   - Donut Chart displaying country distribution
   - Interactive Timeline of all trips
-- **Trip Management**: Inline CRUD operations using Radzen DataGrid
+- **Trip Management**: Add, edit, import, and export trips
 - **Forecast Tool**: Plan future trips and see projected day counts
 - **Authentication**: JWT/OAuth/OpenID Connect support for secure API access
 - **API-First Design**: RESTful API ready for mobile apps and integrations
 - **Persistent Storage**: SQLite database with Docker volume mapping
-- **Responsive UI**: Built with Radzen Blazor components
+- **Responsive UI**: Built with Carbon React
 
 ## Tech Stack
 
 - **Backend**: ASP.NET Core Web API (.NET 10)
-- **Frontend**: Blazor Server (.NET 10)
-- **Authentication**: OpenID Connect + JWT Bearer
-- **UI Library**: Radzen.Blazor (Free/Community components)
+- **Frontend**: React 19, TypeScript, and Vite, served by ASP.NET Core (.NET 10)
+- **Authentication**: OpenID Connect cookie on the BFF, JWT Bearer on the API
+- **UI Library**: Carbon React
 - **Database**: SQLite with Entity Framework Core
 - **API Documentation**: Swagger/OpenAPI
 - **Deployment**: Docker Compose with multi-container setup
@@ -560,17 +559,10 @@ ResidencyRoll/
 │   │   │   └── Trip.cs                  # Entity model
 │   │   └── Program.cs                   # API configuration
 │   │
-│   ├── ResidencyRoll.Web/               # Blazor Frontend
-│   │   ├── Components/
-│   │   │   ├── Pages/
-│   │   │   │   ├── Home.razor           # Dashboard
-│   │   │   │   ├── ManageTrips.razor    # CRUD interface
-│   │   │   │   └── Forecast.razor       # Trip planning
-│   │   │   └── LoginDisplay.razor       # Auth UI
-│   │   ├── Services/
-│   │   │   ├── TripsApiClient.cs        # API client
-│   │   │   └── ApiAuthenticationHandler.cs
-│   │   └── Program.cs                   # Web app configuration
+│   ├── ResidencyRoll.Web/               # BFF and React UI
+│   │   ├── Bff/                         # Auth, CSRF, and the API proxy
+│   │   ├── ClientApp/                   # Vite React application
+│   │   └── Program.cs                   # Web host configuration
 │   │
 │   └── ResidencyRoll.Shared/            # Shared DTOs
 │       └── Trips/

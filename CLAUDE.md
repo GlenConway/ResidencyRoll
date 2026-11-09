@@ -16,10 +16,9 @@ src/
 │   ├── Models/             Trip, DailyPresence, CountryResidencyRule, ResidencyRuleType
 │   ├── Configuration/      OpenAIOptions, ConfigureSwaggerOptions
 │   └── Migrations/         EF Core migrations
-├── ResidencyRoll.Web/      Blazor Server UI (Radzen + Carbon-based CSS), typed API client
-│   ├── Components/         Pages/, Dialogs/, Layout/, dashboard/timeline/chart components
-│   ├── Services/           TripsApiClient, AccessTokenProvider, ApiAuthenticationHandler, LocalStorageService, CountryColorService
-│   └── Data/AirportData.cs IATA airports with IANA timezones
+├── ResidencyRoll.Web/      BFF and static host for the React SPA
+│   ├── Bff/                YARP /api proxy, cookie auth, CSRF, /bff/user
+│   └── ClientApp/          Vite + React 19 + TypeScript UI (Carbon)
 ├── ResidencyRoll.Shared/   DTOs (Trips/) and Extensions (ForwardedHeadersExtensions)
 ├── ResidencyRoll.Tests/    xUnit tests
 └── ResidencyRoll.sln
@@ -34,9 +33,10 @@ The Web app has no database. All data access goes through the API with the signe
 dotnet build src/ResidencyRoll.sln
 dotnet test src/ResidencyRoll.sln
 
-# Run locally (two terminals; API https://localhost:5003, Web https://localhost:5113)
+# Run locally (API https://localhost:5003, Web https://localhost:5113, UI http://127.0.0.1:5173)
 dotnet run --project src/ResidencyRoll.Api
 dotnet run --project src/ResidencyRoll.Web
+npm run dev --prefix src/ResidencyRoll.Web/ClientApp
 
 # Docker (images pulled from the registry)
 docker compose up -d
@@ -50,15 +50,15 @@ Local settings: copy `appsettings.Development.json.example` to `appsettings.Deve
 
 - **Residency engine** (`ResidencyCalculationService`): trips are legs with departure/arrival airports and local times. They become per-day `DailyPresence` records (location at midnight, locations during the day, in-transit flag). Gaps between trips are filled with the last arrival country. Country rules (Midnight vs Partial Day, 183-day threshold) live in a dictionary in the service. See `docs/guides/RESIDENCY_MIDNIGHT_LOGIC.md` and `docs/guides/GAP_FILLING_RULES.md`.
 - **Timezones:** all leg maths uses IANA timezones resolved from IATA codes. Check midnight in both departure and arrival zones (International Date Line cases).
-- **Auth:** the Web app signs in with OpenID Connect (Auth0 in the reference setup). The API validates JWT bearer tokens and scopes trips to the user. `Jwt:ClientSecret` enables decryption of JWE tokens.
+- **Auth:** the browser signs in through the Web BFF (OpenID Connect cookie, Auth0 in the reference setup). Tokens stay on the server. The API validates JWT bearer tokens and scopes trips to the user. `Jwt:ClientSecret` enables decryption of JWE tokens. With OIDC disabled, `/bff/user` returns a local user and `/api` is proxied without a bearer token.
 - **Itinerary parsing:** Semantic Kernel with OpenAI, configured through `OpenAIOptions`. Optional feature.
 - **Home country** is stored in browser localStorage and drives days left/over and timeline emphasis.
 - **Reverse proxy:** `UseConfiguredForwardedHeaders()` (Shared) is used by both hosts.
 
 ## Conventions
 
-- **Blazor code-behind:** `.razor` files contain markup and directives only. All C# goes in `.razor.cs` as a `partial class`. Details in `.github/copilot-instructions.md`.
-- **Tests:** xUnit with plain `Assert` (no Shouldly or Moq packages are referenced). Name tests `MethodName_Condition_ShouldExpectedBehavior`. Tests live in `src/ResidencyRoll.Tests/`.
+- **React UI:** pages and components live in `src/ResidencyRoll.Web/ClientApp`. TypeScript is strict. Component logic that must match the old residency rules belongs in `src/lib` with Vitest tests. Details in `.github/copilot-instructions.md`.
+- **Tests:** xUnit with plain `Assert` (no Shouldly or Moq packages are referenced). Name tests `MethodName_Condition_ShouldExpectedBehavior`. Tests live in `src/ResidencyRoll.Tests/`. UI tests are Vitest; the Playwright smoke runs against the composed web image.
 - **EF migrations:** generate with `dotnet ef`. Do not hand-edit migration files or `ApplicationDbContextModelSnapshot.cs`.
 - **Secrets:** never commit client secrets, API keys or `appsettings.Development.json`.
 - **Commits:** conventional style (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).

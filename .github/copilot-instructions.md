@@ -1,92 +1,18 @@
 # GitHub Copilot Instructions for ResidencyRoll
 
-## Blazor Component Code-Behind Pattern
+The UI is a React SPA in `src/ResidencyRoll.Web/ClientApp`. The ASP.NET Core project is the BFF: it serves the built files from `wwwroot`, keeps the OpenID Connect session, and proxies `/api` with the user's access token. Do not put access tokens in browser storage.
 
-When creating or modifying Blazor components in this project, **ALWAYS** use the code-behind pattern:
+## React
 
-### Structure
-- **`.razor` file**: Contains ONLY markup (HTML/Razor syntax), directives (`@page`, `@using`, `@inject`, `@attribute`, `@rendermode`), and component references
-- **`.razor.cs` file**: Contains ALL C# code including:
-  - Class definition as `public partial class ComponentName`
-  - All parameters (`[Parameter]`)
-  - All injected services (`[Inject]`)
-  - All private fields and properties
-  - All methods (lifecycle methods like `OnInitializedAsync`, event handlers, helper methods)
-  - Nested classes if needed
+- TypeScript is strict. Import local modules with their `.ts` or `.tsx` extension.
+- Keep page markup in `src/pages` and reusable pieces in `src/components`. Put date, airport, and residency rules in `src/lib` so they can be unit tested without rendering Carbon.
+- Talk to the BFF through `src/api/client.ts`. Non-GET calls send `X-CSRF: 1`. A 401 redirects to `/auth/login`.
+- The home country stays in `localStorage` under `residencyroll_home_country`.
+- Match existing Carbon patterns: `Theme`, `DataTable`, `Button`, and `InlineNotification`.
+- Run `npm run lint`, `npm run typecheck`, and `npm test` from `ClientApp` before finishing UI work.
 
-### Example
+## .NET
 
-#### ✅ CORRECT: Component.razor
-```razor
-@page "/example"
-@attribute [Authorize]
-@using ResidencyRoll.Shared
-@rendermode InteractiveServer
-
-<PageTitle>Example</PageTitle>
-
-<h1>@Title</h1>
-<button @onclick="HandleClick">Click Me</button>
-```
-
-#### ✅ CORRECT: Component.razor.cs
-```csharp
-using Microsoft.AspNetCore.Components;
-
-namespace ResidencyRoll.Web.Components.Pages;
-
-public partial class Component
-{
-    private string Title = "Hello World";
-    
-    [Inject] private SomeService Service { get; set; } = default!;
-    
-    protected override async Task OnInitializedAsync()
-    {
-        // Initialization code
-    }
-    
-    private void HandleClick()
-    {
-        // Event handler code
-    }
-}
-```
-
-#### ❌ INCORRECT: Do NOT put code in @code blocks
-```razor
-@page "/example"
-
-<h1>@Title</h1>
-
-@code {
-    // DO NOT DO THIS!
-    private string Title = "Hello World";
-    
-    private void HandleClick() { }
-}
-```
-
-### Key Rules
-1. **Never use `@code { }` blocks** in `.razor` files
-2. Always create a corresponding `.razor.cs` file for any component with logic
-3. Keep the `.razor` file focused on presentation
-4. Use `public partial class` in the `.razor.cs` file
-5. Match the namespace to the folder structure (e.g., `ResidencyRoll.Web.Components.Pages` for files in `Components/Pages/`)
-6. Use proper `using` statements in the `.razor.cs` file for all dependencies
-
-### Benefits
-- Better separation of concerns
-- Improved code organization and maintainability
-- Easier to navigate and test
-- Cleaner version control diffs
-- Better IDE support for code refactoring
-
-## Documentation structure
-
-- All project docs live under `docs/`. See `docs/README.md` for the index.
-- **ADRs** are in `docs/adr/`. Read relevant ADRs before making significant design or architecture changes.
-- **Milestones** are in `docs/development-plan/`.
-- **Guides** are in `docs/guides/`.
-- When adding an ADR, follow `docs/adr/README.md` and increment the number.
-- Update the milestone list when a milestone starts or completes.
+- xUnit tests use plain `Assert`. Name them `MethodName_Condition_ShouldExpectedBehavior`.
+- Do not hand-edit EF Core migrations or `ApplicationDbContextModelSnapshot.cs`.
+- Never commit secrets, API keys, or `appsettings.Development.json`.
