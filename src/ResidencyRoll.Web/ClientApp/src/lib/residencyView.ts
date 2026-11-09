@@ -36,9 +36,11 @@ export function isoDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
+export const rollingWindowDays = 365
+
 export function defaultDateRange(today = new Date()): { start: string; end: string } {
   const start = new Date(today)
-  start.setDate(start.getDate() - 365)
+  start.setDate(start.getDate() - (rollingWindowDays - 1))
   return { start: isoDate(start), end: isoDate(today) }
 }
 

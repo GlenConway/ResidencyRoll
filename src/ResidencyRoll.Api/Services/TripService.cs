@@ -96,7 +96,7 @@ public class TripService
     public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync(string userId)
     {
         var today = DateTime.Today;
-        var windowStart = today.AddDays(-365);
+        var windowStart = RollingWindow.StartOn(today);
 
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
@@ -123,7 +123,7 @@ public class TripService
         }
 
         var today = DateTime.Today;
-        var currentWindowStart = today.AddDays(-365);
+        var currentWindowStart = RollingWindow.StartOn(today);
         var window = GetForecastWindow(hypotheticalTrips);
 
         var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(existingTrips, currentWindowStart, today);
@@ -140,8 +140,8 @@ public class TripService
     }
 
     /// <summary>
-    /// Rolling window whose end is the latest local date-time on the hypothetical legs.
-    /// The start is 365 days earlier, matching <see cref="ForecastDays"/>.
+    /// Rolling window whose end is the latest local date on the hypothetical legs.
+    /// The start is 364 days earlier, so both ends count and the span is 365 days.
     /// </summary>
     public ForecastWindow GetForecastWindow(IReadOnlyList<Trip> hypotheticalTrips)
     {
@@ -153,7 +153,7 @@ public class TripService
         var latestArrival = hypotheticalTrips.Max(trip => trip.ArrivalDateTime);
         var latestDeparture = hypotheticalTrips.Max(trip => trip.DepartureDateTime);
         var forecastWindowEnd = latestArrival > latestDeparture ? latestArrival : latestDeparture;
-        var forecastWindowStart = forecastWindowEnd.AddDays(-365);
+        var forecastWindowStart = RollingWindow.StartOn(forecastWindowEnd);
         return new ForecastWindow(
             DateOnly.FromDateTime(forecastWindowStart.Date),
             DateOnly.FromDateTime(forecastWindowEnd.Date));

@@ -107,12 +107,12 @@ public sealed class ResidencyTools
     private const string Semantics = McpSemantics.Rules + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "get_residency_summary", Title = "Residency summary", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ResidencyCountryStatus[]))]
-    [Description("Days per country between two dates, plus days left, days over, and threshold status (under, approaching, over, or home). Defaults to the last 365 days. " + Semantics)]
+    [Description("Days per country between two dates, plus days left, days over, and threshold status (under, approaching, over, or home). The home country has thresholdStatus home, isApproachingThreshold false, and null days left and days over. Defaults to the 365 days ending on the end date, counting both ends. " + Semantics)]
     public static async Task<CallToolResult> GetResidencySummary(
         ResidencyQueryService query,
         UserProfileService profiles,
         ClaimsPrincipal user,
-        [Description("Range start, yyyy-MM-dd. Defaults to 365 days before the end date.")] string? startDate = null,
+        [Description("Range start, yyyy-MM-dd. Defaults to 364 days before the end date, so both ends count and the range is 365 days.")] string? startDate = null,
         [Description("Range end, yyyy-MM-dd. Defaults to today.")] string? endDate = null,
         [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null)
     {
@@ -120,12 +120,12 @@ public sealed class ResidencyTools
         var userId = McpScopes.UserId(user);
         var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
         var end = string.IsNullOrWhiteSpace(endDate) ? DateOnly.FromDateTime(DateTime.Today) : TripLegResolver.ParseDate(endDate, "endDate");
-        var start = string.IsNullOrWhiteSpace(startDate) ? end.AddDays(-365) : TripLegResolver.ParseDate(startDate, "startDate");
+        var start = string.IsNullOrWhiteSpace(startDate) ? RollingWindow.StartOn(end) : TripLegResolver.ParseDate(startDate, "startDate");
         var summary = await query.GetResidencySummaryAsync(userId, start, end);
         var rows = summary.Select(item => ResidencyCountryStatus.From(item, home)).ToList();
         var text = rows.Count == 0
             ? $"No residency data from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}."
-            : string.Join(" ", rows.Select(row => $"{row.CountryName}: {row.TotalDays} days, {row.ThresholdStatus}, {row.DaysUntilThreshold} left, {row.DaysOverThreshold} over."));
+            : string.Join(" ", rows.Select(ResidencyCountryStatus.Describe));
         if (home is null)
         {
             text += " No home country is saved. Ask the user, then call set_home_country.";
@@ -229,9 +229,15 @@ public class ResidencyCountryStatus
     public int TotalDays { get; set; }
     public string RuleType { get; set; } = string.Empty;
     public int ThresholdDays { get; set; }
+    [Description("True when a country that is not home is within 30 days of the threshold and still under it.")]
     public bool IsApproachingThreshold { get; set; }
-    public int DaysUntilThreshold { get; set; }
-    public int DaysOverThreshold { get; set; }
+
+    [Description("Days remaining before the threshold. Null when this is the home country.")]
+    public int? DaysUntilThreshold { get; set; }
+
+    [Description("Days past the threshold. Null when this is the home country.")]
+    public int? DaysOverThreshold { get; set; }
+
     public string ThresholdStatus { get; set; } = string.Empty;
     public bool IsHomeCountry { get; set; }
 
@@ -247,13 +253,18 @@ public class ResidencyCountryStatus
             TotalDays = summary.TotalDays,
             RuleType = summary.RuleType,
             ThresholdDays = summary.ThresholdDays,
-            IsApproachingThreshold = summary.IsApproachingThreshold,
-            DaysUntilThreshold = summary.DaysUntilThreshold,
-            DaysOverThreshold = Math.Max(0, summary.TotalDays - summary.ThresholdDays),
+            IsApproachingThreshold = !home && summary.IsApproachingThreshold,
+            DaysUntilThreshold = home ? null : summary.DaysUntilThreshold,
+            DaysOverThreshold = home ? null : Math.Max(0, summary.TotalDays - summary.ThresholdDays),
             ThresholdStatus = status,
             IsHomeCountry = home
         };
     }
+
+    internal static string Describe(ResidencyCountryStatus row) =>
+        row.IsHomeCountry
+            ? $"{row.CountryName}: {row.TotalDays} days, home."
+            : $"{row.CountryName}: {row.TotalDays} days, {row.ThresholdStatus}, {row.DaysUntilThreshold} left, {row.DaysOverThreshold} over.";
 }
 
 public sealed class CountryRuleResult

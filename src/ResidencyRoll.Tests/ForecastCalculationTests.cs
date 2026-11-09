@@ -57,7 +57,7 @@ public class ForecastCalculationTests
             }
         };
 
-        var windowStart = today.AddDays(-365);
+        var windowStart = RollingWindow.StartOn(today);
         var windowEnd = today;
 
         // Act

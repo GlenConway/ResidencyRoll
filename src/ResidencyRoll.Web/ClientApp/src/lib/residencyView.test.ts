@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DailyPresence, ResidencySummary } from '../api/types.ts'
 import { CountryColorService } from './countryColor.ts'
-import { cardStatus, countriesInPresence, groupByMonth, presentDay } from './residencyView.ts'
+import { cardStatus, countriesInPresence, defaultDateRange, groupByMonth, presentDay } from './residencyView.ts'
 
 function summary(overrides: Partial<ResidencySummary> = {}): ResidencySummary {
   return {
@@ -24,6 +24,13 @@ function day(overrides: Partial<DailyPresence> = {}): DailyPresence {
     ...overrides,
   }
 }
+
+describe('defaultDateRange', () => {
+  it('counts both ends so the range is 365 days', () => {
+    const range = defaultDateRange(new Date(2026, 11, 22))
+    expect(range).toEqual({ start: '2025-12-23', end: '2026-12-22' })
+  })
+})
 
 describe('cardStatus', () => {
   it('marks a country over the threshold in red when it is not home', () => {

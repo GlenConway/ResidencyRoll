@@ -63,7 +63,7 @@ public sealed class ForecastTools
     }
 
     [McpServerTool(Name = "max_trip_end_date", Title = "Latest trip end under the day limit", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpMaxEndDate))]
-    [Description("Latest departure from the arrival country that keeps that country's peak rolling count at or under dayLimit (default 183). DaysAtLimit is that peak, which can be higher than the count on the end date. MaxEndDate is a local time in the arrival airport's timezone. " + Semantics)]
+    [Description("Last day you can still be in the arrival country at midnight while that country's peak rolling count stays at or under dayLimit (default 183). maxEndDate is that date (yyyy-MM-dd), not a departure time. daysAtLimit is the peak inside windowStart and windowEnd. " + Semantics)]
     public static async Task<CallToolResult> MaxTripEndDate(
         ResidencyQueryService query,
         AirportCatalog airports,
@@ -84,7 +84,7 @@ public sealed class ForecastTools
         var result = await query.CalculateMaxEndDateAsync(McpScopes.UserId(user), request);
         var payload = McpMaxEndDate.From(result);
         return McpResults.Ok(
-            $"Latest end in {request.ArrivalCountry} is {payload.MaxEndDate}, with a peak of {payload.DaysAtLimit} days against a limit of {request.DayLimit}.",
+            $"Last midnight still in {request.ArrivalCountry} is {payload.MaxEndDate:yyyy-MM-dd} ({payload.RuleType}), with a peak of {payload.DaysAtLimit} days in the window {payload.WindowStart:yyyy-MM-dd} to {payload.WindowEnd:yyyy-MM-dd}, against a limit of {request.DayLimit}.",
             payload);
     }
 

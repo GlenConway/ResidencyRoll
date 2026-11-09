@@ -297,8 +297,10 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         });
         var maxEndDate = maxEnd.StructuredContent!.Value.GetProperty("maxEndDate").GetString();
         var summary = McpClientConnector.Text(maxEnd);
-        Assert.Matches(LocalTimePattern(), maxEndDate);
+        Assert.Matches(DatePattern(), maxEndDate);
         Assert.Contains($"is {maxEndDate}", summary);
+        Assert.False(trip.TryGetProperty("startDate", out _));
+        Assert.False(trip.TryGetProperty("endDate", out _));
         var daysAtLimit = maxEnd.StructuredContent.Value.GetProperty("daysAtLimit").GetInt32();
         Assert.Contains($"with a peak of {daysAtLimit} days", summary);
         Assert.InRange(daysAtLimit, 0, 30);
@@ -333,6 +335,15 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         });
         await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdId });
         await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdManyId });
+
+        var called = new[]
+        {
+            "list_trips", "get_trip", "get_days_per_country", "get_residency_summary", "get_daily_presence",
+            "get_location_on", "get_current_location", "get_country_rules", "forecast_trips", "max_trip_end_date",
+            "standard_duration_forecasts", "lookup_airport", "get_home_country", "set_home_country",
+            "create_trip", "create_trips", "update_trip", "delete_trip"
+        };
+        Assert.Equal(tools.Select(tool => tool.Name).OrderBy(name => name), called.OrderBy(name => name));
     }
 
     [Fact]
@@ -361,6 +372,147 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             var cleared = await http.PutAsJsonAsync("/api/v1/profile/home-country", new { homeCountry = "" });
             Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
         }
+    }
+
+    [Fact]
+    public async Task HomeCountryOverTheThreshold_ShouldHideDaysLeftAndDaysOver()
+    {
+        var http = _factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var arrive = DateOnly.FromDateTime(DateTime.Today).AddDays(30);
+        var leave = arrive.AddDays(200);
+        var forecast = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+        {
+            ["homeCountry"] = "Canada",
+            ["trips"] = new object[]
+            {
+                Leg("LHR", arrive.ToString("yyyy-MM-dd") + "T09:00", "YHZ", arrive.ToString("yyyy-MM-dd") + "T16:00"),
+                Leg("YHZ", leave.ToString("yyyy-MM-dd") + "T08:00", "LHR", leave.ToString("yyyy-MM-dd") + "T18:00")
+            }
+        });
+
+        var canada = forecast.StructuredContent!.Value.GetProperty("forecast").EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "Canada");
+        Assert.True(canada.GetProperty("peakDays").GetInt32() > 183);
+        Assert.True(canada.GetProperty("isHomeCountry").GetBoolean());
+        Assert.Equal("home", canada.GetProperty("thresholdStatus").GetString());
+        Assert.False(canada.GetProperty("isApproachingThreshold").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, canada.GetProperty("daysUntilThreshold").ValueKind);
+        Assert.Equal(JsonValueKind.Null, canada.GetProperty("daysOverThreshold").ValueKind);
+
+        var summary = await AssertCall(mcp, tools, "get_residency_summary", new Dictionary<string, object?>
+        {
+            ["homeCountry"] = "Canada"
+        });
+        var current = summary.StructuredContent!.Value.EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "Canada");
+        Assert.Equal("home", current.GetProperty("thresholdStatus").GetString());
+        Assert.False(current.GetProperty("isApproachingThreshold").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, current.GetProperty("daysUntilThreshold").ValueKind);
+        Assert.Equal(JsonValueKind.Null, current.GetProperty("daysOverThreshold").ValueKind);
+    }
+
+    [Fact]
+    public async Task RollingWindowBoundary_ShouldMatchBetweenRestAndMcp()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        var end = DateOnly.FromDateTime(DateTime.Today);
+        var start = end.AddDays(-(365 - 1));
+        var outside = start.AddDays(-1);
+        var arrival = outside.AddDays(-1).ToString("yyyy-MM-dd");
+        var boundary = start.ToString("yyyy-MM-dd");
+        PostBoundaryTrip(http, "Canada", "America/Halifax", arrival + "T08:00:00", "United Kingdom", "Europe/London", arrival + "T18:00:00");
+        PostBoundaryTrip(http, "United Kingdom", "Europe/London", boundary + "T10:00:00", "Canada", "America/Halifax", boundary + "T16:00:00");
+
+        using var restDocument = JsonDocument.Parse(await http.GetStringAsync("/api/v1/trips/days-per-country/last365"));
+        var restDays = restDocument.RootElement.EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "United Kingdom")
+            .GetProperty("days").GetInt32();
+
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var days = await mcp.CallToolAsync("get_days_per_country", new Dictionary<string, object?> { ["window"] = "last365" });
+        var summary = await mcp.CallToolAsync("get_residency_summary", new Dictionary<string, object?>());
+        Assert.NotEqual(true, days.IsError);
+        Assert.NotEqual(true, summary.IsError);
+        var toolDays = days.StructuredContent!.Value.EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "United Kingdom")
+            .GetProperty("days").GetInt32();
+        var summaryDays = summary.StructuredContent!.Value.EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "United Kingdom")
+            .GetProperty("totalDays").GetInt32();
+
+        Assert.Equal(1, restDays);
+        Assert.Equal(restDays, toolDays);
+        Assert.Equal(restDays, summaryDays);
+    }
+
+    [Fact]
+    public async Task TripDuration_ShouldCountMinutesAcrossTimezones()
+    {
+        var http = _factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var created = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("YHZ", "2026-09-04T11:05", "LHR", "2026-09-04T21:00")
+        });
+        try
+        {
+            Assert.Equal(355, created.StructuredContent!.Value.GetProperty("durationMinutes").GetInt32());
+            Assert.False(created.StructuredContent.Value.TryGetProperty("startDate", out _));
+            Assert.False(created.StructuredContent.Value.TryGetProperty("endDate", out _));
+        }
+        finally
+        {
+            await mcp.CallToolAsync("delete_trip", new Dictionary<string, object?>
+            {
+                ["id"] = created.StructuredContent!.Value.GetProperty("id").GetInt32()
+            });
+        }
+    }
+
+    [Fact]
+    public async Task MaxTripEndDate_ShouldMatchTheForecastPeakForThatStay()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var start = DateOnly.FromDateTime(DateTime.Today).AddDays(30);
+        var tripStart = start.ToString("yyyy-MM-dd") + "T12:00";
+        var maxEnd = await AssertCall(mcp, tools, "max_trip_end_date", new Dictionary<string, object?>
+        {
+            ["tripStart"] = tripStart,
+            ["dayLimit"] = 10,
+            ["departureIataCode"] = "YHZ",
+            ["arrivalIataCode"] = "LHR"
+        });
+        var payload = maxEnd.StructuredContent!.Value;
+        var maxEndDate = payload.GetProperty("maxEndDate").GetString()!;
+        Assert.Matches(DatePattern(), maxEndDate);
+        Assert.Equal("Midnight", payload.GetProperty("ruleType").GetString());
+        Assert.Equal(10, payload.GetProperty("daysAtLimit").GetInt32());
+        var windowStart = DateOnly.Parse(payload.GetProperty("windowStart").GetString()!);
+        var windowEnd = DateOnly.Parse(payload.GetProperty("windowEnd").GetString()!);
+        Assert.Equal(365, windowEnd.DayNumber - windowStart.DayNumber + 1);
+
+        var outbound = DateTime.Parse(tripStart).AddHours(-6).ToString("yyyy-MM-ddTHH:mm");
+        var homeAgain = DateTime.Parse(maxEndDate + "T12:00").AddHours(6).ToString("yyyy-MM-ddTHH:mm");
+        var forecast = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+        {
+            ["trips"] = new object[]
+            {
+                Leg("YHZ", outbound, "LHR", tripStart),
+                Leg("LHR", maxEndDate + "T12:00", "YHZ", homeAgain)
+            }
+        });
+        var unitedKingdom = forecast.StructuredContent!.Value.GetProperty("forecast").EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "United Kingdom");
+        Assert.Equal(10, unitedKingdom.GetProperty("peakDays").GetInt32());
+        Assert.Equal(windowStart, DateOnly.Parse(forecast.StructuredContent.Value.GetProperty("windowStart").GetString()!));
+        Assert.Equal(windowEnd, DateOnly.Parse(forecast.StructuredContent.Value.GetProperty("windowEnd").GetString()!));
     }
 
     [Fact]
@@ -421,10 +573,35 @@ public class McpServerTests : IClassFixture<McpApiFactory>
 
     private static Regex LocalTimePattern() => new(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$");
 
+    private static Regex DatePattern() => new(@"^\d{4}-\d{2}-\d{2}$");
+
     private static async Task<int> TripCount(HttpClient http)
     {
         using var document = JsonDocument.Parse(await http.GetStringAsync("/api/v1/trips"));
         return document.RootElement.GetArrayLength();
+    }
+
+    private static void PostBoundaryTrip(
+        HttpClient http,
+        string fromCountry,
+        string fromZone,
+        string departure,
+        string toCountry,
+        string toZone,
+        string arrival)
+    {
+        var response = http.PostAsJsonAsync("/api/v1/trips", new
+        {
+            departureCountry = fromCountry,
+            departureCity = fromCountry,
+            departureDateTime = departure,
+            departureTimezone = fromZone,
+            arrivalCountry = toCountry,
+            arrivalCity = toCountry,
+            arrivalDateTime = arrival,
+            arrivalTimezone = toZone
+        }).GetAwaiter().GetResult();
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     private static Dictionary<string, object?> Leg(string from, string departure, string to, string arrival) => new()
@@ -442,13 +619,14 @@ public class McpApiFactory : WebApplicationFactory<ApiEntryPoint>
 
     public bool McpEnabled { get; set; } = true;
     public bool ParserConfigured { get; set; }
+    public bool SeedExampleTrips { get; set; } = true;
 
     private int _seeded;
 
     public new HttpClient CreateClient()
     {
         var client = base.CreateClient();
-        if (Interlocked.Exchange(ref _seeded, 1) == 0 && McpEnabled)
+        if (Interlocked.Exchange(ref _seeded, 1) == 0 && McpEnabled && SeedExampleTrips)
         {
             Seed(client);
         }

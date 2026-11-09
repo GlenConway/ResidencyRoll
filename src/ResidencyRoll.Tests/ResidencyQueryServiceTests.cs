@@ -39,10 +39,30 @@ public class ResidencyQueryServiceTests
 
         var periodEnd = new DateOnly(2026, 2, 15);
         var peaks = residency.PeakRollingCounts(log, new DateOnly(2026, 1, 1), periodEnd);
-        var endCount = residency.CalculateResidencyDays(log, periodEnd.AddDays(-365), periodEnd)["United Kingdom"];
+        var endCount = residency.CalculateResidencyDays(log, RollingWindow.StartOn(periodEnd), periodEnd)["United Kingdom"];
 
         Assert.True(peaks["United Kingdom"].Days > endCount);
         Assert.True(peaks["United Kingdom"].Date < periodEnd);
+    }
+
+    [Fact]
+    public void RollingWindow_BoundaryDay_ShouldBeCountedOnce()
+    {
+        var end = new DateOnly(2026, 12, 22);
+        var start = RollingWindow.StartOn(end);
+        Assert.Equal(end.AddDays(-364), start);
+        Assert.Equal(RollingWindow.LengthDays, end.DayNumber - start.DayNumber + 1);
+
+        var residency = new ResidencyCalculationService();
+        var log = new List<DailyPresence>();
+        AddStay(log, start.AddDays(-1), start, "United Kingdom");
+
+        var counted = residency.CalculateResidencyDays(log, start, end);
+        Assert.Equal(1, counted["United Kingdom"]);
+
+        var peak = residency.PeakRollingCounts(log, end, end)["United Kingdom"];
+        Assert.Equal(1, peak.Days);
+        Assert.Equal(end, peak.Date);
     }
 
     [Fact]

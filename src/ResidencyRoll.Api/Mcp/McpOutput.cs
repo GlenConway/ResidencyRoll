@@ -12,6 +12,36 @@ internal static class McpTime
 
     public static string Format(DateTime value) =>
         value.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+
+    public static int DurationMinutes(DateTime departureLocal, string? departureZone, DateTime arrivalLocal, string? arrivalZone)
+    {
+        var minutes = (int)Math.Round((ToUtc(arrivalLocal, arrivalZone) - ToUtc(departureLocal, departureZone)).TotalMinutes);
+        return Math.Max(0, minutes);
+    }
+
+    private static DateTime ToUtc(DateTime local, string? timezoneId)
+    {
+        var unspecified = local.Kind == DateTimeKind.Unspecified ? local : DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        var zoneId = string.IsNullOrWhiteSpace(timezoneId) ? "UTC" : timezoneId;
+        if (zoneId == "UTC")
+        {
+            return DateTime.SpecifyKind(unspecified, DateTimeKind.Utc);
+        }
+
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+            return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return DateTime.SpecifyKind(unspecified, DateTimeKind.Utc);
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return DateTime.SpecifyKind(unspecified, DateTimeKind.Utc);
+        }
+    }
 }
 
 public sealed class McpTrip
@@ -35,47 +65,61 @@ public sealed class McpTrip
     public string? ArrivalIataCode { get; set; }
     public string CountryName { get; set; } = string.Empty;
 
-    [Description(McpTime.LocalTimeDescription)]
-    public string StartDate { get; set; } = string.Empty;
-
-    [Description(McpTime.LocalTimeDescription)]
-    public string EndDate { get; set; } = string.Empty;
-
     public int DurationDays { get; set; }
+
+    [Description("Whole hours from departure to arrival, in UTC. durationMinutes is the exact length.")]
     public int DurationHours { get; set; }
 
-    public static McpTrip From(TripDto dto) => new()
+    [Description("Total minutes from departure to arrival, in UTC.")]
+    public int DurationMinutes { get; set; }
+
+    public static McpTrip From(TripDto dto)
     {
-        Id = dto.Id,
-        DepartureCountry = dto.DepartureCountry,
-        DepartureCity = dto.DepartureCity,
-        DepartureDateTime = McpTime.Format(dto.DepartureDateTime),
-        DepartureTimezone = dto.DepartureTimezone,
-        DepartureIataCode = dto.DepartureIataCode,
-        ArrivalCountry = dto.ArrivalCountry,
-        ArrivalCity = dto.ArrivalCity,
-        ArrivalDateTime = McpTime.Format(dto.ArrivalDateTime),
-        ArrivalTimezone = dto.ArrivalTimezone,
-        ArrivalIataCode = dto.ArrivalIataCode,
-        CountryName = dto.CountryName,
-        StartDate = McpTime.Format(dto.StartDate),
-        EndDate = McpTime.Format(dto.EndDate),
-        DurationDays = dto.DurationDays,
-        DurationHours = dto.DurationHours
-    };
+        var minutes = McpTime.DurationMinutes(dto.DepartureDateTime, dto.DepartureTimezone, dto.ArrivalDateTime, dto.ArrivalTimezone);
+        return new McpTrip
+        {
+            Id = dto.Id,
+            DepartureCountry = dto.DepartureCountry,
+            DepartureCity = dto.DepartureCity,
+            DepartureDateTime = McpTime.Format(dto.DepartureDateTime),
+            DepartureTimezone = dto.DepartureTimezone,
+            DepartureIataCode = dto.DepartureIataCode,
+            ArrivalCountry = dto.ArrivalCountry,
+            ArrivalCity = dto.ArrivalCity,
+            ArrivalDateTime = McpTime.Format(dto.ArrivalDateTime),
+            ArrivalTimezone = dto.ArrivalTimezone,
+            ArrivalIataCode = dto.ArrivalIataCode,
+            CountryName = dto.CountryName,
+            DurationDays = dto.DurationDays,
+            DurationMinutes = minutes,
+            DurationHours = minutes / 60
+        };
+    }
 }
 
 public sealed class McpMaxEndDate
 {
-    [Description(McpTime.LocalTimeDescription)]
-    public string MaxEndDate { get; set; } = string.Empty;
+    [Description("Last day you can still be in the country at midnight while staying at or under the limit, yyyy-MM-dd.")]
+    public DateOnly MaxEndDate { get; set; }
 
-    [Description("Peak rolling day count for the arrival country between the trip start and the forecast window end.")]
+    [Description("First day of the rolling window in which daysAtLimit was reached, yyyy-MM-dd. Both ends count.")]
+    public DateOnly WindowStart { get; set; }
+
+    [Description("Last day of the rolling window in which daysAtLimit was reached, yyyy-MM-dd.")]
+    public DateOnly WindowEnd { get; set; }
+
+    [Description("Midnight or PartialDay for the arrival country.")]
+    public string RuleType { get; set; } = string.Empty;
+
+    [Description("Peak rolling day count for the arrival country inside the window. This can be higher than the count on windowEnd.")]
     public int DaysAtLimit { get; set; }
 
     public static McpMaxEndDate From(MaxTripEndDateResponseDto dto) => new()
     {
-        MaxEndDate = McpTime.Format(dto.MaxEndDate),
+        MaxEndDate = DateOnly.FromDateTime(dto.MaxEndDate),
+        WindowStart = dto.WindowStart,
+        WindowEnd = dto.WindowEnd,
+        RuleType = dto.RuleType,
         DaysAtLimit = dto.DaysAtLimit
     };
 }

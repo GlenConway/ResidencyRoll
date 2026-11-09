@@ -49,7 +49,7 @@ public class ResidencyQueryService
         if (hypotheticalTrips.Count == 0)
         {
             var today = DateOnly.FromDateTime(DateTime.Today);
-            return new ForecastBreakdown(today.AddDays(-365), today, current, forecast, new Dictionary<string, PeakCount>(StringComparer.OrdinalIgnoreCase));
+            return new ForecastBreakdown(RollingWindow.StartOn(today), today, current, forecast, new Dictionary<string, PeakCount>(StringComparer.OrdinalIgnoreCase));
         }
 
         var window = _trips.GetForecastWindow(hypotheticalTrips);
@@ -129,34 +129,39 @@ public class ResidencyQueryService
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
         var existing = await _trips.GetAllTripsAsync(userId);
         var bestEnd = request.TripStart;
-        var daysAtBest = MeasureStay(existing, request, request.TripStart).PeakDays;
+        var best = MeasureStay(existing, request, request.TripStart);
 
-        if (daysAtBest > limit)
+        if (best.PeakDays > limit)
         {
-            return new MaxTripEndDateResponseDto
-            {
-                MaxEndDate = request.TripStart,
-                DaysAtLimit = daysAtBest
-            };
+            return MaxEndResponse(request, request.TripStart, best);
         }
 
         for (var extraDays = 1; extraDays <= limit + 366; extraDays++)
         {
             var candidate = request.TripStart.AddDays(extraDays);
-            var days = MeasureStay(existing, request, candidate).PeakDays;
-            if (days > limit)
+            var measured = MeasureStay(existing, request, candidate);
+            if (measured.PeakDays > limit)
             {
                 break;
             }
 
             bestEnd = candidate;
-            daysAtBest = days;
+            best = measured;
         }
 
+        return MaxEndResponse(request, bestEnd, best);
+    }
+
+    private MaxTripEndDateResponseDto MaxEndResponse(MaxTripEndDateRequestDto request, DateTime end, StayMeasure measure)
+    {
+        var rule = _residency.GetCountryRule(request.ArrivalCountry);
         return new MaxTripEndDateResponseDto
         {
-            MaxEndDate = bestEnd,
-            DaysAtLimit = daysAtBest
+            MaxEndDate = end,
+            DaysAtLimit = measure.PeakDays,
+            WindowStart = measure.WindowStart,
+            WindowEnd = measure.WindowEnd,
+            RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay"
         };
     }
 
@@ -181,7 +186,7 @@ public class ResidencyQueryService
             peakDays = peak.Days;
         }
 
-        return new StayMeasure(peakDays, endDays);
+        return new StayMeasure(peakDays, endDays, window.Start, window.End);
     }
 
     public async Task<LocationOnDate> GetLocationOnAsync(string userId, DateOnly day)
@@ -434,7 +439,7 @@ public sealed record ForecastBreakdown(
     Dictionary<string, int> Forecast,
     Dictionary<string, PeakCount> Peaks);
 
-public readonly record struct StayMeasure(int PeakDays, int EndOfWindowDays);
+public readonly record struct StayMeasure(int PeakDays, int EndOfWindowDays, DateOnly WindowStart, DateOnly WindowEnd);
 
 public sealed record LocationOnDate(
     DateOnly Date,

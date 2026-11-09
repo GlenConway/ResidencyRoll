@@ -528,9 +528,9 @@ public class ResidencyCalculationService
     }
 
     /// <summary>
-    /// Highest rolling count for each country. The window ending on day D is the 366 calendar
-    /// days from D-365 through D, the same span <see cref="CalculateResidencyDays"/> uses.
-    /// The recorded date is the first day that count was reached.
+    /// Highest rolling count for each country. The window ending on day D is the 365 calendar
+    /// days from D-364 through D, counting both ends. The recorded date is the first day that
+    /// count was reached.
     /// </summary>
     public Dictionary<string, PeakCount> PeakRollingCounts(
         List<DailyPresence> dailyPresenceLog,
@@ -553,7 +553,7 @@ public class ResidencyCalculationService
 
         for (var day = periodStart; day <= periodEnd; day = day.AddDays(1))
         {
-            var windowStart = day.AddDays(-365);
+            var windowStart = RollingWindow.StartOn(day);
             while (nextToAdd < contributions.Count && contributions[nextToAdd].Date <= day)
             {
                 Adjust(counts, contributions[nextToAdd].Countries, 1);

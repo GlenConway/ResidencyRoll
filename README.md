@@ -73,7 +73,7 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `set_home_country` | Save or clear the home country |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
 | `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved |
-| `max_trip_end_date` | Latest departure that keeps the arrival country at or under a day limit (183 by default) |
+| `max_trip_end_date` | Last midnight you can still be in the arrival country while its peak stays at or under a day limit (183 by default) |
 | `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days |
 | `parse_itinerary` | Draft legs from pasted booking text. Listed only when an OpenAI model, endpoint, and API key are set. Nothing is saved |
 | `create_trip` | Save one leg |
