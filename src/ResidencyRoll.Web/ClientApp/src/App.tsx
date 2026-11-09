@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { HomePage } from './pages/HomePage.tsx'
+import { ForecastPage } from './pages/ForecastPage.tsx'
 import { ManageTripsPage } from './pages/ManageTripsPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { PlaceholderPage } from './pages/PlaceholderPage.tsx'
@@ -32,7 +33,7 @@ export default function App() {
           element={
             <>
               <PageTitle title="Forecast - Residency Roll" />
-              <PlaceholderPage heading="Forecast" message="Plan a future itinerary and see how the day counts change." />
+              <ForecastPage />
             </>
           }
         />

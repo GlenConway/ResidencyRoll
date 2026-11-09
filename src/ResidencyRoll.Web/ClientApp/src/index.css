@@ -108,3 +108,17 @@ body,
 .month-group {
   margin-bottom: 1rem;
 }
+
+.forecast-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.forecast-leg,
+.forecast-warning {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+}
