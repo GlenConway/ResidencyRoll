@@ -53,26 +53,48 @@ public static class BffEndpointExtensions
 
         app.MapGet("/auth/login", async (HttpContext context, string? returnUrl) =>
         {
-            if (!string.IsNullOrEmpty(returnUrl) && !IsLocalReturnUrl(returnUrl))
+            var enabled = context.RequestServices.GetRequiredService<IConfiguration>()
+                .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
+
+            if (string.IsNullOrEmpty(returnUrl))
+            {
+                if (!enabled)
+                {
+                    context.Response.Redirect("/");
+                    return;
+                }
+
+                await context.ChallengeAsync(
+                    OpenIdConnectDefaults.AuthenticationScheme,
+                    new AuthenticationProperties { RedirectUri = "/" });
+                return;
+            }
+
+            if (!IsLocalReturnUrl(returnUrl))
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsync("returnUrl must be a local path.");
                 return;
             }
 
-            var target = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl;
-            var enabled = context.RequestServices.GetRequiredService<IConfiguration>()
-                .GetValue<bool>("Authentication:OpenIdConnect:Enabled");
-
-            if (!enabled)
+            // Only a relative URL reaches the redirect. An absolute URL is rejected.
+            var url = new Uri(returnUrl, UriKind.RelativeOrAbsolute);
+            if (!url.IsAbsoluteUri)
             {
-                context.Response.Redirect(target);
+                if (!enabled)
+                {
+                    context.Response.Redirect(url.ToString());
+                    return;
+                }
+
+                await context.ChallengeAsync(
+                    OpenIdConnectDefaults.AuthenticationScheme,
+                    new AuthenticationProperties { RedirectUri = url.ToString() });
                 return;
             }
 
-            await context.ChallengeAsync(
-                OpenIdConnectDefaults.AuthenticationScheme,
-                new AuthenticationProperties { RedirectUri = target });
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("returnUrl must be a local path.");
         });
 
         app.MapPost("/auth/logout", SignOutAsync);

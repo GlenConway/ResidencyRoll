@@ -3,6 +3,8 @@ FROM node:22-bookworm AS spa
 WORKDIR /src/ClientApp
 COPY src/ResidencyRoll.Web/ClientApp/package.json src/ResidencyRoll.Web/ClientApp/package-lock.json ./
 RUN npm ci
+# The UI imports this file four levels above ClientApp/src/lib. The image root matches that path.
+COPY src/ResidencyRoll.Shared/Airports/airports.json /ResidencyRoll.Shared/Airports/airports.json
 COPY src/ResidencyRoll.Web/ClientApp/ ./
 RUN npm run build
 
