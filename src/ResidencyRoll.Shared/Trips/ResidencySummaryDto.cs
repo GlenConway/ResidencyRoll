@@ -8,4 +8,7 @@ public class ResidencySummaryDto
     public int ThresholdDays { get; set; } = 183;
     public bool IsApproachingThreshold { get; set; }
     public int DaysUntilThreshold { get; set; }
+    public string WindowType { get; set; } = string.Empty;
+    public DateOnly WindowStart { get; set; }
+    public DateOnly WindowEnd { get; set; }
 }

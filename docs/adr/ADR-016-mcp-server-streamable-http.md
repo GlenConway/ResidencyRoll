@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-09). Amended 2026-11-09: MCP structured output uses local wall-clock strings instead of RFC 3339 date-times; `get_days_per_country` includes the country rule; `forecast_trips` and `max_trip_end_date` report the peak inside the window; `get_location_on` projects past the last saved day; `get_current_location` added. Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
+Accepted (2026-11-09). Amended 2026-11-09: MCP structured output uses local wall-clock strings instead of RFC 3339 date-times; `get_days_per_country` includes the country rule; `forecast_trips` and `max_trip_end_date` report the peak inside the window; `get_location_on` projects past the last saved day; `get_current_location` added. Amended 2026-11-09 again: `locationAtMidnight` is 00:00 at the start of the date; threshold status `reached` means the count equals the threshold; planning and rolling-count tools were added. Country windows are in [ADR-018](ADR-018-per-country-counting-windows.md). Trip warnings, record coverage, write impact, and the Nova Scotia MSI minimum are in [ADR-019](ADR-019-trip-warnings-coverage-and-msi.md). Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
 
 ## Context
 
@@ -110,15 +110,18 @@ Tools wrap shared services and are never copies of controller code. Before addin
 | `get_trip(id)` | read | readOnly | `GET /trips/{id}` |
 | `get_residency_summary(startDate?, endDate?, homeCountry?)` | read | readOnly | `GET /trips/residency-summary`, plus days left/over and threshold status per country (the same rules the Home dashboard uses) |
 | `get_days_per_country(window: "last365" \| "all")` | read | readOnly | `days-per-country`, `days-per-country/last365` |
-| `get_daily_presence(startDate, endDate)` | read | readOnly | `GET /trips/daily-presence`, capped at 366 days per call |
+| `get_daily_presence(startDate, endDate, country?, format?)` | read | readOnly | `GET /trips/daily-presence`, capped at 366 days per call. `format` `runs` returns contiguous stretches. `locationAtMidnight` is 00:00 at the start of the date |
+| `get_rolling_count(country, from, to)` | read | readOnly | rolling 365-day total per day, plus whether the anniversary day counted |
 | `get_location_on(date)` | read | readOnly | one day of daily presence: midnight location, countries visited, transit, and status (`recorded`, `gapFilled`, `projected`, `noData`) |
 | `get_current_location()` | read | readOnly | current country, last arrival airport, and that arrival's local date |
 | `get_country_rules(country?)` | read | readOnly | `ResidencyCalculationService.GetCountryRule` |
 | `get_home_country()` | read | readOnly | saved home country for the signed-in user |
 | `set_home_country(homeCountry)` | write | idempotent | save or clear the home country |
-| `forecast_trips(trips[], homeCountry?)` | read | readOnly | `POST /trips/forecast`: hypothetical legs → current vs forecast days |
-| `max_trip_end_date(...)` | read | readOnly | `POST /trips/forecast/max-end-date` |
-| `standard_duration_forecasts(...)` | read | readOnly | `POST /trips/forecast/standard-durations` |
+| `forecast_trips(trips[], homeCountry?, country?, through?)` | read | readOnly | `POST /trips/forecast`: hypothetical legs → current vs forecast days, each on that country's window |
+| `max_trip_end_date(..., trips?)` | read | readOnly | `POST /trips/forecast/max-end-date`. Optional unsaved legs |
+| `max_trip_start_date(...)` | read | readOnly | earliest arrival before a fixed departure |
+| `plan_max_presence(country, from, to, blackoutRanges?, dayLimit?)` | read | readOnly | dates that add the most days without passing the limit |
+| `standard_duration_forecasts(..., trips?)` | read | readOnly | `POST /trips/forecast/standard-durations`. Optional unsaved legs |
 | `lookup_airport(query)` | read | readOnly | server-side airport table (below) |
 | `parse_itinerary(text)` | read | readOnly, openWorld | `ItineraryParsingService`; returns **draft** legs only and saves nothing. Listed only when the parser is configured. |
 | `create_trip(leg)` / `create_trips(legs[])` | write | — | `POST /trips` |

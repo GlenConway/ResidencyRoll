@@ -19,14 +19,14 @@ public class ResidencyQueryService
         _residency = residency;
     }
 
-    public async Task<ForecastResponseDto> ForecastAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips)
+    public async Task<ForecastResponseDto> ForecastAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null)
     {
         Dictionary<string, int> current;
         Dictionary<string, int> forecast;
 
         if (hypotheticalTrips.Count > 0)
         {
-            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList());
+            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList(), through);
         }
         else
         {
@@ -41,9 +41,9 @@ public class ResidencyQueryService
         };
     }
 
-    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips)
+    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null)
     {
-        var basic = await ForecastAsync(userId, hypotheticalTrips);
+        var basic = await ForecastAsync(userId, hypotheticalTrips, through);
         var current = basic.Current.ToDictionary(row => row.CountryName, row => row.Days);
         var forecast = basic.Forecast.ToDictionary(row => row.CountryName, row => row.Days);
         if (hypotheticalTrips.Count == 0)
@@ -52,7 +52,7 @@ public class ResidencyQueryService
             return new ForecastBreakdown(RollingWindow.StartOn(today), today, current, forecast, new Dictionary<string, PeakCount>(StringComparer.OrdinalIgnoreCase));
         }
 
-        var window = _trips.GetForecastWindow(hypotheticalTrips);
+        var window = _trips.ScenarioWindow(hypotheticalTrips, through);
         var existing = await _trips.GetAllTripsAsync(userId);
         var combined = new List<Trip>(existing);
         combined.AddRange(hypotheticalTrips);
@@ -101,33 +101,120 @@ public class ResidencyQueryService
     {
         var trips = await _trips.GetAllTripsAsync(userId);
         var dailyPresence = _residency.GenerateDailyPresenceLog(trips);
-        var residencyDays = _residency.CalculateResidencyDays(dailyPresence, startDate, endDate);
-
-        var summary = new List<ResidencySummaryDto>();
-        foreach (var kvp in residencyDays.OrderByDescending(pair => pair.Value))
+        if (startDate.HasValue)
         {
-            var rule = _residency.GetCountryRule(kvp.Key);
-            var thresholdDays = rule.ResidencyThresholdDays ?? 183;
-            var daysUntilThreshold = thresholdDays - kvp.Value;
-
-            summary.Add(new ResidencySummaryDto
-            {
-                CountryName = kvp.Key,
-                TotalDays = kvp.Value,
-                RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
-                ThresholdDays = thresholdDays,
-                IsApproachingThreshold = daysUntilThreshold <= 30 && daysUntilThreshold > 0,
-                DaysUntilThreshold = Math.Max(0, daysUntilThreshold)
-            });
+            var end = endDate ?? DateOnly.FromDateTime(DateTime.Today);
+            var residencyDays = _residency.CalculateResidencyDays(dailyPresence, startDate, end);
+            return residencyDays
+                .OrderByDescending(pair => pair.Value)
+                .Select(pair => SummaryRow(pair.Key, pair.Value, startDate.Value, end, "range"))
+                .ToList();
         }
 
-        return summary;
+        var reference = endDate ?? DateOnly.FromDateTime(DateTime.Today);
+        var summary = new List<ResidencySummaryDto>();
+        foreach (var country in CountryNames(dailyPresence))
+        {
+            var rule = _residency.GetCountryRule(country);
+            var period = CountingWindow.For(rule, reference);
+            var counted = _residency.CalculateResidencyDays(dailyPresence, period.Start, period.End);
+            if (!counted.TryGetValue(country, out var days) || days <= 0)
+            {
+                continue;
+            }
+
+            summary.Add(SummaryRow(country, days, period.Start, period.End, CountingWindow.Name(rule.WindowType)));
+        }
+
+        return summary.OrderByDescending(row => row.TotalDays).ToList();
     }
 
-    public async Task<MaxTripEndDateResponseDto> CalculateMaxEndDateAsync(string userId, MaxTripEndDateRequestDto request)
+    public async Task<RecordCoverage> GetRecordCoverageAsync(string userId)
+    {
+        var trips = await _trips.GetAllTripsAsync(userId);
+        DateOnly? first = null;
+        DateOnly? last = null;
+        foreach (var trip in trips)
+        {
+            Consider(DateOnly.FromDateTime(trip.DepartureDateTime));
+            Consider(DateOnly.FromDateTime(trip.ArrivalDateTime));
+        }
+
+        return new RecordCoverage(first, last, trips.Count);
+
+        void Consider(DateOnly date)
+        {
+            if (first is null || date < first)
+            {
+                first = date;
+            }
+
+            if (last is null || date > last)
+            {
+                last = date;
+            }
+        }
+    }
+
+    public async Task<MinimumPresence?> MeasureMinimumPresenceAsync(string userId, string country, DateOnly referenceEnd)
+    {
+        var rule = _residency.GetCountryRule(country);
+        if (rule.MinimumPresenceDays is not int minimum || rule.MinimumWindowType is not CountingWindowType windowType)
+        {
+            return null;
+        }
+
+        var period = CountingWindow.For(new CountryResidencyRule
+        {
+            WindowType = windowType,
+            TaxYearStartMonth = rule.TaxYearStartMonth,
+            TaxYearStartDay = rule.TaxYearStartDay
+        }, referenceEnd);
+        var trips = await _trips.GetAllTripsAsync(userId);
+        var presence = _residency.GenerateDailyPresenceLog(trips);
+        var days = CountCountry(_residency.CalculateResidencyDays(presence, period.Start, period.End), rule.CountryName);
+        var shortfall = Math.Max(0, minimum - days);
+        var status = shortfall == 0 ? "reached" : shortfall <= 30 ? "approaching" : "under";
+        return new MinimumPresence(
+            minimum,
+            CountingWindow.Name(windowType),
+            period.Start,
+            period.End,
+            days,
+            shortfall,
+            status);
+    }
+
+    private ResidencySummaryDto SummaryRow(string country, int days, DateOnly windowStart, DateOnly windowEnd, string windowType)
+    {
+        var rule = _residency.GetCountryRule(country);
+        var thresholdDays = rule.ResidencyThresholdDays ?? 183;
+        var daysUntilThreshold = thresholdDays - days;
+        return new ResidencySummaryDto
+        {
+            CountryName = country,
+            TotalDays = days,
+            RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+            ThresholdDays = thresholdDays,
+            IsApproachingThreshold = daysUntilThreshold <= 30 && daysUntilThreshold > 0,
+            DaysUntilThreshold = Math.Max(0, daysUntilThreshold),
+            WindowType = windowType,
+            WindowStart = windowStart,
+            WindowEnd = windowEnd
+        };
+    }
+
+    public async Task<MaxTripEndDateResponseDto> CalculateMaxEndDateAsync(
+        string userId,
+        MaxTripEndDateRequestDto request,
+        IReadOnlyList<Trip>? additionalTrips = null)
     {
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
-        var existing = await _trips.GetAllTripsAsync(userId);
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        if (additionalTrips is { Count: > 0 })
+        {
+            existing.AddRange(additionalTrips);
+        }
         var bestEnd = request.TripStart;
         var best = MeasureStay(existing, request, request.TripStart);
 
@@ -161,8 +248,50 @@ public class ResidencyQueryService
             DaysAtLimit = measure.PeakDays,
             WindowStart = measure.WindowStart,
             WindowEnd = measure.WindowEnd,
-            RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay"
+            RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+            WindowType = CountingWindow.Name(rule.WindowType)
         };
+    }
+
+    public async Task<EarliestArrival> CalculateEarliestArrivalAsync(
+        string userId,
+        MaxTripEndDateRequestDto request,
+        DateTime departure,
+        IReadOnlyList<Trip>? additionalTrips = null)
+    {
+        var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        if (additionalTrips is { Count: > 0 })
+        {
+            existing.AddRange(additionalTrips);
+        }
+
+        var bestArrival = departure;
+        var best = MeasureStay(existing, WithStart(request, departure), departure);
+        if (best.PeakDays <= limit)
+        {
+            for (var earlier = 1; earlier <= limit + 366; earlier++)
+            {
+                var candidate = departure.AddDays(-earlier);
+                var measured = MeasureStay(existing, WithStart(request, candidate), departure);
+                if (measured.PeakDays > limit)
+                {
+                    break;
+                }
+
+                bestArrival = candidate;
+                best = measured;
+            }
+        }
+
+        var rule = _residency.GetCountryRule(request.ArrivalCountry);
+        return new EarliestArrival(
+            bestArrival,
+            best.PeakDays,
+            best.WindowStart,
+            best.WindowEnd,
+            rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+            CountingWindow.Name(rule.WindowType));
     }
 
     public StayMeasure MeasureStay(IReadOnlyList<Trip> existing, MaxTripEndDateRequestDto request, DateTime end)
@@ -171,6 +300,14 @@ public class ResidencyQueryService
         var combined = new List<Trip>(existing);
         combined.AddRange(hypothetical);
         var presence = _residency.GenerateDailyPresenceLog(combined);
+        var rule = _residency.GetCountryRule(request.ArrivalCountry);
+        if (rule.WindowType != CountingWindowType.Rolling365)
+        {
+            var period = CountingWindow.For(rule, DateOnly.FromDateTime(end));
+            var periodDays = CountCountry(_residency.CalculateResidencyDays(presence, period.Start, period.End), request.ArrivalCountry);
+            return new StayMeasure(periodDays, periodDays, period.Start, period.End);
+        }
+
         var window = _trips.GetForecastWindow(hypothetical);
         var endDays = CountCountry(_residency.CalculateResidencyDays(presence, window.Start, window.End), request.ArrivalCountry);
         var periodStart = DateOnly.FromDateTime(request.TripStart);
@@ -242,11 +379,17 @@ public class ResidencyQueryService
 
     public async Task<List<StandardDurationForecastItemDto>> GetStandardDurationForecastsAsync(
         string userId,
-        StandardDurationForecastRequestDto request)
+        StandardDurationForecastRequestDto request,
+        IReadOnlyList<Trip>? additionalTrips = null)
     {
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
         var durations = request.Durations is { Length: > 0 } ? request.Durations : DefaultDurations;
-        var existing = await _trips.GetAllTripsAsync(userId);
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        if (additionalTrips is { Count: > 0 })
+        {
+            existing.AddRange(additionalTrips);
+        }
+
         var stay = new MaxTripEndDateRequestDto
         {
             DepartureCountry = request.DepartureCountry,
@@ -276,6 +419,208 @@ public class ResidencyQueryService
         }
 
         return results;
+    }
+
+    public async Task<IReadOnlyList<RollingDay>> GetRollingCountAsync(
+        string userId,
+        string country,
+        DateOnly from,
+        DateOnly to,
+        IReadOnlyList<Trip>? additionalTrips = null)
+    {
+        var trips = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        if (additionalTrips is { Count: > 0 })
+        {
+            trips.AddRange(additionalTrips);
+        }
+
+        var presence = _residency.GenerateDailyPresenceLog(trips);
+        var counted = new HashSet<DateOnly>();
+        foreach (var day in presence)
+        {
+            if (CountCountry(_residency.CalculateResidencyDays(presence, day.Date, day.Date), country) > 0)
+            {
+                counted.Add(day.Date);
+            }
+        }
+
+        var rows = new List<RollingDay>();
+        for (var date = from; date <= to; date = date.AddDays(1))
+        {
+            var start = RollingWindow.StartOn(date);
+            var total = 0;
+            for (var day = start; day <= date; day = day.AddDays(1))
+            {
+                if (counted.Contains(day))
+                {
+                    total++;
+                }
+            }
+
+            var anniversary = date.AddDays(-RollingWindow.LengthDays);
+            rows.Add(new RollingDay(date, total, anniversary, counted.Contains(anniversary)));
+        }
+
+        return rows;
+    }
+
+    public async Task<PresencePlan> PlanMaxPresenceAsync(
+        string userId,
+        string country,
+        DateOnly from,
+        DateOnly to,
+        IReadOnlyList<(DateOnly From, DateOnly To)> blackouts,
+        int dayLimit)
+    {
+        var limit = dayLimit <= 0 ? 183 : dayLimit;
+        var rule = _residency.GetCountryRule(country);
+        var presence = _residency.GenerateDailyPresenceLog(await _trips.GetAllTripsAsync(userId));
+        var byDate = presence.ToDictionary(day => day.Date);
+        var counted = new SortedSet<DateOnly>();
+        foreach (var day in presence)
+        {
+            if (CountCountry(_residency.CalculateResidencyDays(presence, day.Date, day.Date), country) > 0)
+            {
+                counted.Add(day.Date);
+            }
+        }
+
+        var added = new List<DateOnly>();
+        for (var date = from; date <= to; date = date.AddDays(1))
+        {
+            if (InRange(date, blackouts) || counted.Contains(date))
+            {
+                continue;
+            }
+
+            if (byDate.TryGetValue(date, out var existing)
+                && !string.IsNullOrWhiteSpace(existing.LocationAtMidnight)
+                && existing.LocationAtMidnight != "IN_TRANSIT"
+                && !existing.LocationAtMidnight.Equals(country, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            counted.Add(date);
+            if (ExceedsLimit(counted, rule, date, limit))
+            {
+                counted.Remove(date);
+                continue;
+            }
+
+            added.Add(date);
+        }
+
+        var stays = new List<PlannedStay>();
+        DateOnly? blockStart = null;
+        DateOnly previous = default;
+        foreach (var date in added)
+        {
+            if (blockStart is null)
+            {
+                blockStart = date;
+            }
+            else if (date != previous.AddDays(1))
+            {
+                stays.Add(new PlannedStay(blockStart.Value, previous, previous.DayNumber - blockStart.Value.DayNumber + 1));
+                blockStart = date;
+            }
+
+            previous = date;
+        }
+
+        if (blockStart is not null)
+        {
+            stays.Add(new PlannedStay(blockStart.Value, previous, previous.DayNumber - blockStart.Value.DayNumber + 1));
+        }
+
+        var peak = 0;
+        if (counted.Count > 0)
+        {
+            var first = counted.Min;
+            var last = counted.Max.AddDays(364);
+            for (var end = first; end <= last; end = end.AddDays(1))
+            {
+                peak = Math.Max(peak, CountInWindow(counted, rule, end));
+            }
+        }
+
+        return new PresencePlan(country, limit, added.Count, peak, stays);
+    }
+
+    private static bool ExceedsLimit(SortedSet<DateOnly> counted, CountryResidencyRule rule, DateOnly added, int limit)
+    {
+        if (rule.WindowType == CountingWindowType.Rolling365)
+        {
+            for (var end = added; end <= added.AddDays(364); end = end.AddDays(1))
+            {
+                if (CountInWindow(counted, rule, end) > limit)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return CountInWindow(counted, rule, added) > limit;
+    }
+
+    private static int CountInWindow(SortedSet<DateOnly> counted, CountryResidencyRule rule, DateOnly referenceEnd)
+    {
+        var period = CountingWindow.For(rule, referenceEnd);
+        return counted.GetViewBetween(period.Start, period.End).Count;
+    }
+
+    private static bool InRange(DateOnly date, IReadOnlyList<(DateOnly From, DateOnly To)> ranges)
+    {
+        foreach (var range in ranges)
+        {
+            var start = range.From <= range.To ? range.From : range.To;
+            var end = range.From <= range.To ? range.To : range.From;
+            if (date >= start && date <= end)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static MaxTripEndDateRequestDto WithStart(MaxTripEndDateRequestDto request, DateTime arrival) => new()
+    {
+        DepartureCountry = request.DepartureCountry,
+        DepartureCity = request.DepartureCity,
+        DepartureTimezone = request.DepartureTimezone,
+        DepartureIataCode = request.DepartureIataCode,
+        ArrivalCountry = request.ArrivalCountry,
+        ArrivalCity = request.ArrivalCity,
+        ArrivalTimezone = request.ArrivalTimezone,
+        ArrivalIataCode = request.ArrivalIataCode,
+        TripStart = arrival,
+        DayLimit = request.DayLimit
+    };
+
+    private static IEnumerable<string> CountryNames(IEnumerable<DailyPresence> presence)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var day in presence)
+        {
+            if (!string.IsNullOrWhiteSpace(day.LocationAtMidnight) && day.LocationAtMidnight != "IN_TRANSIT")
+            {
+                names.Add(day.LocationAtMidnight);
+            }
+
+            foreach (var country in day.LocationsDuringDay)
+            {
+                if (!string.IsNullOrWhiteSpace(country) && country != "IN_TRANSIT")
+                {
+                    names.Add(country);
+                }
+            }
+        }
+
+        return names;
     }
 
     private int DaysInCountry(IReadOnlyList<Trip> existing, MaxTripEndDateRequestDto request, DateTime end) =>
@@ -432,6 +777,17 @@ public class ResidencyQueryService
     }
 }
 
+public sealed record RecordCoverage(DateOnly? FirstTripDate, DateOnly? LastTripDate, int LegCount);
+
+public sealed record MinimumPresence(
+    int MinimumDays,
+    string WindowType,
+    DateOnly WindowStart,
+    DateOnly WindowEnd,
+    int Days,
+    int DaysShort,
+    string Status);
+
 public sealed record ForecastBreakdown(
     DateOnly WindowStart,
     DateOnly WindowEnd,
@@ -440,6 +796,25 @@ public sealed record ForecastBreakdown(
     Dictionary<string, PeakCount> Peaks);
 
 public readonly record struct StayMeasure(int PeakDays, int EndOfWindowDays, DateOnly WindowStart, DateOnly WindowEnd);
+
+public sealed record EarliestArrival(
+    DateTime Arrival,
+    int DaysAtLimit,
+    DateOnly WindowStart,
+    DateOnly WindowEnd,
+    string RuleType,
+    string WindowType);
+
+public readonly record struct RollingDay(DateOnly Date, int RollingDays, DateOnly AnniversaryDate, bool AnniversaryCounted);
+
+public sealed record PlannedStay(DateOnly Arrival, DateOnly Departure, int Days);
+
+public sealed record PresencePlan(
+    string Country,
+    int DayLimit,
+    int PlannedDays,
+    int PeakDays,
+    IReadOnlyList<PlannedStay> Stays);
 
 public sealed record LocationOnDate(
     DateOnly Date,

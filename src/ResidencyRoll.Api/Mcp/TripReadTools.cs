@@ -107,24 +107,61 @@ public sealed class ResidencyTools
     private const string Semantics = McpSemantics.Rules + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "get_residency_summary", Title = "Residency summary", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ResidencyCountryStatus[]))]
-    [Description("Days per country between two dates, plus days left, days over, and threshold status (under, approaching, over, or home). The home country has thresholdStatus home, isApproachingThreshold false, and null days left and days over. Defaults to the 365 days ending on the end date, counting both ends. " + Semantics)]
+    [Description("Days per country, plus days left, days over, and threshold status (under, approaching, reached, over, or home). reached means the count equals the threshold, which counts as residency. over means the count is past it, and daysOverThreshold is then the number of days past. The home country has thresholdStatus home, isApproachingThreshold false, and null days left and days over. When the home country has a minimum presence, such as Canada's 183 calendar-year days for Nova Scotia MSI, the row also includes daysTowardMinimum and minimumStatus. coverageStart and coverageEnd are the part of each window the saved trips actually cover. isComplete is false when the window runs past the records, so days outside that span are not counted. When startDate is omitted, each country uses its own window (rolling365, taxYear, or calendarYear) ending on the end date. " + Semantics)]
     public static async Task<CallToolResult> GetResidencySummary(
         ResidencyQueryService query,
+        ResidencyCalculationService rules,
         UserProfileService profiles,
         ClaimsPrincipal user,
-        [Description("Range start, yyyy-MM-dd. Defaults to 364 days before the end date, so both ends count and the range is 365 days.")] string? startDate = null,
-        [Description("Range end, yyyy-MM-dd. Defaults to today.")] string? endDate = null,
+        [Description("Range start, yyyy-MM-dd. Optional. When omitted, each country uses its own counting window.")] string? startDate = null,
+        [Description("Range end, yyyy-MM-dd. Defaults to today. Country windows end on this date when startDate is omitted.")] string? endDate = null,
         [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null)
     {
         McpScopes.Require(user, McpScopes.Read);
         var userId = McpScopes.UserId(user);
         var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
-        var end = string.IsNullOrWhiteSpace(endDate) ? DateOnly.FromDateTime(DateTime.Today) : TripLegResolver.ParseDate(endDate, "endDate");
-        var start = string.IsNullOrWhiteSpace(startDate) ? RollingWindow.StartOn(end) : TripLegResolver.ParseDate(startDate, "startDate");
+        DateOnly? end = string.IsNullOrWhiteSpace(endDate) ? null : TripLegResolver.ParseDate(endDate, "endDate");
+        DateOnly? start = string.IsNullOrWhiteSpace(startDate) ? null : TripLegResolver.ParseDate(startDate, "startDate");
+        var reference = end ?? DateOnly.FromDateTime(DateTime.Today);
         var summary = await query.GetResidencySummaryAsync(userId, start, end);
         var rows = summary.Select(item => ResidencyCountryStatus.From(item, home)).ToList();
+        var coverage = await query.GetRecordCoverageAsync(userId);
+        if (!string.IsNullOrWhiteSpace(home) && rows.All(row => !row.CountryName.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            var rule = rules.GetCountryRule(home);
+            if (rule.MinimumPresenceDays is not null)
+            {
+                var period = CountingWindow.For(rule, reference);
+                rows.Add(ResidencyCountryStatus.From(new ResidencySummaryDto
+                {
+                    CountryName = rule.CountryName,
+                    TotalDays = 0,
+                    RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
+                    ThresholdDays = rule.ResidencyThresholdDays ?? 183,
+                    WindowType = start is null ? CountingWindow.Name(rule.WindowType) : "range",
+                    WindowStart = start ?? period.Start,
+                    WindowEnd = start is null ? period.End : reference
+                }, home));
+            }
+        }
+
+        foreach (var row in rows)
+        {
+            ResidencyCountryStatus.ApplyCoverage(row, coverage);
+        }
+
+        if (!string.IsNullOrWhiteSpace(home))
+        {
+            var minimum = await query.MeasureMinimumPresenceAsync(userId, home, reference);
+            var homeRow = rows.FirstOrDefault(row => row.CountryName.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (homeRow is not null && minimum is not null)
+            {
+                ResidencyCountryStatus.ApplyMinimum(homeRow, minimum);
+            }
+        }
+
         var text = rows.Count == 0
-            ? $"No residency data from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}."
+            ? "No residency data for the requested window."
             : string.Join(" ", rows.Select(ResidencyCountryStatus.Describe));
         if (home is null)
         {
@@ -134,13 +171,51 @@ public sealed class ResidencyTools
         return McpResults.Ok(text, rows);
     }
 
-    [McpServerTool(Name = "get_daily_presence", Title = "Daily presence", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(DailyPresenceDto[]))]
-    [Description("Midnight location, countries visited, and transit flag for each day in a range. At most 366 days per call. Days after the last saved trip are omitted; use get_location_on to project those. " + Semantics)]
+    private static bool Involves(DailyPresenceDto day, string country) =>
+        day.LocationAtMidnight.Equals(country.Trim(), StringComparison.OrdinalIgnoreCase)
+        || day.LocationsDuringDay.Any(place => place.Equals(country.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static List<PresenceRun> PresenceRuns(IReadOnlyList<DailyPresenceDto> days, string? country)
+    {
+        var selected = days
+            .Where(day => !string.IsNullOrWhiteSpace(day.LocationAtMidnight) && day.LocationAtMidnight != "IN_TRANSIT")
+            .Where(day => string.IsNullOrWhiteSpace(country) || day.LocationAtMidnight.Equals(country.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(day => day.Date)
+            .ToList();
+        var runs = new List<PresenceRun>();
+        foreach (var day in selected)
+        {
+            var current = runs.LastOrDefault();
+            if (current is not null
+                && current.Country.Equals(day.LocationAtMidnight, StringComparison.OrdinalIgnoreCase)
+                && day.Date == current.To.AddDays(1))
+            {
+                current.To = day.Date;
+                current.Days++;
+                continue;
+            }
+
+            runs.Add(new PresenceRun
+            {
+                Country = day.LocationAtMidnight,
+                From = day.Date,
+                To = day.Date,
+                Days = 1
+            });
+        }
+
+        return runs;
+    }
+
+    [McpServerTool(Name = "get_daily_presence", Title = "Daily presence", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(DailyPresenceResponse))]
+    [Description("Midnight location for each day in a range. locationAtMidnight is the country at 00:00 at the start of that date. format \"days\" returns one row per day. format \"runs\" returns contiguous stretches as country, from, to, and days. country limits the rows to that country. At most 366 days per call. Days after the last saved trip are omitted; use get_location_on to project those. " + Semantics)]
     public static async Task<CallToolResult> GetDailyPresence(
         ResidencyQueryService query,
         ClaimsPrincipal user,
         [Description("Range start, yyyy-MM-dd.")] string startDate,
-        [Description("Range end, yyyy-MM-dd.")] string endDate)
+        [Description("Range end, yyyy-MM-dd.")] string endDate,
+        [Description("Country name. Optional. Limits the rows to that country.")] string? country = null,
+        [Description("days or runs. Defaults to days.")] string format = "days")
     {
         McpScopes.Require(user, McpScopes.Read);
         var start = TripLegResolver.ParseDate(startDate, "startDate");
@@ -150,14 +225,61 @@ public sealed class ResidencyTools
             throw new ModelContextProtocol.McpException("endDate is before startDate.");
         }
 
-        var days = end.DayNumber - start.DayNumber + 1;
-        if (days > 366)
+        var span = end.DayNumber - start.DayNumber + 1;
+        if (span > 366)
         {
             throw new ModelContextProtocol.McpException("get_daily_presence returns at most 366 days per call.");
         }
 
         var presence = await query.GetDailyPresenceAsync(McpScopes.UserId(user), start, end);
-        return McpResults.Ok($"{presence.Count} days from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", presence);
+        if (!string.IsNullOrWhiteSpace(country))
+        {
+            presence = presence.Where(day => Involves(day, country)).ToList();
+        }
+
+        var mode = string.Equals(format, "runs", StringComparison.OrdinalIgnoreCase) ? "runs" : "days";
+        var response = new DailyPresenceResponse { Format = mode };
+        if (mode == "runs")
+        {
+            response.Runs = PresenceRuns(presence, country);
+            return McpResults.Ok($"{response.Runs.Count} runs from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
+        }
+
+        response.Days = presence;
+        return McpResults.Ok($"{presence.Count} days from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
+    }
+
+    [McpServerTool(Name = "get_rolling_count", Title = "Rolling day count", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(RollingCountPoint[]))]
+    [Description("Rolling 365-day count for one country on each day in a range, counting both ends. This view is always the rolling 365-day window, including when the country's own rule uses a tax year or a calendar year. anniversaryDate is the day that leaves the window when this date is included (365 days earlier). anniversaryCounted means that day counted, so a counted day on this date does not raise the total. " + Semantics)]
+    public static async Task<CallToolResult> GetRollingCount(
+        ResidencyQueryService query,
+        ClaimsPrincipal user,
+        [Description("Country name.")] string country,
+        [Description("Range start, yyyy-MM-dd.")] string from,
+        [Description("Range end, yyyy-MM-dd.")] string to)
+    {
+        McpScopes.Require(user, McpScopes.Read);
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            throw new ModelContextProtocol.McpException("country is required.");
+        }
+
+        var start = TripLegResolver.ParseDate(from, "from");
+        var end = TripLegResolver.ParseDate(to, "to");
+        if (end < start)
+        {
+            throw new ModelContextProtocol.McpException("to is before from.");
+        }
+
+        if (end.DayNumber - start.DayNumber + 1 > 366)
+        {
+            throw new ModelContextProtocol.McpException("get_rolling_count returns at most 366 days per call.");
+        }
+
+        var rows = (await query.GetRollingCountAsync(McpScopes.UserId(user), country.Trim(), start, end))
+            .Select(RollingCountPoint.From)
+            .ToList();
+        return McpResults.Ok($"{rows.Count} days of rolling counts for {country.Trim()}.", rows);
     }
 
     [McpServerTool(Name = "get_location_on", Title = "Location on a date", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpLocationOn))]
@@ -203,7 +325,7 @@ public sealed class ResidencyTools
     }
 
     [McpServerTool(Name = "get_country_rules", Title = "Country residency rules", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(CountryRuleResult[]))]
-    [Description("Residency rule for one country, or every known country when country is omitted. Unknown countries use the midnight rule and a 183-day threshold.")]
+    [Description("Residency rule for one country, or every known country when country is omitted. Includes ruleType, thresholdDays, windowType (rolling365, taxYear, or calendarYear), and minimumPresenceDays when the home country has one. Unknown countries use the midnight rule, a 183-day threshold, and rolling365. The United Kingdom uses taxYear starting 6 April. Canada has a 183-day calendar-year minimum for Nova Scotia MSI; the log counts days in Canada.")]
     public static Task<CallToolResult> GetCountryRules(
         ResidencyCalculationService rules,
         ClaimsPrincipal user,
@@ -213,13 +335,57 @@ public sealed class ResidencyTools
         if (string.IsNullOrWhiteSpace(country))
         {
             var known = rules.ListCountryRules().Select(rule => CountryRuleResult.From(rule, isDefault: false)).ToList();
-            return Task.FromResult(McpResults.Ok(string.Join(" ", known.Select(rule => $"{rule.CountryName}: {rule.RuleType}, threshold {rule.ThresholdDays}.")), known));
+            return Task.FromResult(McpResults.Ok(string.Join(" ", known.Select(rule => $"{rule.CountryName}: {rule.RuleType}, threshold {rule.ThresholdDays}, {rule.WindowType}.")), known));
         }
 
         var match = rules.GetCountryRule(country.Trim());
         var isDefault = !rules.ListCountryRules().Any(rule => string.Equals(rule.CountryName, match.CountryName, StringComparison.OrdinalIgnoreCase));
         var one = CountryRuleResult.From(match, isDefault);
         return Task.FromResult(McpResults.Ok($"{one.CountryName}: {one.RuleType}, threshold {one.ThresholdDays}.", new[] { one }));
+    }
+
+    [McpServerTool(Name = "get_record_coverage", Title = "Record coverage", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(RecordCoverageResult))]
+    [Description("How far the saved legs reach. firstTripDate and lastTripDate are the earliest and latest local dates on any leg. legCount is the number of saved legs. A summary window that starts before firstTripDate or ends after lastTripDate is incomplete.")]
+    public static async Task<CallToolResult> GetRecordCoverage(TripService trips, ClaimsPrincipal user)
+    {
+        McpScopes.Require(user, McpScopes.Read);
+        var saved = await trips.GetAllTripsAsync(McpScopes.UserId(user));
+        DateOnly? first = null;
+        DateOnly? last = null;
+        foreach (var trip in saved)
+        {
+            foreach (var date in new[] { DateOnly.FromDateTime(trip.DepartureDateTime), DateOnly.FromDateTime(trip.ArrivalDateTime) })
+            {
+                if (first is null || date < first)
+                {
+                    first = date;
+                }
+
+                if (last is null || date > last)
+                {
+                    last = date;
+                }
+            }
+        }
+
+        var result = new RecordCoverageResult { FirstTripDate = first, LastTripDate = last, LegCount = saved.Count };
+        var text = saved.Count == 0
+            ? "No trips are saved."
+            : $"{saved.Count} legs, from {first:yyyy-MM-dd} to {last:yyyy-MM-dd}.";
+        return McpResults.Ok(text, result);
+    }
+
+    [McpServerTool(Name = "find_suspect_trips", Title = "Find suspect trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(TripWarning[]))]
+    [Description("Checks every saved leg. Warns when arrival is before departure in UTC, a non-stop leg is over 20 hours, the duration is far from the usual time for the timezone difference, a leg overlaps another, or the arrival country does not match the next leg's departure country. Nothing is changed.")]
+    public static async Task<CallToolResult> FindSuspectTrips(TripService trips, ClaimsPrincipal user)
+    {
+        McpScopes.Require(user, McpScopes.Read);
+        var saved = await trips.GetAllTripsAsync(McpScopes.UserId(user));
+        var warnings = TripAuditor.InspectAll(saved);
+        var text = warnings.Count == 0
+            ? $"Checked {saved.Count} legs. None look suspicious."
+            : $"{warnings.Count} warning{(warnings.Count == 1 ? "" : "s")}: " + string.Join(" ", warnings.Select(warning => warning.Message));
+        return McpResults.Ok(text, warnings);
     }
 }
 
@@ -229,42 +395,134 @@ public class ResidencyCountryStatus
     public int TotalDays { get; set; }
     public string RuleType { get; set; } = string.Empty;
     public int ThresholdDays { get; set; }
-    [Description("True when a country that is not home is within 30 days of the threshold and still under it.")]
+    [Description("True when a country that is not home is within 30 days of the threshold and still under it. False at and past the threshold.")]
     public bool IsApproachingThreshold { get; set; }
 
-    [Description("Days remaining before the threshold. Null when this is the home country.")]
+    [Description("Days remaining before the threshold. Zero at or past the threshold. Null when this is the home country.")]
     public int? DaysUntilThreshold { get; set; }
 
-    [Description("Days past the threshold. Null when this is the home country.")]
+    [Description("Days past the threshold. Zero until the count is greater than the threshold. Null when this is the home country.")]
     public int? DaysOverThreshold { get; set; }
 
+    [Description("under, approaching, reached, over, or home. reached means the count equals the threshold and counts as residency. over means the count is past the threshold.")]
     public string ThresholdStatus { get; set; } = string.Empty;
+
     public bool IsHomeCountry { get; set; }
+
+    [Description("rolling365, taxYear, calendarYear, or range when the caller set the dates.")]
+    public string WindowType { get; set; } = string.Empty;
+
+    public DateOnly WindowStart { get; set; }
+    public DateOnly WindowEnd { get; set; }
+
+    [Description("First date in this window that the saved trips cover. Null when the trips do not overlap the window.")]
+    public DateOnly? CoverageStart { get; set; }
+
+    [Description("Last date in this window that the saved trips cover. Null when the trips do not overlap the window.")]
+    public DateOnly? CoverageEnd { get; set; }
+
+    [Description("False when this window starts before the first saved date or ends after the last saved date. Days outside the covered span are not counted.")]
+    public bool IsComplete { get; set; }
+
+    [Description("Days required in the home country, such as 183 for Nova Scotia MSI. Null unless this row is that home country.")]
+    public int? MinimumDays { get; set; }
+
+    [Description("calendarYear for Nova Scotia MSI. Null when this country has no minimum.")]
+    public string? MinimumWindowType { get; set; }
+
+    public DateOnly? MinimumWindowStart { get; set; }
+    public DateOnly? MinimumWindowEnd { get; set; }
+
+    [Description("Days counted toward the home-country minimum in its window.")]
+    public int? DaysTowardMinimum { get; set; }
+
+    [Description("Days still needed to meet the minimum. Zero once the minimum is met.")]
+    public int? DaysShortOfMinimum { get; set; }
+
+    [Description("under, approaching, or reached. approaching means 30 or fewer days short of the minimum. Null when this country has no minimum.")]
+    public string? MinimumStatus { get; set; }
+
+    public static void ApplyCoverage(ResidencyCountryStatus row, RecordCoverage coverage)
+    {
+        if (coverage.FirstTripDate is not DateOnly first || coverage.LastTripDate is not DateOnly last)
+        {
+            row.IsComplete = false;
+            return;
+        }
+
+        var start = row.WindowStart > first ? row.WindowStart : first;
+        var end = row.WindowEnd < last ? row.WindowEnd : last;
+        if (start > end)
+        {
+            row.IsComplete = false;
+            return;
+        }
+
+        row.CoverageStart = start;
+        row.CoverageEnd = end;
+        row.IsComplete = first <= row.WindowStart && last >= row.WindowEnd;
+    }
+
+    public static void ApplyMinimum(ResidencyCountryStatus row, MinimumPresence minimum)
+    {
+        row.MinimumDays = minimum.MinimumDays;
+        row.MinimumWindowType = minimum.WindowType;
+        row.MinimumWindowStart = minimum.WindowStart;
+        row.MinimumWindowEnd = minimum.WindowEnd;
+        row.DaysTowardMinimum = minimum.Days;
+        row.DaysShortOfMinimum = minimum.DaysShort;
+        row.MinimumStatus = minimum.Status;
+    }
 
     public static ResidencyCountryStatus From(ResidencySummaryDto summary, string? homeCountry)
     {
         var home = !string.IsNullOrWhiteSpace(homeCountry)
             && summary.CountryName.Equals(homeCountry.Trim(), StringComparison.OrdinalIgnoreCase);
-        var over = summary.TotalDays >= summary.ThresholdDays;
-        var status = home ? "home" : over ? "over" : summary.IsApproachingThreshold ? "approaching" : "under";
+        var past = summary.TotalDays > summary.ThresholdDays;
+        var reached = summary.TotalDays == summary.ThresholdDays;
+        var status = home
+            ? "home"
+            : past
+                ? "over"
+                : reached
+                    ? "reached"
+                    : summary.IsApproachingThreshold ? "approaching" : "under";
         return new ResidencyCountryStatus
         {
             CountryName = summary.CountryName,
             TotalDays = summary.TotalDays,
             RuleType = summary.RuleType,
             ThresholdDays = summary.ThresholdDays,
-            IsApproachingThreshold = !home && summary.IsApproachingThreshold,
-            DaysUntilThreshold = home ? null : summary.DaysUntilThreshold,
-            DaysOverThreshold = home ? null : Math.Max(0, summary.TotalDays - summary.ThresholdDays),
+            IsApproachingThreshold = !home && !past && !reached && summary.IsApproachingThreshold,
+            DaysUntilThreshold = home ? null : past || reached ? 0 : summary.DaysUntilThreshold,
+            DaysOverThreshold = home ? null : past ? summary.TotalDays - summary.ThresholdDays : 0,
             ThresholdStatus = status,
-            IsHomeCountry = home
+            IsHomeCountry = home,
+            WindowType = summary.WindowType,
+            WindowStart = summary.WindowStart,
+            WindowEnd = summary.WindowEnd
         };
     }
 
-    internal static string Describe(ResidencyCountryStatus row) =>
-        row.IsHomeCountry
-            ? $"{row.CountryName}: {row.TotalDays} days, home."
-            : $"{row.CountryName}: {row.TotalDays} days, {row.ThresholdStatus}, {row.DaysUntilThreshold} left, {row.DaysOverThreshold} over.";
+    internal static string Describe(ResidencyCountryStatus row)
+    {
+        var text = row.IsHomeCountry
+            ? $"{row.CountryName}: {row.TotalDays} days, home, {row.WindowType} {row.WindowStart:yyyy-MM-dd} to {row.WindowEnd:yyyy-MM-dd}."
+            : $"{row.CountryName}: {row.TotalDays} days, {row.ThresholdStatus}, {row.DaysUntilThreshold} left, {row.DaysOverThreshold} over, {row.WindowType} {row.WindowStart:yyyy-MM-dd} to {row.WindowEnd:yyyy-MM-dd}.";
+        if (row.MinimumStatus is not null)
+        {
+            text += $" Minimum {row.DaysTowardMinimum} of {row.MinimumDays} in {row.MinimumWindowType} {row.MinimumWindowStart:yyyy-MM-dd} to {row.MinimumWindowEnd:yyyy-MM-dd}, {row.MinimumStatus}, {row.DaysShortOfMinimum} short.";
+        }
+
+        if (!row.IsComplete)
+        {
+            text += row.CoverageStart is DateOnly start && row.CoverageEnd is DateOnly end
+                ? $" Records cover {start:yyyy-MM-dd} to {end:yyyy-MM-dd}."
+                : " No saved trips cover this window.";
+        }
+
+        return text;
+    }
 }
 
 public sealed class CountryRuleResult
@@ -276,6 +534,21 @@ public sealed class CountryRuleResult
     public bool HasTransitException { get; set; }
     public bool IsDefaultRule { get; set; }
 
+    [Description("rolling365, taxYear, or calendarYear.")]
+    public string WindowType { get; set; } = string.Empty;
+
+    [Description("Month the tax year starts. Null unless windowType is taxYear.")]
+    public int? TaxYearStartMonth { get; set; }
+
+    [Description("Day the tax year starts. Null unless windowType is taxYear.")]
+    public int? TaxYearStartDay { get; set; }
+
+    [Description("Days the home country must contain in minimumWindowType. 183 for Canada, which is how Nova Scotia MSI is counted here. Null when there is no minimum.")]
+    public int? MinimumPresenceDays { get; set; }
+
+    [Description("calendarYear when a home-country minimum applies. Null otherwise.")]
+    public string? MinimumWindowType { get; set; }
+
     public static CountryRuleResult From(CountryResidencyRule rule, bool isDefault) => new()
     {
         CountryName = rule.CountryName,
@@ -283,6 +556,18 @@ public sealed class CountryRuleResult
         RuleType = rule.RuleType == ResidencyRuleType.MidnightRule ? "Midnight" : "PartialDay",
         ThresholdDays = rule.ResidencyThresholdDays ?? 183,
         HasTransitException = rule.HasTransitException,
-        IsDefaultRule = isDefault
+        IsDefaultRule = isDefault,
+        WindowType = Services.CountingWindow.Name(rule.WindowType),
+        TaxYearStartMonth = rule.TaxYearStartMonth,
+        TaxYearStartDay = rule.TaxYearStartDay,
+        MinimumPresenceDays = rule.MinimumPresenceDays,
+        MinimumWindowType = rule.MinimumWindowType is CountingWindowType window ? Services.CountingWindow.Name(window) : null
     };
+}
+
+public sealed class RecordCoverageResult
+{
+    public DateOnly? FirstTripDate { get; set; }
+    public DateOnly? LastTripDate { get; set; }
+    public int LegCount { get; set; }
 }

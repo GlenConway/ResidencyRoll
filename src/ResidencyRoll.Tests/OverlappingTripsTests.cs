@@ -308,10 +308,9 @@ public class OverlappingTripsTests : IDisposable
     [Fact]
     public async Task ForecastDaysWithTrip_WithOverlappingHypotheticalTrip_CountsCorrectly()
     {
-        // Arrange: Existing trip to Japan from Jan 1 to Jan 15 (14 days)
-        // Forecast a trip to South Korea from Jan 10 to Jan 20 (10 days)
-        // In forecast, Japan should count: Jan 1-10 (9 days)
-        // South Korea should count: Jan 10-20 (10 days)
+        // Arrange: Existing trip to Japan from Jan 1 to Jan 15.
+        // Forecast a trip to South Korea from Jan 10 to Jan 20.
+        // Korea does not replace Japan's midnights. Korea counts the days after Japan.
         var japanTrip = new Trip
         {
             UserId = _testUserId,
@@ -351,13 +350,11 @@ public class OverlappingTripsTests : IDisposable
         Assert.Single(current);
         Assert.Equal(17, current["Japan"]);
 
-        // Assert - Forecast should have Japan with reduced days and South Korea
-        // With ResidencyCalculationService and proper gap filling:
-        // Japan: Jan 1 - Jan 10 (when SK starts overlapping) = 9 days
-        // South Korea: Jan 10 - Jan 20 = 12 days
+        // A later leg does not replace a midnight an earlier leg already set.
+        // Japan keeps the days through its own departure. Korea counts only the days after that.
         Assert.Equal(2, forecast.Count);
-        Assert.Equal(9, forecast["Japan"]); // Jan 1-10 (before Korea overlaps)
-        Assert.Equal(12, forecast["South Korea"]); // Jan 10-20
+        Assert.Equal(17, forecast["Japan"]);
+        Assert.Equal(4, forecast["South Korea"]);
     }
 
     [Fact]

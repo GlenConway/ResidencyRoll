@@ -44,7 +44,7 @@ internal static class McpTime
     }
 }
 
-public sealed class McpTrip
+public class McpTrip
 {
     public int Id { get; set; }
     public string DepartureCountry { get; set; } = string.Empty;
@@ -111,6 +111,9 @@ public sealed class McpMaxEndDate
     [Description("Midnight or PartialDay for the arrival country.")]
     public string RuleType { get; set; } = string.Empty;
 
+    [Description("rolling365, taxYear, or calendarYear. The limit applies to this window.")]
+    public string WindowType { get; set; } = string.Empty;
+
     [Description("Peak rolling day count for the arrival country inside the window. This can be higher than the count on windowEnd.")]
     public int DaysAtLimit { get; set; }
 
@@ -120,7 +123,44 @@ public sealed class McpMaxEndDate
         WindowStart = dto.WindowStart,
         WindowEnd = dto.WindowEnd,
         RuleType = dto.RuleType,
+        WindowType = dto.WindowType,
         DaysAtLimit = dto.DaysAtLimit
+    };
+}
+
+public sealed class DailyPresenceResponse
+{
+    [Description("days or runs.")]
+    public string Format { get; set; } = "days";
+
+    public List<DailyPresenceDto> Days { get; set; } = [];
+    public List<PresenceRun> Runs { get; set; } = [];
+}
+
+public sealed class PresenceRun
+{
+    public string Country { get; set; } = string.Empty;
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public int Days { get; set; }
+}
+
+public sealed class RollingCountPoint
+{
+    public DateOnly Date { get; set; }
+    public int RollingDays { get; set; }
+
+    [Description("The day that leaves the 365-day window when Date is included. A counted anniversary means a counted day on Date does not raise the total.")]
+    public DateOnly AnniversaryDate { get; set; }
+
+    public bool AnniversaryCounted { get; set; }
+
+    public static RollingCountPoint From(RollingDay day) => new()
+    {
+        Date = day.Date,
+        RollingDays = day.RollingDays,
+        AnniversaryDate = day.AnniversaryDate,
+        AnniversaryCounted = day.AnniversaryCounted
     };
 }
 
@@ -222,10 +262,10 @@ public sealed class McpCurrentLocation
 
 public sealed class McpForecastCountry : ResidencyCountryStatus
 {
-    [Description("Highest rolling 365-day count during the forecast period. thresholdStatus uses this count.")]
+    [Description("For rolling365, the highest rolling count in the scenario. For taxYear and calendarYear, the count in that period. thresholdStatus uses this count.")]
     public int PeakDays { get; set; }
 
-    [Description("First date the peak rolling count was reached, yyyy-MM-dd.")]
+    [Description("Date the peak was reached, yyyy-MM-dd. For taxYear and calendarYear this is the end of that period.")]
     public DateOnly PeakDate { get; set; }
 
     public static McpForecastCountry Create(ResidencyCountryStatus status, int endDays, int peakDays, DateOnly peakDate) => new()
@@ -239,6 +279,9 @@ public sealed class McpForecastCountry : ResidencyCountryStatus
         DaysOverThreshold = status.DaysOverThreshold,
         ThresholdStatus = status.ThresholdStatus,
         IsHomeCountry = status.IsHomeCountry,
+        WindowType = status.WindowType,
+        WindowStart = status.WindowStart,
+        WindowEnd = status.WindowEnd,
         PeakDays = peakDays,
         PeakDate = peakDate
     };

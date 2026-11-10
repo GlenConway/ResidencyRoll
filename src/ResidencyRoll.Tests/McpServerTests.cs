@@ -265,6 +265,19 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             ["startDate"] = today.AddDays(-20).ToString("yyyy-MM-dd"),
             ["endDate"] = today.AddDays(-10).ToString("yyyy-MM-dd")
         });
+        await AssertCall(mcp, tools, "get_daily_presence", new Dictionary<string, object?>
+        {
+            ["startDate"] = today.AddDays(-20).ToString("yyyy-MM-dd"),
+            ["endDate"] = today.AddDays(-10).ToString("yyyy-MM-dd"),
+            ["country"] = "Canada",
+            ["format"] = "runs"
+        });
+        await AssertCall(mcp, tools, "get_rolling_count", new Dictionary<string, object?>
+        {
+            ["country"] = "Canada",
+            ["from"] = today.AddDays(-5).ToString("yyyy-MM-dd"),
+            ["to"] = today.ToString("yyyy-MM-dd")
+        });
         var future = await AssertCall(mcp, tools, "get_location_on", new Dictionary<string, object?>
         {
             ["date"] = today.AddDays(30).ToString("yyyy-MM-dd")
@@ -279,6 +292,8 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         Assert.Equal("YHZ", current.StructuredContent!.Value.GetProperty("lastArrivalIataCode").GetString());
         Assert.Equal("Canada", current.StructuredContent.Value.GetProperty("country").GetString());
         await AssertCall(mcp, tools, "get_country_rules", new Dictionary<string, object?>());
+        await AssertCall(mcp, tools, "get_record_coverage", new Dictionary<string, object?>());
+        await AssertCall(mcp, tools, "find_suspect_trips", new Dictionary<string, object?>());
         var forecast = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
         {
             ["homeCountry"] = "Canada",
@@ -304,6 +319,28 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         var daysAtLimit = maxEnd.StructuredContent.Value.GetProperty("daysAtLimit").GetInt32();
         Assert.Contains($"with a peak of {daysAtLimit} days", summary);
         Assert.InRange(daysAtLimit, 0, 30);
+        await AssertCall(mcp, tools, "max_trip_start_date", new Dictionary<string, object?>
+        {
+            ["tripEnd"] = today.AddDays(50).ToString("yyyy-MM-dd") + "T12:00",
+            ["dayLimit"] = 14,
+            ["departureIataCode"] = "YHZ",
+            ["arrivalIataCode"] = "LHR"
+        });
+        await AssertCall(mcp, tools, "plan_max_presence", new Dictionary<string, object?>
+        {
+            ["country"] = "France",
+            ["from"] = today.AddDays(60).ToString("yyyy-MM-dd"),
+            ["to"] = today.AddDays(80).ToString("yyyy-MM-dd"),
+            ["dayLimit"] = 10,
+            ["blackoutRanges"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["from"] = today.AddDays(70).ToString("yyyy-MM-dd"),
+                    ["to"] = today.AddDays(72).ToString("yyyy-MM-dd")
+                }
+            }
+        });
         await AssertCall(mcp, tools, "standard_duration_forecasts", new Dictionary<string, object?>
         {
             ["tripStart"] = today.AddDays(40).ToString("yyyy-MM-dd") + "T12:00",
@@ -339,8 +376,10 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         var called = new[]
         {
             "list_trips", "get_trip", "get_days_per_country", "get_residency_summary", "get_daily_presence",
-            "get_location_on", "get_current_location", "get_country_rules", "forecast_trips", "max_trip_end_date",
-            "standard_duration_forecasts", "lookup_airport", "get_home_country", "set_home_country",
+            "get_rolling_count", "get_location_on", "get_current_location", "get_country_rules",
+            "get_record_coverage", "find_suspect_trips", "forecast_trips",
+            "max_trip_end_date", "max_trip_start_date", "plan_max_presence", "standard_duration_forecasts",
+            "lookup_airport", "get_home_country", "set_home_country",
             "create_trip", "create_trips", "update_trip", "delete_trip"
         };
         Assert.Equal(tools.Select(tool => tool.Name).OrderBy(name => name), called.OrderBy(name => name));
@@ -433,7 +472,11 @@ public class McpServerTests : IClassFixture<McpApiFactory>
 
         await using var mcp = await McpClientConnector.ConnectAsync(http);
         var days = await mcp.CallToolAsync("get_days_per_country", new Dictionary<string, object?> { ["window"] = "last365" });
-        var summary = await mcp.CallToolAsync("get_residency_summary", new Dictionary<string, object?>());
+        var summary = await mcp.CallToolAsync("get_residency_summary", new Dictionary<string, object?>
+        {
+            ["startDate"] = start.ToString("yyyy-MM-dd"),
+            ["endDate"] = end.ToString("yyyy-MM-dd")
+        });
         Assert.NotEqual(true, days.IsError);
         Assert.NotEqual(true, summary.IsError);
         var toolDays = days.StructuredContent!.Value.EnumerateArray()
@@ -511,8 +554,56 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         var unitedKingdom = forecast.StructuredContent!.Value.GetProperty("forecast").EnumerateArray()
             .Single(row => row.GetProperty("countryName").GetString() == "United Kingdom");
         Assert.Equal(10, unitedKingdom.GetProperty("peakDays").GetInt32());
-        Assert.Equal(windowStart, DateOnly.Parse(forecast.StructuredContent.Value.GetProperty("windowStart").GetString()!));
-        Assert.Equal(windowEnd, DateOnly.Parse(forecast.StructuredContent.Value.GetProperty("windowEnd").GetString()!));
+        Assert.Equal("taxYear", unitedKingdom.GetProperty("windowType").GetString());
+        Assert.Equal(windowStart, DateOnly.Parse(unitedKingdom.GetProperty("windowStart").GetString()!));
+        Assert.Equal(windowEnd, DateOnly.Parse(unitedKingdom.GetProperty("windowEnd").GetString()!));
+    }
+
+    [Fact]
+    public async Task ForecastTrips_WithCountryAndThrough_ShouldIncludeALaterSavedTrip()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var created = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("LHR", "2027-03-01T09:00", "CDG", "2027-03-01T11:00")
+        });
+        var stay = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("CDG", "2027-03-05T10:00", "LHR", "2027-03-05T12:00")
+        });
+        try
+        {
+            var filtered = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+            {
+                ["country"] = "France",
+                ["through"] = "2027-03-15",
+                ["trips"] = new object[] { Leg("YHZ", "2027-02-01T09:00", "LHR", "2027-02-01T18:00") }
+            });
+            var forecastRows = filtered.StructuredContent!.Value.GetProperty("forecast").EnumerateArray().ToList();
+            var france = Assert.Single(forecastRows);
+            Assert.Equal("France", france.GetProperty("countryName").GetString());
+            Assert.True(france.GetProperty("totalDays").GetInt32() > 0);
+            Assert.Equal("rolling365", france.GetProperty("windowType").GetString());
+            Assert.Empty(filtered.StructuredContent.Value.GetProperty("current").EnumerateArray());
+            Assert.NotEmpty(filtered.StructuredContent.Value.GetProperty("rollingAroundPeak").EnumerateArray());
+
+            var open = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+            {
+                ["trips"] = new object[] { Leg("YHZ", "2027-02-01T09:00", "LHR", "2027-02-01T18:00") }
+            });
+            Assert.DoesNotContain(
+                open.StructuredContent!.Value.GetProperty("forecast").EnumerateArray(),
+                row => row.GetProperty("countryName").GetString() == "France");
+            Assert.Empty(open.StructuredContent.Value.GetProperty("rollingAroundPeak").EnumerateArray());
+        }
+        finally
+        {
+            await mcp.CallToolAsync("delete_trip", new Dictionary<string, object?> { ["id"] = created.StructuredContent!.Value.GetProperty("id").GetInt32() });
+            await mcp.CallToolAsync("delete_trip", new Dictionary<string, object?> { ["id"] = stay.StructuredContent!.Value.GetProperty("id").GetInt32() });
+        }
     }
 
     [Fact]

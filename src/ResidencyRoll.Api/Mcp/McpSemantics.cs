@@ -3,7 +3,7 @@ namespace ResidencyRoll.Api.Mcp;
 internal static class McpSemantics
 {
     public const string Rules =
-        "Each country uses either the midnight rule (the location at local midnight) or the partial-day rule (any presence during the day). The ruleType in the result says which. The usual window is the rolling 365 days ending today.";
+        "locationAtMidnight for a date is the country at 00:00 at the start of that date. A later flight the same day does not change it. Each country uses either the midnight rule (that midnight location) or the partial-day rule (any presence during the day). The ruleType in the result says which. Each country is counted over its windowType: rolling365 (365 days, both ends), taxYear (United Kingdom, 6 April to 5 April), or calendarYear.";
 
     public const string HomeCountry =
         " The home country is saved on the user profile. These tools use that saved value when homeCountry is omitted. Call get_home_country to read it and set_home_country to change it.";

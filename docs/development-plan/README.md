@@ -96,6 +96,7 @@ Expose residency queries, forecasts and trip editing to Claude Code and other MC
 - ✅ M10.6 — Write tools
 - ✅ M10.7 — "Connect an AI client" panel and docs
 - ✅ Follow-up — MCP local-time output schemas, country rules on `get_days_per_country`, forecast peaks, location projection, `get_current_location`, and a saved home country ([ADR-017](../adr/ADR-017-home-country-on-the-user-profile.md))
+- ✅ Follow-up — Trip warnings, record coverage, write impact, partial `update_trip`, and the Nova Scotia MSI minimum ([ADR-019](../adr/ADR-019-trip-warnings-coverage-and-msi.md))
 - M10.8 — (Optional, not started) Personal access tokens. Needs its own ADR before any work.
 
 **ADR:** [ADR-016](../adr/ADR-016-mcp-server-streamable-http.md)

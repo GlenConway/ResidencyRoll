@@ -27,21 +27,29 @@ public class ResidencyCalculationService
                 CountryCode = "CA",
                 CountryName = "Canada",
                 RuleType = ResidencyRuleType.PartialDayRule,
-                ResidencyThresholdDays = 183
+                ResidencyThresholdDays = 183,
+                MinimumPresenceDays = 183,
+                MinimumWindowType = CountingWindowType.CalendarYear
             },
             ["United Kingdom"] = new CountryResidencyRule
             {
                 CountryCode = "GB",
                 CountryName = "United Kingdom",
                 RuleType = ResidencyRuleType.MidnightRule,
-                ResidencyThresholdDays = 183
+                ResidencyThresholdDays = 183,
+                WindowType = CountingWindowType.TaxYear,
+                TaxYearStartMonth = 4,
+                TaxYearStartDay = 6
             },
             ["UK"] = new CountryResidencyRule
             {
                 CountryCode = "GB",
                 CountryName = "United Kingdom",
                 RuleType = ResidencyRuleType.MidnightRule,
-                ResidencyThresholdDays = 183
+                ResidencyThresholdDays = 183,
+                WindowType = CountingWindowType.TaxYear,
+                TaxYearStartMonth = 4,
+                TaxYearStartDay = 6
             },
             ["Australia"] = new CountryResidencyRule
             {
@@ -115,8 +123,9 @@ public class ResidencyCalculationService
     {
         var presenceMap = new Dictionary<DateOnly, DailyPresence>();
         
-        // First pass: process each trip
-        foreach (var trip in trips.OrderBy(t => t.ArrivalDateTime))
+        // Earlier legs establish where the person was at 00:00. A later leg the same day
+        // must not replace that midnight location.
+        foreach (var trip in trips.OrderBy(DepartureInstant))
         {
             ProcessTripForDailyPresence(trip, presenceMap);
         }
@@ -292,6 +301,8 @@ public class ResidencyCalculationService
             midnightMoments.Add((GetDayStartUtc(date, arrivalTimeZone), arrivalTimeZone, false));
         }
 
+        // Resolve this leg on its own, including both timezones, then keep an earlier leg's answer.
+        var draft = new Dictionary<DateOnly, DailyPresence>();
         foreach (var entry in midnightMoments.OrderBy(m => m.MidnightUtc))
         {
             CheckMidnightInTimezone(
@@ -301,7 +312,7 @@ public class ResidencyCalculationService
                 departureUtc,
                 arrivalUtc,
                 entry.Zone,
-                presenceMap,
+                draft,
                 entry.MidnightUtc,
                 entry.AllowOverride);
         }
@@ -318,6 +329,12 @@ public class ResidencyCalculationService
             presenceMap[date] = presence;
         }
         
+        if (draft.TryGetValue(date, out var resolved) && string.IsNullOrEmpty(presence.LocationAtMidnight))
+        {
+            presence.LocationAtMidnight = resolved.LocationAtMidnight;
+            presence.IsInTransitAtMidnight = resolved.IsInTransitAtMidnight;
+        }
+
         // Check if this date overlaps with the trip at all
         // We need to determine the date range in both timezones
         var dayStartDepartureUtc = GetDayStartUtc(date, departureTimeZone);
@@ -412,6 +429,19 @@ public class ResidencyCalculationService
         }
     }
     
+    private DateTime DepartureInstant(Trip trip)
+    {
+        if (trip.DepartureDateTime.Kind == DateTimeKind.Utc)
+        {
+            return trip.DepartureDateTime;
+        }
+
+        var source = trip.DepartureDateTime.Kind == DateTimeKind.Unspecified
+            ? trip.DepartureDateTime
+            : DateTime.SpecifyKind(trip.DepartureDateTime, DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(source, GetTimeZoneOrUtc(trip.DepartureTimezone));
+    }
+
     /// <summary>
     /// Get the UTC time for the start of a day (00:00:00) in a specific timezone.
     /// </summary>

@@ -19,8 +19,8 @@ public sealed class McpTripLeg
     [Description("Departure IANA timezone, such as America/Halifax. Filled from the airport table when an IATA code is known.")]
     public string? DepartureTimezone { get; set; }
 
-    [Description("Local departure date and time, yyyy-MM-ddTHH:mm.")]
-    public string DepartureDateTime { get; set; } = string.Empty;
+    [Description("Local departure date and time, yyyy-MM-ddTHH:mm. Required when creating a leg. On update_trip, omit it to leave the saved departure time.")]
+    public string? DepartureDateTime { get; set; }
 
     [Description("Arrival airport IATA code, such as LHR. Optional when city, country, and timezone are set.")]
     public string? ArrivalIataCode { get; set; }
@@ -34,8 +34,8 @@ public sealed class McpTripLeg
     [Description("Arrival IANA timezone, such as Europe/London. Filled from the airport table when an IATA code is known.")]
     public string? ArrivalTimezone { get; set; }
 
-    [Description("Local arrival date and time, yyyy-MM-ddTHH:mm.")]
-    public string ArrivalDateTime { get; set; } = string.Empty;
+    [Description("Local arrival date and time, yyyy-MM-ddTHH:mm. Required when creating a leg. On update_trip, omit it to leave the saved arrival time.")]
+    public string? ArrivalDateTime { get; set; }
 }
 
 public static class TripLegResolver
@@ -59,6 +59,57 @@ public static class TripLegResolver
             ArrivalDateTime = ParseLocal(leg.ArrivalDateTime, "arrivalDateTime")
         };
     }
+
+    public static void ApplyPatch(Trip existing, McpTripLeg changes, AirportCatalog airports)
+    {
+        if (HasPlace(changes.DepartureIataCode, changes.DepartureCity, changes.DepartureCountry, changes.DepartureTimezone))
+        {
+            var replacingAirport = !string.IsNullOrWhiteSpace(changes.DepartureIataCode);
+            var departure = ResolvePlace(
+                replacingAirport ? changes.DepartureIataCode : existing.DepartureIataCode,
+                changes.DepartureCity,
+                changes.DepartureCountry ?? (replacingAirport ? null : existing.DepartureCountry),
+                changes.DepartureTimezone ?? (replacingAirport ? null : existing.DepartureTimezone),
+                "Departure",
+                airports);
+            existing.DepartureIataCode = departure.IataCode ?? existing.DepartureIataCode;
+            existing.DepartureCity = departure.City;
+            existing.DepartureCountry = departure.Country;
+            existing.DepartureTimezone = departure.Timezone;
+        }
+
+        if (HasPlace(changes.ArrivalIataCode, changes.ArrivalCity, changes.ArrivalCountry, changes.ArrivalTimezone))
+        {
+            var replacingAirport = !string.IsNullOrWhiteSpace(changes.ArrivalIataCode);
+            var arrival = ResolvePlace(
+                replacingAirport ? changes.ArrivalIataCode : existing.ArrivalIataCode,
+                changes.ArrivalCity,
+                changes.ArrivalCountry ?? (replacingAirport ? null : existing.ArrivalCountry),
+                changes.ArrivalTimezone ?? (replacingAirport ? null : existing.ArrivalTimezone),
+                "Arrival",
+                airports);
+            existing.ArrivalIataCode = arrival.IataCode ?? existing.ArrivalIataCode;
+            existing.ArrivalCity = arrival.City;
+            existing.ArrivalCountry = arrival.Country;
+            existing.ArrivalTimezone = arrival.Timezone;
+        }
+
+        if (!string.IsNullOrWhiteSpace(changes.DepartureDateTime))
+        {
+            existing.DepartureDateTime = ParseLocal(changes.DepartureDateTime, "departureDateTime");
+        }
+
+        if (!string.IsNullOrWhiteSpace(changes.ArrivalDateTime))
+        {
+            existing.ArrivalDateTime = ParseLocal(changes.ArrivalDateTime, "arrivalDateTime");
+        }
+    }
+
+    private static bool HasPlace(string? iata, string? city, string? country, string? timezone) =>
+        !string.IsNullOrWhiteSpace(iata)
+        || !string.IsNullOrWhiteSpace(city)
+        || !string.IsNullOrWhiteSpace(country)
+        || !string.IsNullOrWhiteSpace(timezone);
 
     public static (string? IataCode, string City, string Country, string Timezone) ResolvePlace(
         string? iataCode,

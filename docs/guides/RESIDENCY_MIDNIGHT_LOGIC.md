@@ -9,7 +9,7 @@ This document outlines the refactored residency tracking system based on "locati
 ### 1. Daily Presence (`DailyPresence.cs`)
 Represents physical presence on a specific calendar date:
 - `Date`: The calendar date
-- `LocationAtMidnight`: Country where physically present at 00:00 local time
+- `LocationAtMidnight`: Country where the person was at 00:00 at the **start** of that date. For date D this is the location at 00:00 as D begins, not the location at the end of D. A model that reads it as end-of-day will be off by one.
 - `LocationsDuringDay`: All countries visited during any part of the day (for Partial Day Rule)
 - `IsInTransitAtMidnight`: Whether in transit (international waters/airspace) at midnight
 
@@ -31,9 +31,9 @@ We analyze EACH calendar date and determine:
 2. Which countries were visited during any part of that day?
 
 ### Process Flow
-1. **Generate Daily Presence Log**: For each trip, determine the location at midnight for each relevant date
+1. **Generate Daily Presence Log**: Legs are applied in departure order. For each date, the location at midnight is where the person was at 00:00 at the start of that date
 2. **Apply Country Rules**: Count days based on each country's specific residency rule
-3. **Handle Overlaps**: Later trips take precedence for overlapping dates
+3. **Keep the first midnight**: A later leg the same day does not replace a midnight location an earlier leg already set, including `IN_TRANSIT`. Within one leg, a later midnight moment can still override an earlier one, which is how an International Date Line crossing is resolved. Countries visited later that day are recorded in `LocationsDuringDay` and can count under a partial-day rule
 
 ### Timezone Handling
 - All calculations use UTC as the absolute timeline

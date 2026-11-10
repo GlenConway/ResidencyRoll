@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ResidencyRoll.Api.Data;
+using ResidencyRoll.Api.Mcp;
 using ResidencyRoll.Api.Models;
 using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Trips;
@@ -71,19 +72,19 @@ public class ResidencyQueryServiceTests
         await using var db = NewDatabase();
         var residency = new ResidencyCalculationService();
         var query = new ResidencyQueryService(new TripService(db, residency), residency);
-        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2025, 2, 1, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2025, 2, 1, 18, 0, 0)));
-        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2025, 2, 28, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2025, 2, 28, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2025, 2, 1, 8, 0, 0), "France", "Europe/Paris", new DateTime(2025, 2, 1, 18, 0, 0)));
+        db.Trips.Add(Leg("local", "France", "Europe/Paris", new DateTime(2025, 2, 28, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2025, 2, 28, 16, 0, 0)));
         await db.SaveChangesAsync();
 
         var breakdown = await query.ForecastBreakdownAsync("local",
         [
-            Leg("local", "Canada", "America/Halifax", new DateTime(2026, 2, 1, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 2, 1, 18, 0, 0)),
-            Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 2, 5, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 2, 20, 16, 0, 0))
+            Leg("local", "Canada", "America/Halifax", new DateTime(2026, 2, 1, 8, 0, 0), "France", "Europe/Paris", new DateTime(2026, 2, 1, 18, 0, 0)),
+            Leg("local", "France", "Europe/Paris", new DateTime(2026, 2, 5, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 2, 20, 16, 0, 0))
         ]);
 
         Assert.True(breakdown.WindowEnd > breakdown.WindowStart);
-        var peak = breakdown.Peaks["United Kingdom"];
-        var endDays = breakdown.Forecast["United Kingdom"];
+        var peak = breakdown.Peaks["France"];
+        var endDays = breakdown.Forecast["France"];
         Assert.True(peak.Days > endDays, $"peak {peak.Days} on {peak.Date:yyyy-MM-dd}, end {endDays}, window {breakdown.WindowStart:yyyy-MM-dd} to {breakdown.WindowEnd:yyyy-MM-dd}");
     }
 
@@ -222,6 +223,156 @@ public class ResidencyQueryServiceTests
     }
 
     [Fact]
+    public async Task GetResidencySummary_WhenStartIsOmitted_ShouldExcludeThePreviousUkTaxYear()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2025, 2, 1, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2025, 2, 1, 18, 0, 0)));
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2025, 2, 4, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2025, 2, 4, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2026, 6, 1, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 6, 1, 18, 0, 0)));
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 6, 3, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 6, 3, 16, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var summary = await query.GetResidencySummaryAsync("local", null, new DateOnly(2026, 11, 9));
+        var uk = summary.Single(row => row.CountryName == "United Kingdom");
+
+        Assert.Equal("taxYear", uk.WindowType);
+        Assert.Equal(new DateOnly(2026, 4, 6), uk.WindowStart);
+        Assert.Equal(new DateOnly(2027, 4, 5), uk.WindowEnd);
+        // June 2 and 3 are UK midnights. June 1 counts as well because midnight was in Canada, which uses the partial-day rule.
+        // The February 2025 UK days fall in the previous tax year and are not included.
+        Assert.Equal(3, uk.TotalDays);
+    }
+
+    [Fact]
+    public async Task CalculateMaxEndDate_WithHypotheticalTrips_ShouldCountThoseDays()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        var request = new MaxTripEndDateRequestDto
+        {
+            DepartureCountry = "Canada",
+            DepartureCity = "Halifax",
+            DepartureTimezone = "America/Halifax",
+            ArrivalCountry = "United Kingdom",
+            ArrivalCity = "London",
+            ArrivalTimezone = "Europe/London",
+            TripStart = new DateTime(2026, 7, 1, 12, 0, 0),
+            DayLimit = 10
+        };
+        var prior = new[]
+        {
+            Leg("local", "Canada", "America/Halifax", new DateTime(2026, 6, 1, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 6, 1, 18, 0, 0)),
+            Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 6, 6, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 6, 6, 16, 0, 0))
+        };
+
+        var alone = await query.CalculateMaxEndDateAsync("local", request);
+        var withPrior = await query.CalculateMaxEndDateAsync("local", request, prior);
+
+        Assert.True(withPrior.MaxEndDate < alone.MaxEndDate);
+        Assert.InRange(withPrior.DaysAtLimit, 1, 10);
+        Assert.Equal("taxYear", withPrior.WindowType);
+    }
+
+    [Fact]
+    public async Task CalculateEarliestArrival_ShouldStayAtOrUnderTheLimit()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        var departure = new DateTime(2026, 7, 20, 12, 0, 0);
+        var request = new MaxTripEndDateRequestDto
+        {
+            DepartureCountry = "Canada",
+            DepartureCity = "Halifax",
+            DepartureTimezone = "America/Halifax",
+            ArrivalCountry = "United Kingdom",
+            ArrivalCity = "London",
+            ArrivalTimezone = "Europe/London",
+            TripStart = departure,
+            DayLimit = 10
+        };
+
+        var result = await query.CalculateEarliestArrivalAsync("local", request, departure);
+
+        // Arriving on 10 July makes that day count: midnight is still in Canada, and Canada counts every country visited.
+        Assert.Equal(new DateTime(2026, 7, 11, 12, 0, 0), result.Arrival);
+        Assert.Equal(10, result.DaysAtLimit);
+        Assert.Equal("taxYear", result.WindowType);
+    }
+
+    [Fact]
+    public async Task PlanMaxPresence_ShouldSkipBlackoutDays()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+
+        var plan = await query.PlanMaxPresenceAsync(
+            "local",
+            "France",
+            new DateOnly(2026, 12, 20),
+            new DateOnly(2026, 12, 31),
+            [(new DateOnly(2026, 12, 24), new DateOnly(2026, 12, 26))],
+            10);
+
+        Assert.Equal(9, plan.PlannedDays);
+        Assert.Equal(2, plan.Stays.Count);
+        Assert.Equal(new DateOnly(2026, 12, 20), plan.Stays[0].Arrival);
+        Assert.Equal(new DateOnly(2026, 12, 23), plan.Stays[0].Departure);
+        Assert.Equal(new DateOnly(2026, 12, 27), plan.Stays[1].Arrival);
+        Assert.Equal(new DateOnly(2026, 12, 31), plan.Stays[1].Departure);
+        Assert.True(plan.PeakDays <= 10);
+    }
+
+    [Fact]
+    public async Task GetRollingCount_WhenTheAnniversaryCounted_ShouldNotIncludeItInTheTotal()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2024, 12, 31, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2024, 12, 31, 18, 0, 0)));
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2025, 1, 1, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2025, 1, 1, 16, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var rows = await query.GetRollingCountAsync("local", "United Kingdom", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 2));
+
+        Assert.Equal(new DateOnly(2025, 1, 1), rows[0].AnniversaryDate);
+        Assert.True(rows[0].AnniversaryCounted);
+        Assert.Equal(0, rows[0].RollingDays);
+        Assert.Equal(new DateOnly(2025, 1, 2), rows[1].AnniversaryDate);
+        Assert.False(rows[1].AnniversaryCounted);
+        Assert.Equal(0, rows[1].RollingDays);
+    }
+
+    [Fact]
+    public void ThresholdStatus_WhenTheCountEqualsTheThreshold_ShouldBeReached()
+    {
+        var reached = ResidencyCountryStatus.From(new ResidencySummaryDto
+        {
+            CountryName = "United Kingdom",
+            TotalDays = 183,
+            ThresholdDays = 183,
+            DaysUntilThreshold = 0,
+            WindowType = "taxYear",
+            WindowStart = new DateOnly(2026, 4, 6),
+            WindowEnd = new DateOnly(2027, 4, 5)
+        }, "Canada");
+        var over = ResidencyCountryStatus.From(new ResidencySummaryDto
+        {
+            CountryName = "United Kingdom",
+            TotalDays = 184,
+            ThresholdDays = 183,
+            DaysUntilThreshold = 0
+        }, "Canada");
+
+        Assert.Equal("reached", reached.ThresholdStatus);
+        Assert.Equal(0, reached.DaysOverThreshold);
+        Assert.Equal(0, reached.DaysUntilThreshold);
+        Assert.False(reached.IsApproachingThreshold);
+        Assert.Equal("over", over.ThresholdStatus);
+        Assert.Equal(1, over.DaysOverThreshold);
+        Assert.False(over.IsApproachingThreshold);
+    }
+
+    [Fact]
     public async Task Forecast_DateLineCrossing_ShouldIncludeBothCountries()
     {
         await using var db = NewDatabase();
@@ -245,6 +396,63 @@ public class ResidencyQueryServiceTests
         ]);
 
         Assert.Contains(forecast.Forecast, row => row.CountryName is "New Zealand" or "United States" && row.Days > 0);
+    }
+
+    [Fact]
+    public async Task GetRecordCoverage_ShouldSpanTheSavedLegs()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2024, 1, 19, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2024, 1, 19, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 11, 23, 10, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 11, 23, 16, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var coverage = await query.GetRecordCoverageAsync("local");
+
+        Assert.Equal(new DateOnly(2024, 1, 19), coverage.FirstTripDate);
+        Assert.Equal(new DateOnly(2026, 11, 23), coverage.LastTripDate);
+        Assert.Equal(2, coverage.LegCount);
+    }
+
+    [Fact]
+    public void ApplyCoverage_WhenTheCalendarYearRunsPastTheRecords_ShouldBeIncomplete()
+    {
+        var records = new RecordCoverage(new DateOnly(2024, 1, 19), new DateOnly(2026, 11, 23), 2);
+        var year2024 = new ResidencyCountryStatus { WindowStart = new DateOnly(2024, 1, 1), WindowEnd = new DateOnly(2024, 12, 31) };
+        var year2026 = new ResidencyCountryStatus { WindowStart = new DateOnly(2026, 1, 1), WindowEnd = new DateOnly(2026, 12, 31) };
+
+        ResidencyCountryStatus.ApplyCoverage(year2024, records);
+        ResidencyCountryStatus.ApplyCoverage(year2026, records);
+
+        Assert.False(year2024.IsComplete);
+        Assert.Equal(new DateOnly(2024, 1, 19), year2024.CoverageStart);
+        Assert.Equal(new DateOnly(2024, 12, 31), year2024.CoverageEnd);
+        Assert.False(year2026.IsComplete);
+        Assert.Equal(new DateOnly(2026, 1, 1), year2026.CoverageStart);
+        Assert.Equal(new DateOnly(2026, 11, 23), year2026.CoverageEnd);
+    }
+
+    [Fact]
+    public async Task MeasureMinimumPresence_ForCanada_ShouldUseTheCalendarYear()
+    {
+        await using var db = NewDatabase();
+        var query = new ResidencyQueryService(new TripService(db, new ResidencyCalculationService()), new ResidencyCalculationService());
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 6, 1, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 6, 1, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2026, 6, 4, 10, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 6, 4, 18, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var canada = await query.MeasureMinimumPresenceAsync("local", "Canada", new DateOnly(2026, 11, 9));
+        var uk = await query.MeasureMinimumPresenceAsync("local", "United Kingdom", new DateOnly(2026, 11, 9));
+
+        Assert.NotNull(canada);
+        Assert.Equal(183, canada.MinimumDays);
+        Assert.Equal("calendarYear", canada.WindowType);
+        Assert.Equal(new DateOnly(2026, 1, 1), canada.WindowStart);
+        Assert.Equal(new DateOnly(2026, 12, 31), canada.WindowEnd);
+        Assert.True(canada.Days > 0);
+        Assert.Equal(183 - canada.Days, canada.DaysShort);
+        Assert.Equal("under", canada.Status);
+        Assert.Null(uk);
     }
 
     private static ApplicationDbContext NewDatabase()

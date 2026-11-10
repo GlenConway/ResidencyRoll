@@ -105,38 +105,88 @@ public class TripService
         return CalculateDaysPerCountryByDateRange(trips, windowStart, today);
     }
 
-    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(string userId, List<Trip> hypotheticalTrips)
+    public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(
+        string userId,
+        List<Trip> hypotheticalTrips,
+        DateOnly? through = null)
     {
         var trips = await _context.Trips
             .Where(t => t.UserId == userId)
             .ToListAsync();
-        return ForecastDays(trips, hypotheticalTrips);
+        return ForecastDays(trips, hypotheticalTrips, through);
     }
 
     public (Dictionary<string, int> Current, Dictionary<string, int> Forecast) ForecastDays(
         IReadOnlyList<Trip> existingTrips,
-        IReadOnlyList<Trip> hypotheticalTrips)
+        IReadOnlyList<Trip> hypotheticalTrips,
+        DateOnly? through = null)
     {
         if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
         {
             return (new Dictionary<string, int>(), new Dictionary<string, int>());
         }
 
-        var today = DateTime.Today;
-        var currentWindowStart = RollingWindow.StartOn(today);
-        var window = GetForecastWindow(hypotheticalTrips);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var window = ScenarioWindow(hypotheticalTrips, through);
 
-        var currentDaysPerCountry = CalculateDaysPerCountryByDateRange(existingTrips, currentWindowStart, today);
+        var currentDaysPerCountry = CountByCountryWindow(existingTrips, today);
 
         var tripsWithHypothetical = new List<Trip>(existingTrips);
         tripsWithHypothetical.AddRange(hypotheticalTrips);
 
-        var forecastDaysPerCountry = CalculateDaysPerCountryByDateRange(
-            tripsWithHypothetical,
-            window.Start.ToDateTime(TimeOnly.MinValue),
-            window.End.ToDateTime(TimeOnly.MinValue));
+        var forecastDaysPerCountry = CountByCountryWindow(tripsWithHypothetical, window.End);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
+
+    public ForecastWindow ScenarioWindow(IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through)
+    {
+        var window = GetForecastWindow(hypotheticalTrips);
+        if (through is { } end && end > window.End)
+        {
+            return new ForecastWindow(RollingWindow.StartOn(end), end);
+        }
+
+        return window;
+    }
+
+    private Dictionary<string, int> CountByCountryWindow(IEnumerable<Trip> trips, DateOnly referenceEnd)
+    {
+        var presence = _residencyService.GenerateDailyPresenceLog(trips.ToList());
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var country in CountriesIn(presence))
+        {
+            var period = CountingWindow.For(_residencyService.GetCountryRule(country), referenceEnd);
+            var counted = _residencyService.CalculateResidencyDays(presence, period.Start, period.End);
+            if (counted.TryGetValue(country, out var days) && days > 0)
+            {
+                totals[country] = days;
+            }
+        }
+
+        return totals;
+    }
+
+    private static IEnumerable<string> CountriesIn(IEnumerable<DailyPresence> presence)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var day in presence)
+        {
+            if (!string.IsNullOrWhiteSpace(day.LocationAtMidnight) && day.LocationAtMidnight != "IN_TRANSIT")
+            {
+                names.Add(day.LocationAtMidnight);
+            }
+
+            foreach (var country in day.LocationsDuringDay)
+            {
+                if (!string.IsNullOrWhiteSpace(country) && country != "IN_TRANSIT")
+                {
+                    names.Add(country);
+                }
+            }
+        }
+
+        return names;
     }
 
     /// <summary>

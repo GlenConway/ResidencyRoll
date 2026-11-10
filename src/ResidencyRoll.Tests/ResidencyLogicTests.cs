@@ -119,6 +119,107 @@ public class ResidencyLogicTests
         Assert.True(residencyDays.GetValueOrDefault("Australia", 0) >= 1);
     }
 
+    [Fact]
+    public void SameDayConnection_UkToCanadaToCanada_ShouldKeepTheUkMidnight()
+    {
+        // Woke up in London. LHR → YUL, then YUL → YHZ the same calendar day.
+        // The domestic leg is listed first so ordering, not list order, has to protect the midnight.
+        var trips = new List<Trip>
+        {
+            new Trip
+            {
+                DepartureCountry = "Canada",
+                DepartureCity = "Montreal",
+                DepartureDateTime = new DateTime(2026, 2, 8, 18, 40, 0),
+                DepartureTimezone = "America/Toronto",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Halifax",
+                ArrivalDateTime = new DateTime(2026, 2, 8, 20, 40, 0),
+                ArrivalTimezone = "America/Halifax"
+            },
+            new Trip
+            {
+                DepartureCountry = "United Kingdom",
+                DepartureCity = "London",
+                DepartureDateTime = new DateTime(2026, 2, 8, 13, 25, 0),
+                DepartureTimezone = "Europe/London",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Montreal",
+                ArrivalDateTime = new DateTime(2026, 2, 8, 15, 25, 0),
+                ArrivalTimezone = "America/Toronto"
+            }
+        };
+
+        var log = _service.GenerateDailyPresenceLog(trips);
+        var feb8 = log.Single(day => day.Date == new DateOnly(2026, 2, 8));
+
+        Assert.Equal("United Kingdom", feb8.LocationAtMidnight);
+        Assert.Contains("Canada", feb8.LocationsDuringDay);
+        var counted = _service.CalculateResidencyDays(log, new DateOnly(2026, 2, 8), new DateOnly(2026, 2, 8));
+        Assert.Equal(1, counted["United Kingdom"]);
+        Assert.False(counted.ContainsKey("Canada"));
+    }
+
+    [Fact]
+    public void DirectDeparture_LondonToHalifax_ShouldKeepTheUkMidnight()
+    {
+        var trips = new List<Trip>
+        {
+            new Trip
+            {
+                DepartureCountry = "United Kingdom",
+                DepartureCity = "London",
+                DepartureDateTime = new DateTime(2025, 11, 12, 9, 0, 0),
+                DepartureTimezone = "Europe/London",
+                ArrivalCountry = "Canada",
+                ArrivalCity = "Halifax",
+                ArrivalDateTime = new DateTime(2025, 11, 12, 12, 0, 0),
+                ArrivalTimezone = "America/Halifax"
+            }
+        };
+
+        var log = _service.GenerateDailyPresenceLog(trips);
+        var day = log.Single(item => item.Date == new DateOnly(2025, 11, 12));
+
+        Assert.Equal("United Kingdom", day.LocationAtMidnight);
+    }
+
+    [Fact]
+    public void AustraliaLeap_LaterDomesticLeg_ShouldNotReplaceDateLineMidnights()
+    {
+        var trips = new List<Trip>
+        {
+            new Trip
+            {
+                DepartureCountry = "Australia",
+                DepartureCity = "Sydney",
+                DepartureDateTime = new DateTime(2025, 12, 25, 20, 0, 0),
+                DepartureTimezone = "Australia/Sydney",
+                ArrivalCountry = "Australia",
+                ArrivalCity = "Melbourne",
+                ArrivalDateTime = new DateTime(2025, 12, 25, 21, 30, 0),
+                ArrivalTimezone = "Australia/Melbourne"
+            },
+            new Trip
+            {
+                DepartureCountry = "Canada",
+                DepartureCity = "Vancouver",
+                DepartureDateTime = new DateTime(2025, 12, 23, 18, 0, 0, DateTimeKind.Utc),
+                DepartureTimezone = "America/Vancouver",
+                ArrivalCountry = "Australia",
+                ArrivalCity = "Sydney",
+                ArrivalDateTime = new DateTime(2025, 12, 25, 6, 0, 0, DateTimeKind.Utc),
+                ArrivalTimezone = "Australia/Sydney"
+            }
+        };
+
+        var log = _service.GenerateDailyPresenceLog(trips);
+
+        Assert.Equal("Canada", log.Single(day => day.Date == new DateOnly(2025, 12, 23)).LocationAtMidnight);
+        Assert.Equal("IN_TRANSIT", log.Single(day => day.Date == new DateOnly(2025, 12, 24)).LocationAtMidnight);
+        Assert.Equal("Australia", log.Single(day => day.Date == new DateOnly(2025, 12, 25)).LocationAtMidnight);
+    }
+
     #endregion
 
     #region Scenario 2: The US Partial Day Rule

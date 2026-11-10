@@ -16,6 +16,40 @@ public class CountryResidencyRule
 
     /// <summary>
     /// Common residency threshold in days (e.g., 183 days for most countries).
+    /// Reaching the threshold counts as residency.
     /// </summary>
     public int? ResidencyThresholdDays { get; set; }
+
+    /// <summary>
+    /// Which period the threshold applies to. Rolling 365 days, a tax year, or a calendar year.
+    /// </summary>
+    public CountingWindowType WindowType { get; set; } = CountingWindowType.Rolling365;
+
+    /// <summary>
+    /// Month the tax year starts, when <see cref="WindowType"/> is <see cref="CountingWindowType.TaxYear"/>.
+    /// </summary>
+    public int? TaxYearStartMonth { get; set; }
+
+    /// <summary>
+    /// Day the tax year starts, when <see cref="WindowType"/> is <see cref="CountingWindowType.TaxYear"/>.
+    /// </summary>
+    public int? TaxYearStartDay { get; set; }
+
+    /// <summary>
+    /// Days the home country requires in <see cref="MinimumWindowType"/>.
+    /// Nova Scotia MSI requires 183 days in the calendar year. The log counts the country, not the province.
+    /// </summary>
+    public int? MinimumPresenceDays { get; set; }
+
+    /// <summary>
+    /// Period for <see cref="MinimumPresenceDays"/>. Null when the country has no minimum.
+    /// </summary>
+    public CountingWindowType? MinimumWindowType { get; set; }
+}
+
+public enum CountingWindowType
+{
+    Rolling365,
+    TaxYear,
+    CalendarYear
 }

@@ -65,21 +65,27 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `list_trips` | Flight legs, optionally limited to those that overlap a date range |
 | `get_trip` | One leg by id |
 | `get_days_per_country` | Days per country for the last 365 days, or for the whole log |
-| `get_residency_summary` | Days, threshold status, days left, and days over between two dates |
-| `get_daily_presence` | Midnight location, countries visited, and the transit flag, up to 366 days per call |
+| `get_residency_summary` | Days, threshold status (`under`, `approaching`, `reached`, `over`, or `home`), days left, and days over. Says when the window runs past the saved trips. When Canada is home, also shows the 183-day calendar-year minimum |
+| `get_daily_presence` | Midnight location for each day, or contiguous runs. `locationAtMidnight` is 00:00 at the start of that date. Optional country filter. Up to 366 days per call |
+| `get_rolling_count` | Rolling 365-day total for one country on each day, and whether the anniversary day counted |
 | `get_location_on` | The presence record for a single date |
-| `get_country_rules` | Midnight or partial-day rule and threshold for one country, or for every known country |
+| `get_current_location` | Current country and the last arrival airport |
+| `get_country_rules` | Midnight or partial-day rule, threshold, counting window, and any home-country minimum |
+| `get_record_coverage` | Earliest saved date, latest saved date, and the number of legs |
+| `find_suspect_trips` | Legs whose duration, order, overlap, or country sequence looks wrong |
 | `get_home_country` | The home country saved for the signed-in user |
 | `set_home_country` | Save or clear the home country |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
-| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved |
-| `max_trip_end_date` | Last midnight you can still be in the arrival country while its peak stays at or under a day limit (183 by default) |
-| `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days |
+| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, and a short rolling count around the peak |
+| `max_trip_end_date` | Last midnight you can still be in the arrival country while its count stays at or under a day limit (183 by default). Optional unsaved legs |
+| `max_trip_start_date` | Earliest arrival that stays at or under the day limit when the departure date is fixed |
+| `plan_max_presence` | Arrival and departure dates that add the most days in a country without passing the limit, skipping blackout dates |
+| `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days. Optional unsaved legs |
 | `parse_itinerary` | Draft legs from pasted booking text. Listed only when an OpenAI model, endpoint, and API key are set. Nothing is saved |
-| `create_trip` | Save one leg |
+| `create_trip` | Save one leg. Returns warnings and the change in country day counts |
+| `update_trip` | Change one leg. Omitted fields stay as they are. Returns warnings and the day-count change |
+| `delete_trip` | Delete one leg and report the day-count change |
 | `create_trips` | Save every leg, or none of them, in one transaction |
-| `update_trip` | Replace one leg |
-| `delete_trip` | Delete one leg |
 
 There is also a `residency_check` prompt and a `residencyroll://rules/countries` resource. CSV import, backups, and system administration are not exposed as tools. Connection steps, OAuth, and rate limits are in [Connect an AI client](docs/guides/MCP_SETUP.md).
 

@@ -86,11 +86,13 @@ MCP Inspector: run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP
 
 ## What the tools can do
 
-Read tools report trips, days per country, the residency summary, one day's location, country rules, forecasts, and the saved home country. `get_residency_summary` and `forecast_trips` use that saved country when `homeCountry` is omitted. Call `set_home_country` (or set it in the app) before answering days left, days over, or days away when none is saved.
+Read tools report trips, days per country, the residency summary, daily presence, a rolling count, one day's location, the current location, country rules, forecasts, and the saved home country. `locationAtMidnight` for a date is the country at 00:00 at the start of that date. `get_residency_summary` and `forecast_trips` use the saved home country when `homeCountry` is omitted, and each country is counted on its own window (`rolling365`, `taxYear`, or `calendarYear`). The United Kingdom tax year runs from 6 April to 5 April. Reaching the threshold counts as residency (`thresholdStatus` `reached`). Call `set_home_country` (or set it in the app) before answering days left, days over, or days away when none is saved.
 
 `parse_itinerary` is listed only when an OpenAI model, endpoint, and API key are all set. It returns a draft and saves nothing. `lookup_airport` searches the shared airport list.
 
-`create_trip`, `create_trips`, `update_trip`, `delete_trip`, and `set_home_country` change saved data and require `write:trips`. `create_trips` saves every leg or none. Confirm with the user before a write. The server does not treat that confirmation as a security check.
+`create_trip`, `create_trips`, `update_trip`, `delete_trip`, and `set_home_country` change saved data and require `write:trips`. `create_trips` saves every leg or none. `update_trip` changes only the fields you send. A saved leg that looks wrong comes back in `warnings` and is also listed by `find_suspect_trips`; the save still happens. `impact` is the change in each country's day count for the rolling 365 days and for each calendar year touched. Confirm with the user before a write. The server does not treat that confirmation as a security check.
+
+`get_record_coverage` reports the first and last saved dates. `get_residency_summary` sets `isComplete` false when a window starts before the first saved date or ends after the last one, and `coverageStart` / `coverageEnd` are the part of the window the records cover. Days outside that span are not counted. When Canada is the home country, the summary also reports progress toward 183 days in the calendar year. That is the Nova Scotia MSI test, counted as days in Canada because the log does not record the province.
 
 CSV import, backups, and system administration are not exposed.
 
