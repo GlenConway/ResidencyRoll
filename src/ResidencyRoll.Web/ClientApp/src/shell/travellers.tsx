@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { getTravellers, updateTraveller } from '../api/client.ts'
 import type { Traveller } from '../api/types.ts'
 import { useHomeCountry, writeHomeCountry } from '../lib/homeCountry.ts'
@@ -13,6 +13,7 @@ interface TravellerState {
 }
 
 const TravellerContext = createContext<TravellerState | null>(null)
+const emptyTravellers: Traveller[] = []
 
 export function TravellerProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -20,19 +21,13 @@ export function TravellerProvider({ children }: { children: ReactNode }) {
     queryKey: ['travellers'],
     queryFn: getTravellers,
   })
-  const travellers = query.data ?? []
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-
-  useEffect(() => {
-    const chosen = chooseTraveller(travellers, storedTravellerId())
-    setSelectedId(chosen?.id ?? null)
-  }, [travellers])
-
-  const selected = travellers.find((traveller) => traveller.id === selectedId) ?? null
+  const travellers = query.data ?? emptyTravellers
+  const [pickedId, setPickedId] = useState<number | null>(storedTravellerId)
+  const selected = chooseTraveller(travellers, pickedId)
 
   const select = useCallback((id: number) => {
     rememberTraveller(id)
-    setSelectedId(id)
+    setPickedId(id)
   }, [])
 
   const save = useCallback(

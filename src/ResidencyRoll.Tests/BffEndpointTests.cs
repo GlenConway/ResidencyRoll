@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using ResidencyRoll.Web.Bff;
 using Xunit;
@@ -81,21 +82,6 @@ public class BffWebApplicationFactory : WebApplicationFactory<WebEntryPoint>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Api:BaseUrl"] = DownstreamUrl,
-                ["Authentication:OpenIdConnect:Enabled"] = OidcEnabled ? "true" : "false",
-                ["Authentication:OpenIdConnect:Authority"] = "https://example.invalid",
-                ["Authentication:OpenIdConnect:ClientId"] = "test-client",
-                ["Authentication:OpenIdConnect:ClientSecret"] = "test-secret",
-                ["Authentication:OpenIdConnect:RequireHttpsMetadata"] = "false",
-                ["Authentication:OpenIdConnect:ApiAudience"] = "https://example.invalid/api",
-                ["DataProtection:KeysPath"] = Path.Join(Path.GetTempPath(), "residencyroll-tests", Guid.NewGuid().ToString("N"))
-            });
-        });
-
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IStartupFilter>(new TestSignInStartupFilter());
@@ -114,6 +100,28 @@ public class BffWebApplicationFactory : WebApplicationFactory<WebEntryPoint>
                 });
             }
         });
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        // Host configuration becomes the entry-point args and overrides appsettings,
+        // including a local appsettings.Development.json that CI does not have.
+        builder.ConfigureHostConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Api:BaseUrl"] = DownstreamUrl,
+                ["Authentication:OpenIdConnect:Enabled"] = OidcEnabled ? "true" : "false",
+                ["Authentication:OpenIdConnect:Authority"] = "https://example.invalid",
+                ["Authentication:OpenIdConnect:ClientId"] = "test-client",
+                ["Authentication:OpenIdConnect:ClientSecret"] = "test-secret",
+                ["Authentication:OpenIdConnect:RequireHttpsMetadata"] = "false",
+                ["Authentication:OpenIdConnect:ApiAudience"] = "https://example.invalid/api",
+                ["DataProtection:KeysPath"] = Path.Join(Path.GetTempPath(), "residencyroll-tests", Guid.NewGuid().ToString("N"))
+            });
+        });
+
+        return base.CreateHost(builder);
     }
 
     protected override void Dispose(bool disposing)

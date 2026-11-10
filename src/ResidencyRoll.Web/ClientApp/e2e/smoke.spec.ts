@@ -69,7 +69,7 @@ test('a second traveller keeps a separate day count', async ({ page }) => {
   await page.goto('/travellers')
   await page.getByLabel('Name').fill('Sam')
   await page.getByRole('button', { name: 'Add traveller' }).click()
-  await expect(page.getByText('Sam', { exact: true })).toBeVisible()
+  await expect(page.getByRole('list').getByText('Sam', { exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: 'Manage Trips' }).click()
   await page.getByRole('button', { name: 'Add Trip' }).first().click()
@@ -101,14 +101,17 @@ test('a second traveller keeps a separate day count', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
   await page.getByLabel('Traveller').selectOption('Sam')
-  for (const _ of [0, 1]) {
-    await page.getByRole('button', { name: 'Delete' }).first().click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
-  }
+  await deleteFirstTrip(page)
+  await deleteFirstTrip(page)
   await page.goto('/travellers')
   await page.getByRole('button', { name: 'Delete' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
 })
+
+async function deleteFirstTrip(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Delete' }).first().click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+}
 
 async function selectAirport(page: import('@playwright/test').Page, label: string, code: string) {
   const box = page.getByRole('combobox', { name: label })
