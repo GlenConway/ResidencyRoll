@@ -16,6 +16,9 @@ public class TripDto
     public DateTime ArrivalDateTime { get; set; }
     public string ArrivalTimezone { get; set; } = "UTC";
     public string? ArrivalIataCode { get; set; }
+    public string? Source { get; set; }
+    public string? BookingRef { get; set; }
+    public string? Notes { get; set; }
     
     // Legacy fields (computed for backward compatibility)
     public string CountryName 

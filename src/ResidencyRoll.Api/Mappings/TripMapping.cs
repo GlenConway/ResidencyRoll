@@ -17,7 +17,10 @@ public static class TripMapping
         ArrivalCity = trip.ArrivalCity,
         ArrivalDateTime = trip.ArrivalDateTime,
         ArrivalTimezone = trip.ArrivalTimezone,
-        ArrivalIataCode = trip.ArrivalIataCode
+        ArrivalIataCode = trip.ArrivalIataCode,
+        Source = trip.Source,
+        BookingRef = trip.BookingRef,
+        Notes = trip.Notes
     };
 
     public static Trip ToEntity(this TripDto dto) => new()
@@ -32,7 +35,10 @@ public static class TripMapping
         ArrivalCity = dto.ArrivalCity,
         ArrivalDateTime = dto.ArrivalDateTime,
         ArrivalTimezone = dto.ArrivalTimezone,
-        ArrivalIataCode = dto.ArrivalIataCode
+        ArrivalIataCode = dto.ArrivalIataCode,
+        Source = dto.Source,
+        BookingRef = dto.BookingRef,
+        Notes = dto.Notes
     };
 }
 

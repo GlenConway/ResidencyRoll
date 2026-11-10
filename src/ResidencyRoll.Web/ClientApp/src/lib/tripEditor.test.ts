@@ -27,7 +27,7 @@ describe('trip editor', () => {
       {
         departure_airport: 'ZZZ',
         departure_datetime_local: '2026-03-20T09:00',
-        arrival_airport: 'YYY',
+        arrival_airport: 'NOPE',
         arrival_datetime_local: null,
       },
     ])
@@ -36,7 +36,7 @@ describe('trip editor', () => {
       departureCity: 'ZZZ',
       departureCountry: 'ZZZ',
       departureTimezone: 'UTC',
-      arrivalCity: 'YYY',
+      arrivalCity: 'NOPE',
       arrivalTimezone: 'UTC',
       arrivalDate: '2026-03-20',
       arrivalTime: '09:00',

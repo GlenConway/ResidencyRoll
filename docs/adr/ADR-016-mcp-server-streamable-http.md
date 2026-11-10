@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-09). Amended 2026-11-09: MCP structured output uses local wall-clock strings instead of RFC 3339 date-times; `get_days_per_country` includes the country rule; `forecast_trips` and `max_trip_end_date` report the peak inside the window; `get_location_on` projects past the last saved day; `get_current_location` added. Amended 2026-11-09 again: `locationAtMidnight` is 00:00 at the start of the date; threshold status `reached` means the count equals the threshold; planning and rolling-count tools were added. Country windows are in [ADR-018](ADR-018-per-country-counting-windows.md). Trip warnings, record coverage, write impact, and the Nova Scotia MSI minimum are in [ADR-019](ADR-019-trip-warnings-coverage-and-msi.md). Amended 2026-11-10 by [ADR-020](ADR-020-travellers-on-an-account.md): trip, residency, forecast, presence, and home-country tools take an optional `traveller`, and the home country is stored on the traveller. Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
+Accepted (2026-11-09). Amended 2026-11-09: MCP structured output uses local wall-clock strings instead of RFC 3339 date-times; `get_days_per_country` includes the country rule; `forecast_trips` and `max_trip_end_date` report the peak inside the window; `get_location_on` projects past the last saved day; `get_current_location` added. Amended 2026-11-09 again: `locationAtMidnight` is 00:00 at the start of the date; threshold status `reached` means the count equals the threshold; planning and rolling-count tools were added. Country windows are in [ADR-018](ADR-018-per-country-counting-windows.md). Trip warnings, record coverage, write impact, and the Nova Scotia MSI minimum are in [ADR-019](ADR-019-trip-warnings-coverage-and-msi.md). Amended 2026-11-10 by [ADR-020](ADR-020-travellers-on-an-account.md): trip, residency, forecast, presence, and home-country tools take an optional `traveller`, and the home country is stored on the traveller. Amended 2026-11-10 by [ADR-021](ADR-021-mcp-itinerary-batch.md): batch writes, a 1 MB body limit, and `get_server_info`. Amends [ADR-002](ADR-002-auth0-oidc-and-jwt-bearer.md) (the API accepts a second token audience for MCP clients) and [ADR-015](ADR-015-react-spa-replaces-blazor.md) (the Web host proxies `/mcp` and OAuth metadata as well as `/api`).
 
 ## Context
 
@@ -145,7 +145,7 @@ Optional, low priority: an MCP **prompt** `residency_check` (asks for the home c
 - Allow CORS for `/mcp` and the metadata endpoint for configured origins only, exposing `WWW-Authenticate`, `Mcp-Session-Id` and `MCP-Protocol-Version`. This is needed by the browser-based MCP Inspector and claude.ai.
 - Rate-limit `/mcp` per user (`sub`) with ASP.NET Core rate limiting, for example 120 requests a minute. Limit `parse_itinerary` more tightly because it spends OpenAI tokens.
 - Do not log tokens. Downgrade the API's existing `OnMessageReceived` / `OnTokenValidated` claim dumps to `Debug`, since every MCP call would otherwise log the full claim set at `Information`.
-- Cap request body size on `/mcp` (64 KB is plenty; itinerary text is the largest input).
+- Cap request body size on `/mcp` at 1 MB, so a full itinerary batch or CSV import fits. [ADR-021](ADR-021-mcp-itinerary-batch.md).
 
 ### 6. Configuration
 

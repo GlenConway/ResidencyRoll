@@ -13,7 +13,7 @@ namespace ResidencyRoll.Api.Mcp;
 public sealed class TripWriteTools
 {
     [McpServerTool(Name = "create_trip", Title = "Create a trip", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTripWriteResult))]
-    [Description("Saves one flight leg for the signed-in user. Uses the same checks as the trips API. warnings lists problems such as a duration far from the usual time, arrival before departure in UTC, a non-stop leg over 20 hours, or an overlap with another leg. The leg is saved even when warnings is not empty. impact lists the country day-count changes in the rolling 365 days and in each calendar year the change touches. Ask the user to confirm before calling. IATA codes resolve city, country, and IANA timezone; pass those explicitly for airports that are not in the table.")]
+    [Description("Saves one flight leg. warnings lists a duration far from the usual time, arrival before departure in UTC, a non-stop leg over 20 hours, or an overlap with another leg. The leg is saved even when warnings is not empty, unless onConflict is reject or skip. impact lists the country day-count changes in the rolling 365 days and in each calendar year the change touches. Ask the user to confirm before calling. IATA codes resolve city, country, and IANA timezone. Pass source, bookingRef, and notes to record where the leg came from.")]
     public static async Task<CallToolResult> CreateTrip(
         TripService trips,
         TravellerService travellerService,
@@ -22,12 +22,26 @@ public sealed class TripWriteTools
         ClaimsPrincipal user,
         McpTripLeg leg,
         [Description("Travellers to save this leg for, by id or name. Optional. Omit it to use traveller, or the signed-in person. The write is atomic across travellers.")] List<string>? travellers = null,
+        [Description("save keeps an overlapping leg and returns a warning. reject and skip do not save it. Optional. Defaults to save.")] string? onConflict = null,
         [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Write);
+        var mode = McpTripWrites.Conflict(onConflict);
         var people = await McpTravellers.ResolveMany(travellerService, user, travellers, traveller);
         var actor = McpScopes.UserId(user);
         var resolved = TripLegResolver.Resolve(leg, people[0].OwnerUserId, airports);
+        if (mode != McpTripWrites.Save)
+        {
+            foreach (var person in people)
+            {
+                var saved = await trips.GetAllTripsAsync(person.OwnerUserId, person);
+                var applied = McpTripWrites.Apply([resolved], saved, mode);
+                if (applied.Accepted.Count == 0)
+                {
+                    throw new McpException(string.Join("\n", applied.Warnings.Select(warning => warning.Message)));
+                }
+            }
+        }
         if (people.Count == 1)
         {
             var person = people[0];
@@ -56,76 +70,70 @@ public sealed class TripWriteTools
         return McpResults.Ok($"{names}: Saved the leg for {people.Count} travellers.", results);
     }
 
-    [McpServerTool(Name = "create_trips", Title = "Create trips", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTripWriteResult[]))]
-    [Description("Saves every leg or none of them, in one transaction. A bad leg leaves no partial import. Each saved leg includes warnings and the day-count impact of adding that leg. Ask the user to confirm before calling. Use this after parse_itinerary once the user accepts the draft.")]
+    [McpServerTool(Name = "create_trips", Title = "Create trips", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(McpWriteBatch))]
+    [Description("Saves every valid leg or none of them, in one transaction. Every leg is checked before anything is saved, and all of the problems come back in one response. The result lists the new ids, a short summary, and any warnings. Pass detail full to include the legs. onConflict save keeps overlapping legs and warns. reject saves nothing when any new leg overlaps a saved one or another new leg. skip leaves the overlapping legs out and saves the rest. Ask the user to confirm before calling.")]
     public static async Task<CallToolResult> CreateTrips(
         TripService trips,
         TravellerService travellerService,
-        ResidencyCalculationService residency,
         AirportCatalog airports,
         ClaimsPrincipal user,
         [Description("Flight legs to save together.")] List<McpTripLeg> legs,
         [Description("Travellers to save these legs for, by id or name. Optional. Omit it to use traveller, or the signed-in person. The write is atomic across legs and travellers.")] List<string>? travellers = null,
+        [Description("summary or full. Optional. Defaults to summary, which omits the full legs.")] string? detail = null,
+        [Description("save, reject, or skip. Optional. Defaults to save.")] string? onConflict = null,
         [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Write);
-        if (legs is null || legs.Count == 0)
-        {
-            throw new McpException("legs must contain at least one flight leg.");
-        }
-
+        var depth = McpTripWrites.Detail(detail);
+        var mode = McpTripWrites.Conflict(onConflict);
         var people = await McpTravellers.ResolveMany(travellerService, user, travellers, traveller);
         var actor = McpScopes.UserId(user);
-        var resolved = legs.Select(leg => TripLegResolver.Resolve(leg, people[0].OwnerUserId, airports)).ToList();
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var results = new List<McpTripWriteResult>();
+        var resolved = TripLegResolver.ResolveAll(legs ?? [], people[0].OwnerUserId, airports);
+        var accepted = new List<Trip>();
+        var warnings = new List<TripWarning>();
         if (people.Count == 1)
         {
             var person = people[0];
-            foreach (var trip in resolved)
+            var existing = await trips.GetAllTripsAsync(person.OwnerUserId, person);
+            var applied = McpTripWrites.Apply(resolved, existing, mode);
+            foreach (var trip in applied.Accepted)
             {
                 trip.TravellerId = person.Id;
                 trip.UserId = person.OwnerUserId;
                 trip.CreatedByUserId = actor;
+                accepted.Add(trip);
             }
 
-            var rolling = (await trips.GetAllTripsAsync(person.OwnerUserId, person)).Select(TripImpact.Snapshot).ToList();
-            var created = await trips.CreateTripsAsync(resolved);
-            foreach (var trip in created)
-            {
-                var next = rolling.Append(TripImpact.Snapshot(trip)).ToList();
-                var impact = TripImpact.Compare(rolling, next, residency, today);
-                results.Add(WriteResult(trip, next, impact));
-                rolling = next;
-            }
+            warnings.AddRange(applied.Warnings);
         }
         else
         {
-            var created = await trips.CreateLegsForTravellersAsync(resolved, people, actor);
-            foreach (var trip in created)
+            foreach (var person in people)
             {
-                var person = people.First(item => item.Id == trip.TravellerId);
-                var saved = await trips.GetAllTripsAsync(person.OwnerUserId, person);
-                var result = WriteResult(trip, saved, []);
-                result.Traveller = new McpTravellerRef { Id = person.Id, Name = person.Name };
-                results.Add(result);
+                var existing = await trips.GetAllTripsAsync(person.OwnerUserId, person);
+                var copies = resolved.Select(trip => TripCopies.Onto(trip, person, actor)).ToList();
+                var applied = McpTripWrites.Apply(copies, existing, mode);
+                accepted.AddRange(applied.Accepted);
+                warnings.AddRange(applied.Warnings);
             }
         }
 
-        var warningCount = results.Sum(result => result.Warnings.Count);
-        var text = $"Saved {results.Count} trip{(results.Count == 1 ? "" : "s")}.";
-        if (warningCount > 0)
+        var created = accepted.Count == 0 ? [] : await trips.CreateTripsAsync(accepted);
+        var skipped = (resolved.Count * people.Count) - created.Count;
+        var lead = $"Saved {created.Count} trip{(created.Count == 1 ? "" : "s")}.";
+        if (skipped > 0)
         {
-            text += $" {warningCount} warning{(warningCount == 1 ? "" : "s")}: " + string.Join(" ", results.SelectMany(result => result.Warnings).Select(warning => warning.Message));
+            lead += $" Skipped {skipped} overlapping leg{(skipped == 1 ? "" : "s")}.";
         }
 
+        var batch = McpTripWrites.Batch(created, warnings, depth, lead);
         if (people.Count == 1)
         {
-            return McpResults.For(people[0], text, results);
+            return McpResults.For(people[0], batch.Summary, batch);
         }
 
         var names = string.Join(", ", people.Select(person => person.Name));
-        return McpResults.Ok($"{names}: {text}", results);
+        return McpResults.Ok($"{names}: {batch.Summary}", batch);
     }
 
     [McpServerTool(Name = "update_trip", Title = "Update a trip", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTripWriteResult))]
@@ -199,6 +207,9 @@ public sealed class TripWriteTools
             ArrivalDateTime = written.ArrivalDateTime,
             ArrivalTimezone = written.ArrivalTimezone,
             ArrivalIataCode = written.ArrivalIataCode,
+            Source = written.Source,
+            BookingRef = written.BookingRef,
+            Notes = written.Notes,
             CountryName = written.CountryName,
             DurationDays = written.DurationDays,
             DurationHours = written.DurationHours,

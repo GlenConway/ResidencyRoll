@@ -23,6 +23,14 @@ public class Trip
     public string ArrivalTimezone { get; set; } = string.Empty; // IANA timezone (e.g., "Australia/Sydney")
     public string? ArrivalIataCode { get; set; } // IATA airport code (e.g., "SYD")
 
+    public const int MaxSourceLength = 100;
+    public const int MaxBookingRefLength = 100;
+    public const int MaxNotesLength = 2000;
+
+    public string? Source { get; set; }
+    public string? BookingRef { get; set; }
+    public string? Notes { get; set; }
+
     // Duration in hours (timezone-aware)
     public int DurationHours
     {

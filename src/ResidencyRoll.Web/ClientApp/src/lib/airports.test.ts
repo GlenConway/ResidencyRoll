@@ -3,7 +3,10 @@ import { airportsForQuery, findByIataCode, getAllAirports, searchAirports } from
 
 describe('airports', () => {
   it('includes the bundled catalogue', () => {
-    expect(getAllAirports()).toHaveLength(109)
+    expect(getAllAirports().length).toBeGreaterThan(5000)
+    expect(findByIataCode('OOL')?.city).toBe('Gold Coast')
+    expect(findByIataCode('CBR')?.city).toBe('Canberra')
+    expect(findByIataCode('CMN')?.city).toBe('Casablanca')
   })
 
   it('finds an airport by IATA code ignoring case', () => {

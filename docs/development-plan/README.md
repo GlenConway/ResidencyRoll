@@ -118,6 +118,14 @@ Track trips and residency for several people, such as a spouse who does not sign
 
 ---
 
+### ✅ M12 — MCP itinerary batch (Complete, 2026-11-10)
+
+Batch validation, atomic delete and replace, compact write results, overlap handling, reconciliation, CSV over MCP, trip provenance, a full airport table, and `get_server_info`.
+
+**ADR:** [ADR-021](../adr/ADR-021-mcp-itinerary-batch.md)
+
+---
+
 ## Adding a milestone
 
 1. Create a GitHub Milestone and attach issues/PRs to it.

@@ -157,7 +157,7 @@ public static class TripAuditor
         TripId = IdOrNull(trip),
         OtherTripId = IdOrNull(other),
         Code = "overlap",
-        Message = $"Trip {trip.Id} ({Code(trip, true)} to {Code(trip, false)}) overlaps trip {other.Id} ({Code(other, true)} to {Code(other, false)})."
+        Message = $"{Describe(trip)} overlaps {Describe(other)}."
     };
 
     private static bool TryInterval(Trip trip, out DateTime start, out DateTime end)
@@ -255,6 +255,10 @@ public static class TripAuditor
         var city = departure ? trip.DepartureCity : trip.ArrivalCity;
         return string.IsNullOrWhiteSpace(city) ? (departure ? trip.DepartureCountry : trip.ArrivalCountry) : city;
     }
+
+    private static string Describe(Trip trip) => trip.Id == 0
+        ? $"{Code(trip, true)} to {Code(trip, false)} departing {trip.DepartureDateTime:yyyy-MM-dd HH:mm}"
+        : $"trip {trip.Id} ({Code(trip, true)} to {Code(trip, false)}, departing {trip.DepartureDateTime:yyyy-MM-dd HH:mm})";
 
     private static int? IdOrNull(Trip trip) => trip.Id == 0 ? null : trip.Id;
 }

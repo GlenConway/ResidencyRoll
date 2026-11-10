@@ -276,6 +276,83 @@ public class TripService
     public Task<List<Trip>> GetTripsForTimelineAsync(string userId, Traveller? traveller = null) =>
         GetAllTripsAsync(userId, traveller);
 
+    /// <summary>
+    /// Deletes every id, or none of them. A missing id rolls the batch back.
+    /// </summary>
+    public async Task DeleteTripsAsync(IReadOnlyCollection<int> ids, string userId, Traveller? traveller = null)
+    {
+        var distinct = ids.Distinct().ToList();
+        if (distinct.Count == 0)
+        {
+            throw new ArgumentException("At least one trip id is required.", nameof(ids));
+        }
+
+        var scope = await Scope(userId, traveller);
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var found = await _access.TripsFor(scope).Where(trip => distinct.Contains(trip.Id)).ToListAsync();
+            var missing = distinct.Except(found.Select(trip => trip.Id)).OrderBy(id => id).ToList();
+            if (missing.Count > 0)
+            {
+                throw new InvalidOperationException($"Trips not found: {string.Join(", ", missing)}.");
+            }
+
+            _context.Trips.RemoveRange(found);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Deletes the listed trips and inserts the new ones, or leaves the traveller unchanged.
+    /// </summary>
+    public async Task<List<Trip>> ReplaceTripsAsync(
+        IReadOnlyCollection<int> deleteIds,
+        IReadOnlyList<Trip> created,
+        string userId,
+        Traveller? traveller = null)
+    {
+        var distinct = deleteIds.Distinct().ToList();
+        var scope = await Scope(userId, traveller);
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var found = distinct.Count == 0
+                ? []
+                : await _access.TripsFor(scope).Where(trip => distinct.Contains(trip.Id)).ToListAsync();
+            var missing = distinct.Except(found.Select(trip => trip.Id)).OrderBy(id => id).ToList();
+            if (missing.Count > 0)
+            {
+                throw new InvalidOperationException($"Trips not found: {string.Join(", ", missing)}.");
+            }
+
+            if (found.Count > 0)
+            {
+                _context.Trips.RemoveRange(found);
+            }
+
+            if (created.Count > 0)
+            {
+                _context.Trips.AddRange(created);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return created.ToList();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     private async Task<Traveller> Scope(string userId, Traveller? traveller) =>
         traveller ?? await _access.ResolveSelfAsync(userId);
 

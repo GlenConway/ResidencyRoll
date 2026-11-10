@@ -10,6 +10,9 @@ export interface Trip {
   arrivalDateTime: string
   arrivalTimezone: string
   arrivalIataCode: string | null
+  source?: string | null
+  bookingRef?: string | null
+  notes?: string | null
 }
 
 export interface TripLeg {

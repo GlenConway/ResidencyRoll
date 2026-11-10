@@ -81,6 +81,7 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `update_traveller` | Rename a person or change their home country |
 | `delete_traveller` | Delete a person. Refuses you, and refuses someone who still has trips unless `deleteTrips` is true |
 | `copy_trips` | Copy saved legs from one person to another, skipping legs that are already there |
+| `get_server_info` | The release, git commit, and airport-table size of the build that answered |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
 | `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, and a short rolling count around the peak |
 | `max_trip_end_date` | Last midnight you can still be in the arrival country while its count stays at or under a day limit (183 by default). Optional unsaved legs |
@@ -88,12 +89,17 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `plan_max_presence` | Arrival and departure dates that add the most days in a country without passing the limit, skipping blackout dates |
 | `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days. Optional unsaved legs |
 | `parse_itinerary` | Draft legs from pasted booking text. Listed only when an OpenAI model, endpoint, and API key are set. Nothing is saved |
-| `create_trip` | Save one leg. An optional `travellers` list saves that same leg for several people in one transaction. Returns warnings and the change in country day counts |
+| `create_trip` | Save one leg. An optional `travellers` list saves that same leg for several people in one transaction. Returns warnings and the change in country day counts. `onConflict` can reject or skip an overlapping leg |
 | `update_trip` | Change one leg. Omitted fields stay as they are. Returns warnings and the day-count change |
 | `delete_trip` | Delete one leg and report the day-count change |
-| `create_trips` | Save every leg, or none of them, in one transaction. An optional `travellers` list does that for several people |
+| `delete_trips` | Delete every listed leg, or none of them, in one transaction |
+| `create_trips` | Save every leg, or none of them, in one transaction. Checks every leg first and returns every error together. The default result is ids, a short summary, and warnings |
+| `replace_trips` | Delete one set of legs and save another in the same transaction |
+| `reconcile_trips` | Compare a set of legs with the saved trips: missing, different times, and saved legs that are not in the set |
+| `export_trips` | CSV in the web export format, plus a compact list of airports, times, source, and booking reference |
+| `import_trips_csv` | Import that same CSV. A bad row saves nothing and every error comes back together |
 
-There is also a `residency_check` prompt and a `residencyroll://rules/countries` resource. CSV import, backups, and system administration are not exposed as tools. Connection steps, OAuth, and rate limits are in [Connect an AI client](docs/guides/MCP_SETUP.md).
+There is also a `residency_check` prompt and a `residencyroll://rules/countries` resource. Backups and system administration are not exposed as tools. Connection steps, OAuth, and rate limits are in [Connect an AI client](docs/guides/MCP_SETUP.md).
 
 ## Tech Stack
 

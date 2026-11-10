@@ -36,10 +36,48 @@ public sealed class McpTripLeg
 
     [Description("Local arrival date and time, yyyy-MM-ddTHH:mm. Required when creating a leg. On update_trip, omit it to leave the saved arrival time.")]
     public string? ArrivalDateTime { get; set; }
+
+    [Description("Where this leg came from, such as an email or a calendar. Optional. On update_trip, omit it to leave the saved value and pass an empty string to clear it.")]
+    public string? Source { get; set; }
+
+    [Description("Booking reference used to recognise the same leg on a later import. Optional. On update_trip, omit it to leave the saved value.")]
+    public string? BookingRef { get; set; }
+
+    [Description("Free-text note. Optional. On update_trip, omit it to leave the saved value.")]
+    public string? Notes { get; set; }
 }
 
 public static class TripLegResolver
 {
+    public static List<Trip> ResolveAll(IReadOnlyList<McpTripLeg> legs, string userId, AirportCatalog airports)
+    {
+        if (legs.Count == 0)
+        {
+            throw new ModelContextProtocol.McpException("legs must contain at least one flight leg.");
+        }
+
+        var errors = new List<string>();
+        var trips = new List<Trip>();
+        for (var index = 0; index < legs.Count; index++)
+        {
+            try
+            {
+                trips.Add(Resolve(legs[index], userId, airports));
+            }
+            catch (ModelContextProtocol.McpException ex)
+            {
+                errors.Add($"Leg {index + 1}: {ex.Message}");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new ModelContextProtocol.McpException(string.Join("\n", errors));
+        }
+
+        return trips;
+    }
+
     public static Trip Resolve(McpTripLeg leg, string userId, AirportCatalog airports)
     {
         var departure = ResolvePlace(leg.DepartureIataCode, leg.DepartureCity, leg.DepartureCountry, leg.DepartureTimezone, "Departure", airports);
@@ -56,7 +94,10 @@ public static class TripLegResolver
             ArrivalCity = arrival.City,
             ArrivalCountry = arrival.Country,
             ArrivalTimezone = arrival.Timezone,
-            ArrivalDateTime = ParseLocal(leg.ArrivalDateTime, "arrivalDateTime")
+            ArrivalDateTime = ParseLocal(leg.ArrivalDateTime, "arrivalDateTime"),
+            Source = Optional(leg.Source, Trip.MaxSourceLength, "source"),
+            BookingRef = Optional(leg.BookingRef, Trip.MaxBookingRefLength, "bookingRef"),
+            Notes = Optional(leg.Notes, Trip.MaxNotesLength, "notes")
         };
     }
 
@@ -102,6 +143,21 @@ public static class TripLegResolver
         if (!string.IsNullOrWhiteSpace(changes.ArrivalDateTime))
         {
             existing.ArrivalDateTime = ParseLocal(changes.ArrivalDateTime, "arrivalDateTime");
+        }
+
+        if (changes.Source is not null)
+        {
+            existing.Source = Optional(changes.Source, Trip.MaxSourceLength, "source");
+        }
+
+        if (changes.BookingRef is not null)
+        {
+            existing.BookingRef = Optional(changes.BookingRef, Trip.MaxBookingRefLength, "bookingRef");
+        }
+
+        if (changes.Notes is not null)
+        {
+            existing.Notes = Optional(changes.Notes, Trip.MaxNotesLength, "notes");
         }
     }
 
@@ -180,6 +236,16 @@ public static class TripLegResolver
         {
             throw new ModelContextProtocol.McpException($"Invalid {label.ToLowerInvariant()} timezone '{timezone}'. Use an IANA name such as America/Halifax.");
         }
+    }
+
+    private static string? Optional(string? value, int maxLength, string name)
+    {
+        if (!TripText.TryOptional(value, maxLength, name, out var stored, out var error))
+        {
+            throw new ModelContextProtocol.McpException(error!);
+        }
+
+        return stored;
     }
 
     private static string? First(string? explicitValue, string? fallback) =>

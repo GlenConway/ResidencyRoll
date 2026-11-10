@@ -231,6 +231,9 @@ public static class TripCopies
         ArrivalCity = source.ArrivalCity,
         ArrivalDateTime = source.ArrivalDateTime,
         ArrivalTimezone = source.ArrivalTimezone,
-        ArrivalIataCode = source.ArrivalIataCode
+        ArrivalIataCode = source.ArrivalIataCode,
+        Source = source.Source,
+        BookingRef = source.BookingRef,
+        Notes = source.Notes
     };
 }

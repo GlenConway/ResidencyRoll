@@ -266,6 +266,9 @@ export function ManageTripsPage() {
                   <TableCell>
                     <div>{placeLabel(trip.departureIataCode, trip.departureCity)}</div>
                     <div className="text-xs text-muted-foreground">{formatUtcOffset(trip.departureTimezone)}</div>
+                    {trip.bookingRef || trip.source ? (
+                      <div className="text-xs text-muted-foreground">{[trip.bookingRef, trip.source].filter(Boolean).join(' · ')}</div>
+                    ) : null}
                   </TableCell>
                   <TableCell>{formatTripWhen(trip.departureDateTime)}</TableCell>
                   <TableCell>
@@ -476,6 +479,26 @@ function TripFields({ draft, onChange }: { draft: TripDraft; onChange: (draft: T
           onChange={(event) => onChange({ ...draft, arrivalTime: event.target.value })}
         />
         </div>
+      </div>
+      <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+        <Field
+          id="trip-source"
+          label="Source"
+          value={draft.source}
+          onChange={(event) => onChange({ ...draft, source: event.target.value })}
+        />
+        <Field
+          id="trip-booking"
+          label="Booking reference"
+          value={draft.bookingRef}
+          onChange={(event) => onChange({ ...draft, bookingRef: event.target.value })}
+        />
+        <Field
+          id="trip-notes"
+          label="Notes"
+          value={draft.notes}
+          onChange={(event) => onChange({ ...draft, notes: event.target.value })}
+        />
       </div>
     </div>
   )

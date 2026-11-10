@@ -182,6 +182,84 @@ public class McpServerTests : IClassFixture<McpApiFactory>
     }
 
     [Fact]
+    public async Task CreateTrips_SeveralUnknownAirports_ShouldReportEveryCode()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var result = await mcp.CallToolAsync("create_trips", new Dictionary<string, object?>
+        {
+            ["legs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["departureIataCode"] = "OOL",
+                    ["departureDateTime"] = "2026-04-01T08:00",
+                    ["arrivalIataCode"] = "ZZZ",
+                    ["arrivalDateTime"] = "2026-04-01T12:00"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["departureIataCode"] = "NOPE",
+                    ["departureDateTime"] = "2026-04-02T08:00",
+                    ["arrivalIataCode"] = "CBR",
+                    ["arrivalDateTime"] = "2026-04-02T10:00"
+                }
+            }
+        });
+
+        var text = McpClientConnector.Text(result);
+        Assert.Equal(true, result.IsError);
+        Assert.Contains("ZZZ", text);
+        Assert.Contains("NOPE", text);
+        Assert.Contains("Leg 1", text);
+        Assert.Contains("Leg 2", text);
+        Assert.Equal(0, await TripCount(http));
+    }
+
+    [Fact]
+    public async Task CreateTrips_RejectOverlap_ShouldSaveNothing()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var created = await mcp.CallToolAsync("create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("YHZ", "2024-02-01T08:00", "LHR", "2024-02-01T18:00")
+        });
+        Assert.NotEqual(true, created.IsError);
+        var id = created.StructuredContent!.Value.GetProperty("id").GetInt32();
+
+        var rejected = await mcp.CallToolAsync("create_trips", new Dictionary<string, object?>
+        {
+            ["onConflict"] = "reject",
+            ["legs"] = new object[] { Leg("YHZ", "2024-02-01T09:00", "LHR", "2024-02-01T16:00") }
+        });
+        Assert.Equal(true, rejected.IsError);
+        Assert.Contains("overlap", McpClientConnector.Text(rejected), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, await TripCount(http));
+
+        var deleted = await mcp.CallToolAsync("delete_trips", new Dictionary<string, object?> { ["ids"] = new[] { id, 999 } });
+        Assert.Equal(true, deleted.IsError);
+        Assert.Contains("999", McpClientConnector.Text(deleted));
+        Assert.Equal(1, await TripCount(http));
+        Assert.NotEqual(true, (await mcp.CallToolAsync("delete_trips", new Dictionary<string, object?> { ["ids"] = new[] { id } })).IsError);
+    }
+
+    [Fact]
+    public async Task GetServerInfo_ShouldNameTheBuildAndTheAirportTable()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        await using var mcp = await McpClientConnector.ConnectAsync(factory.CreateClient());
+        var result = await mcp.CallToolAsync("get_server_info", new Dictionary<string, object?>());
+
+        Assert.NotEqual(true, result.IsError);
+        Assert.Equal("1.0.0", result.StructuredContent!.Value.GetProperty("version").GetString());
+        Assert.Equal("local", result.StructuredContent.Value.GetProperty("commit").GetString());
+        Assert.True(result.StructuredContent.Value.GetProperty("airportCount").GetInt32() > 5000);
+    }
+
+    [Fact]
     public async Task UnknownIataWithoutPlace_ShouldFail()
     {
         var http = _factory.CreateClient();
@@ -364,14 +442,33 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         {
             ["legs"] = new object[] { Leg("YHZ", "2026-08-10T08:00", "LHR", "2026-08-10T18:00") }
         });
-        var createdManyId = createdMany.StructuredContent!.Value.EnumerateArray().First().GetProperty("id").GetInt32();
+        var createdManyId = createdMany.StructuredContent!.Value.GetProperty("ids").EnumerateArray().First().GetInt32();
+        Assert.Equal(JsonValueKind.Null, createdMany.StructuredContent.Value.GetProperty("trips").ValueKind);
         await AssertCall(mcp, tools, "update_trip", new Dictionary<string, object?>
         {
             ["id"] = createdId,
             ["changes"] = Leg("YUL", "2026-08-01T09:00", "LHR", "2026-08-01T20:00")
         });
         await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdId });
-        await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdManyId });
+        await AssertCall(mcp, tools, "delete_trips", new Dictionary<string, object?> { ["ids"] = new[] { createdManyId } });
+        await AssertCall(mcp, tools, "get_server_info", new Dictionary<string, object?>());
+        await AssertCall(mcp, tools, "export_trips", new Dictionary<string, object?>());
+        await AssertCall(mcp, tools, "reconcile_trips", new Dictionary<string, object?>
+        {
+            ["legs"] = new object[] { Leg("YHZ", "2026-09-01T08:00", "LHR", "2026-09-01T18:00") }
+        });
+        var imported = await AssertCall(mcp, tools, "import_trips_csv", new Dictionary<string, object?>
+        {
+            ["csv"] = "DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,DepartureIataCode,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone,ArrivalIataCode,Source,BookingRef\nCanada,Halifax,2026-09-02 08:00:00,America/Halifax,YHZ,United Kingdom,London,2026-09-02 18:00:00,Europe/London,LHR,email,ABC123"
+        });
+        var importedId = imported.StructuredContent!.Value.GetProperty("ids").EnumerateArray().First().GetInt32();
+        var replaced = await AssertCall(mcp, tools, "replace_trips", new Dictionary<string, object?>
+        {
+            ["deleteIds"] = new[] { importedId },
+            ["legs"] = new object[] { Leg("YUL", "2026-09-03T09:00", "CDG", "2026-09-03T21:00") }
+        });
+        var replacedId = replaced.StructuredContent!.Value.GetProperty("ids").EnumerateArray().First().GetInt32();
+        await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = replacedId });
 
         var listedTravellers = await AssertCall(mcp, tools, "list_travellers", new Dictionary<string, object?>());
         var selfId = listedTravellers.StructuredContent!.Value.EnumerateArray().Single(row => row.GetProperty("isSelf").GetBoolean()).GetProperty("id").GetInt32();
@@ -388,7 +485,8 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             "get_record_coverage", "find_suspect_trips", "forecast_trips",
             "max_trip_end_date", "max_trip_start_date", "plan_max_presence", "standard_duration_forecasts",
             "lookup_airport", "get_home_country", "set_home_country",
-            "create_trip", "create_trips", "update_trip", "delete_trip",
+            "create_trip", "create_trips", "update_trip", "delete_trip", "delete_trips", "replace_trips",
+            "reconcile_trips", "export_trips", "import_trips_csv", "get_server_info",
             "list_travellers", "create_traveller", "update_traveller", "delete_traveller", "copy_trips"
         };
         Assert.Equal(tools.Select(tool => tool.Name).OrderBy(name => name), called.OrderBy(name => name));

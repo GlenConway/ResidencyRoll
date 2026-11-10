@@ -18,6 +18,9 @@ export interface TripDraft {
   arrivalIataCode: string | null
   arrivalDate: string
   arrivalTime: string
+  source: string
+  bookingRef: string
+  notes: string
 }
 
 const requiredLabels = [
@@ -45,6 +48,9 @@ export function newTripDraft(today = new Date()): TripDraft {
     arrivalIataCode: null,
     arrivalDate: date,
     arrivalTime: '12:00',
+    source: '',
+    bookingRef: '',
+    notes: '',
   }
 }
 
@@ -65,6 +71,9 @@ export function draftFromTrip(trip: Trip): TripDraft {
     arrivalIataCode: trip.arrivalIataCode,
     arrivalDate: arrival.date,
     arrivalTime: arrival.time,
+    source: trip.source ?? '',
+    bookingRef: trip.bookingRef ?? '',
+    notes: trip.notes ?? '',
   }
 }
 
@@ -90,6 +99,9 @@ export function draftFromNextLeg(trip: Trip): TripDraft {
     arrivalIataCode: null,
     arrivalDate: arrival.date,
     arrivalTime: arrival.time,
+    source: '',
+    bookingRef: '',
+    notes: '',
   }
 }
 
@@ -128,6 +140,9 @@ export function toTripBody(draft: TripDraft): Omit<Trip, 'id'> {
     arrivalDateTime: combine(draft.arrivalDate, draft.arrivalTime),
     arrivalTimezone: draft.arrivalTimezone,
     arrivalIataCode: draft.arrivalIataCode,
+    source: draft.source.trim() || null,
+    bookingRef: draft.bookingRef.trim() || null,
+    notes: draft.notes.trim() || null,
   }
 }
 
@@ -174,6 +189,9 @@ export function draftsFromParsedLegs(legs: readonly ItineraryFlightLeg[]): Parse
       arrivalIataCode: leg.arrival_airport,
       arrivalDate: arrival.toFormat('yyyy-MM-dd'),
       arrivalTime: arrival.toFormat('HH:mm'),
+      source: '',
+      bookingRef: '',
+      notes: '',
     })
   }
 

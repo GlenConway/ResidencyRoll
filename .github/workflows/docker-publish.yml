@@ -85,6 +85,7 @@ jobs:
           file: ${{ matrix.service.file }}
           build-args: |
             VERSION=${{ steps.version.outputs.VERSION }}
+            SOURCE_REVISION=${{ github.sha }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

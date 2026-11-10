@@ -10,13 +10,18 @@ public class AirportCatalogTests
     [Fact]
     public void All_ShouldLoadTheSharedCatalogue()
     {
-        Assert.Equal(109, _catalog.All.Count);
+        Assert.True(_catalog.All.Count > 5000);
     }
 
     [Fact]
     public void FindByIataCode_ShouldIgnoreCase()
     {
         Assert.Equal("Toronto", _catalog.FindByIataCode("yyz")?.City);
+        Assert.Equal("Gold Coast", _catalog.FindByIataCode("OOL")?.City);
+        Assert.Equal("Australia/Brisbane", _catalog.FindByIataCode("ool")?.IanaTimezone);
+        Assert.Equal("Canberra", _catalog.FindByIataCode("CBR")?.City);
+        Assert.Equal("Casablanca", _catalog.FindByIataCode("CMN")?.City);
+        Assert.Equal("Morocco", _catalog.FindByIataCode("CMN")?.Country);
         Assert.Null(_catalog.FindByIataCode("NOPE"));
     }
 

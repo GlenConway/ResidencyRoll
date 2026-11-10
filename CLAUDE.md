@@ -13,7 +13,7 @@ src/
 ├── ResidencyRoll.Api/      ASP.NET Core Web API: EF Core + SQLite, residency engine, itinerary parsing
 │   ├── Controllers/        TripsController (/api/v1/trips), SystemController (/api/v1/system/info)
 │   ├── Mcp/                Streamable HTTP MCP server at /mcp (tools, OAuth metadata, guards)
-│   ├── Services/           TripService, ResidencyCalculationService, ResidencyQueryService, AirportCatalog, ItineraryParsingService
+│   ├── Services/           TripService, ResidencyCalculationService, ResidencyQueryService, AirportCatalog, ItineraryParsingService, TripCsv, TripReconciler
 │   ├── Models/             Trip, DailyPresence, CountryResidencyRule, ResidencyRuleType
 │   ├── Configuration/      OpenAIOptions, ConfigureSwaggerOptions
 │   └── Migrations/         EF Core migrations
@@ -55,7 +55,8 @@ Local settings: copy `appsettings.Development.json.example` to `appsettings.Deve
 - **Itinerary parsing:** Semantic Kernel with OpenAI, configured through `OpenAIOptions`. Optional feature.
 - **Home country** is stored on the traveller and drives days left/over and timeline emphasis. `GET` and `PUT /api/v1/profile/home-country` still read and write the signed-in person's traveller. The React app mirrors the selected traveller's home country in localStorage. MCP tools use that traveller's saved value when `homeCountry` is omitted; `get_home_country` and `set_home_country` read and change it. `UserProfiles` remains so existing databases can be copied forward, and new writes do not use it.
 - **Travellers:** one account owns many travellers. The signed-in person is the traveller whose `LinkedUserId` equals their user id. `TravellerAccess` is the only place that decides who can see a traveller and the only place that filters trips by `UserId` (legacy rows whose `TravellerId` is still 0). The UI remembers the current traveller in `localStorage` (`residencyroll_traveller_id`). See [ADR-020](docs/adr/ADR-020-travellers-on-an-account.md) and `docs/guides/TRAVELLERS.md`.
-- **MCP:** the API hosts a stateless Streamable HTTP server at `/mcp` (`ModelContextProtocol.AspNetCore` 2.4.0). The Web host proxies it without attaching the cookie token and without a CSRF check. With JWT off, `/mcp` runs as the local user. With JWT on, clients use OAuth 2.1 (Auth0) and the `read:trips` / `write:trips` scopes. Trip, residency, forecast, presence, and home-country tools take an optional `traveller` (id or name); omit it for the signed-in person. See `docs/guides/MCP_SETUP.md` and ADR-016. Personal access tokens (M10.8) are not implemented.
+- **MCP:** the API hosts a stateless Streamable HTTP server at `/mcp` (`ModelContextProtocol.AspNetCore` 2.4.0). The Web host proxies it without attaching the cookie token and without a CSRF check. With JWT off, `/mcp` runs as the local user. With JWT on, clients use OAuth 2.1 (Auth0) and the `read:trips` / `write:trips` scopes. Trip, residency, forecast, presence, and home-country tools take an optional `traveller` (id or name); omit it for the signed-in person. `get_server_info` returns the release and git commit. Batch writes validate every leg first. See `docs/guides/MCP_SETUP.md`, ADR-016, and ADR-021. Personal access tokens (M10.8) are not implemented.
+- **Airports:** `ResidencyRoll.Shared/Airports/airports.json` is the OurAirports IATA set. Each code has an IANA timezone. The React app and `AirportCatalog` use the same file.
 - **Reverse proxy:** `UseConfiguredForwardedHeaders()` (Shared) is used by both hosts.
 
 ## Conventions

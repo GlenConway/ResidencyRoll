@@ -65,6 +65,9 @@ public class McpTrip
 
     public string ArrivalTimezone { get; set; } = string.Empty;
     public string? ArrivalIataCode { get; set; }
+    public string? Source { get; set; }
+    public string? BookingRef { get; set; }
+    public string? Notes { get; set; }
     public string CountryName { get; set; } = string.Empty;
 
     public int DurationDays { get; set; }
@@ -91,6 +94,9 @@ public class McpTrip
             ArrivalDateTime = McpTime.Format(dto.ArrivalDateTime),
             ArrivalTimezone = dto.ArrivalTimezone,
             ArrivalIataCode = dto.ArrivalIataCode,
+            Source = dto.Source,
+            BookingRef = dto.BookingRef,
+            Notes = dto.Notes,
             CountryName = dto.CountryName,
             DurationDays = dto.DurationDays,
             DurationMinutes = minutes,

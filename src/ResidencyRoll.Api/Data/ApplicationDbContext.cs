@@ -24,6 +24,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.UserId).IsRequired().HasMaxLength(256);
             entity.Property(e => e.CreatedByUserId).HasMaxLength(256);
             entity.Property(e => e.UpdatedByUserId).HasMaxLength(256);
+            entity.Property(e => e.Source).HasMaxLength(Trip.MaxSourceLength);
+            entity.Property(e => e.BookingRef).HasMaxLength(Trip.MaxBookingRefLength);
+            entity.Property(e => e.Notes).HasMaxLength(Trip.MaxNotesLength);
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.TravellerId, e.DepartureDateTime });
             entity.HasOne(e => e.Traveller)

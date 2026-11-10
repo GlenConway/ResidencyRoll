@@ -236,17 +236,35 @@ public class TravellerBackfillTests
         db.ChangeTracker.Clear();
 
         var residency = new ResidencyCalculationService();
+        var loaded = db.Trips
+            .Select(trip => new Trip
+            {
+                Id = trip.Id,
+                UserId = trip.UserId,
+                TravellerId = trip.TravellerId,
+                DepartureCountry = trip.DepartureCountry,
+                DepartureCity = trip.DepartureCity,
+                DepartureDateTime = trip.DepartureDateTime,
+                DepartureTimezone = trip.DepartureTimezone,
+                DepartureIataCode = trip.DepartureIataCode,
+                ArrivalCountry = trip.ArrivalCountry,
+                ArrivalCity = trip.ArrivalCity,
+                ArrivalDateTime = trip.ArrivalDateTime,
+                ArrivalTimezone = trip.ArrivalTimezone,
+                ArrivalIataCode = trip.ArrivalIataCode
+            })
+            .ToList();
         var days = new Dictionary<string, int>();
         foreach (var userId in new[] { "glen", "sam" })
         {
-            var trips = db.Trips.Where(trip => trip.UserId == userId).ToList();
+            var trips = loaded.Where(trip => trip.UserId == userId).ToList();
             days[userId] = residency.CalculateResidencyDays(residency.GenerateDailyPresenceLog(trips)).Values.Sum();
         }
 
         var snapshot = new BackfillSnapshot(
             days,
             db.Travellers.OrderBy(traveller => traveller.OwnerUserId).Select(traveller => traveller.Id).ToList(),
-            db.Trips.OrderBy(trip => trip.Id).ToDictionary(trip => trip.Id, trip => trip.TravellerId),
+            loaded.OrderBy(trip => trip.Id).ToDictionary(trip => trip.Id, trip => trip.TravellerId),
             db.Travellers.Select(traveller => traveller.HomeCountry ?? string.Empty).ToList());
 
         db.Database.Migrate();

@@ -94,11 +94,13 @@ Read tools report trips, days per country, the residency summary, daily presence
 
 `parse_itinerary` is listed only when an OpenAI model, endpoint, and API key are all set. It returns a draft and saves nothing. `lookup_airport` searches the shared airport list.
 
-`create_trip`, `create_trips`, `update_trip`, `delete_trip`, and `set_home_country` change saved data and require `write:trips`. `create_trips` saves every leg or none. `update_trip` changes only the fields you send. A saved leg that looks wrong comes back in `warnings` and is also listed by `find_suspect_trips`; the save still happens. `impact` is the change in each country's day count for the rolling 365 days and for each calendar year touched. Confirm with the user before a write. The server does not treat that confirmation as a security check.
+`create_trip`, `create_trips`, `update_trip`, `delete_trip`, `delete_trips`, `replace_trips`, `import_trips_csv`, and `set_home_country` change saved data and require `write:trips`. `create_trips`, `replace_trips`, and `import_trips_csv` check every leg before saving. A bad airport or a bad row saves nothing, and every problem comes back in one response. The default write result is the new ids, a short summary, and any warnings. Pass `detail` `full` when you need the legs themselves. `onConflict` is `save` (keep the leg and warn), `reject` (save nothing), or `skip` (leave the overlapping legs out). `delete_trips` and `replace_trips` each run in one transaction. `update_trip` changes only the fields you send. A saved leg that looks wrong comes back in `warnings` and is also listed by `find_suspect_trips`. `impact` on a single create, update, or delete is the change in each country's day count. Confirm with the user before a write. The server does not treat that confirmation as a security check.
+
+`export_trips` returns CSV in the same columns as the web export, and a compact list. `reconcile_trips` compares a set of legs with what is saved and changes nothing. `get_server_info` returns the release, the git commit, and how many airports are loaded, so a client can see which build it is talking to. Optional `source`, `bookingRef`, and `notes` on a leg record where it came from.
 
 `get_record_coverage` reports the first and last saved dates. `get_residency_summary` sets `isComplete` false when a window starts before the first saved date or ends after the last one, and `coverageStart` / `coverageEnd` are the part of the window the records cover. Days outside that span are not counted. When Canada is the home country, the summary also reports progress toward 183 days in the calendar year. That is the Nova Scotia MSI test, counted as days in Canada because the log does not record the province.
 
-CSV import, backups, and system administration are not exposed.
+`import_trips_csv` accepts the same CSV as the web trip export. Backups and system administration are not exposed.
 
 ## Settings
 
@@ -111,7 +113,7 @@ Empty values count as unset.
 | `Mcp:Audience` | `MCP_AUDIENCE` | `Mcp:ResourceUrl` when that is set, otherwise only `Jwt:Audience` |
 | `Mcp:AllowedOrigins:N` | `MCP_ALLOWED_ORIGIN_0`, `MCP_ALLOWED_ORIGIN_1`, … | none beyond `Cors:AllowedOrigins` |
 
-`/mcp` allows a missing `Origin` (CLI and desktop clients). A browser `Origin` must be in `Cors:AllowedOrigins` or `Mcp:AllowedOrigins`. The endpoint is limited to 120 calls a minute per user, and `parse_itinerary` is limited further. Request bodies over 64 KB are rejected.
+`/mcp` allows a missing `Origin` (CLI and desktop clients). A browser `Origin` must be in `Cors:AllowedOrigins` or `Mcp:AllowedOrigins`. The endpoint is limited to 120 calls a minute per user, and `parse_itinerary` is limited further. Request bodies over 1 MB are rejected.
 
 ## Reverse proxies
 
