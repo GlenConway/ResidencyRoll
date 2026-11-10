@@ -72,24 +72,13 @@ test('a second traveller keeps a separate day count', async ({ page }) => {
   await expect(page.getByRole('list').getByText('Sam', { exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: 'Manage Trips' }).click()
-  await page.getByRole('button', { name: 'Add Trip' }).first().click()
-  await selectAirport(page, 'Departure Airport', 'YHZ')
-  await selectAirport(page, 'Arrival Airport', 'LHR')
-  await page.getByLabel('Departure Date').fill('2026-01-02')
-  await page.getByLabel('Arrival Date').fill('2026-01-20')
-  await page.getByRole('checkbox', { name: 'Sam' }).check()
-  await page.getByRole('button', { name: 'Save Trip' }).click()
-  await expect(page.getByText('LHR - London')).toBeVisible()
+  await saveTrip(page, 'YHZ', 'LHR', '2026-06-01', '2026-06-01', 'Sam')
+  await saveTrip(page, 'LHR', 'YHZ', '2026-06-10', '2026-06-10', 'Sam')
 
   await page.getByLabel('Traveller').selectOption('Sam')
-  await expect(page.getByText('LHR - London')).toBeVisible()
-  await page.getByRole('button', { name: 'Add Trip' }).first().click()
-  await selectAirport(page, 'Departure Airport', 'YUL')
-  await selectAirport(page, 'Arrival Airport', 'CDG')
-  await page.getByLabel('Departure Date').fill('2026-02-01')
-  await page.getByLabel('Arrival Date').fill('2026-02-10')
-  await page.getByRole('button', { name: 'Save Trip' }).click()
-  await expect(page.getByText('CDG - Paris')).toBeVisible()
+  await expect(page.getByText('LHR - London').first()).toBeVisible()
+  await saveTrip(page, 'YUL', 'CDG', '2026-07-01', '2026-07-01')
+  await saveTrip(page, 'CDG', 'YUL', '2026-07-10', '2026-07-10')
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'France' })).toBeVisible()
@@ -98,19 +87,41 @@ test('a second traveller keeps a separate day count', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'France' })).toHaveCount(0)
 
   await page.goto('/manage-trips')
-  await page.getByRole('button', { name: 'Delete' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+  await deleteTrips(page, 2)
   await page.getByLabel('Traveller').selectOption('Sam')
-  await deleteFirstTrip(page)
-  await deleteFirstTrip(page)
+  await deleteTrips(page, 4)
   await page.goto('/travellers')
   await page.getByRole('button', { name: 'Delete' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
 })
 
-async function deleteFirstTrip(page: import('@playwright/test').Page) {
-  await page.getByRole('button', { name: 'Delete' }).first().click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+async function saveTrip(
+  page: import('@playwright/test').Page,
+  from: string,
+  to: string,
+  departure: string,
+  arrival: string,
+  alsoFor?: string,
+) {
+  await page.getByRole('button', { name: 'Add Trip' }).first().click()
+  await selectAirport(page, 'Departure Airport', from)
+  await selectAirport(page, 'Arrival Airport', to)
+  await page.getByLabel('Departure Date').fill(departure)
+  await page.getByLabel('Arrival Date').fill(arrival)
+  if (alsoFor) {
+    await page.getByRole('checkbox', { name: alsoFor }).check()
+  }
+  await page.getByRole('button', { name: 'Save Trip' }).click()
+  await expect(page.getByText(`${to} -`).first()).toBeVisible()
+}
+
+async function deleteTrips(page: import('@playwright/test').Page, count: number) {
+  for (let remaining = count; remaining > 0; remaining -= 1) {
+    await page.getByRole('button', { name: 'Delete' }).first().click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Delete' }).click({ force: true })
+    await expect(dialog).toBeHidden()
+  }
 }
 
 async function selectAirport(page: import('@playwright/test').Page, label: string, code: string) {
