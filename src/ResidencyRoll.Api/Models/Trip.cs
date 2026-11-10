@@ -4,6 +4,10 @@ public class Trip
 {
     public int Id { get; set; }
     public string UserId { get; set; } = string.Empty;
+    public int TravellerId { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public Traveller? Traveller { get; set; }
     
     // Departure information (departure leg)
     public string DepartureCountry { get; set; } = string.Empty;

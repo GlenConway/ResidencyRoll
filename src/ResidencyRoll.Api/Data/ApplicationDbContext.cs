@@ -12,6 +12,7 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<Traveller> Travellers => Set<Traveller>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,7 +22,26 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.UserId).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.CreatedByUserId).HasMaxLength(256);
+            entity.Property(e => e.UpdatedByUserId).HasMaxLength(256);
             entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => new { e.TravellerId, e.DepartureDateTime });
+            entity.HasOne(e => e.Traveller)
+                .WithMany()
+                .HasForeignKey(e => e.TravellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Traveller>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.OwnerUserId).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(Traveller.MaxNameLength);
+            entity.Property(e => e.HomeCountry).HasMaxLength(Traveller.MaxHomeCountryLength);
+            entity.Property(e => e.LinkedUserId).HasMaxLength(256);
+            entity.HasIndex(e => e.OwnerUserId);
+            entity.HasIndex(e => e.LinkedUserId).IsUnique();
+            entity.HasIndex(e => new { e.OwnerUserId, e.Name }).IsUnique();
         });
 
         modelBuilder.Entity<UserProfile>(entity =>

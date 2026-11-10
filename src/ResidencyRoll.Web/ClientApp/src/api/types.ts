@@ -93,6 +93,13 @@ export interface McpInfo {
   url: string
 }
 
+export interface Traveller {
+  id: number
+  name: string
+  homeCountry: string | null
+  isSelf: boolean
+}
+
 export interface CurrentUser {
   name: string
   email: string

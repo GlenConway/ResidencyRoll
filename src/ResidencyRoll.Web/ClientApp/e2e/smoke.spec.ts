@@ -32,6 +32,9 @@ test('signed-out local mode renders every route', async ({ page }) => {
   await page.getByRole('link', { name: 'Forecast' }).click()
   await expect(page.getByRole('heading', { name: 'Trip Forecast' })).toBeVisible()
 
+  await page.getByRole('link', { name: 'Travellers' }).click()
+  await expect(page.getByRole('heading', { name: 'Travellers' })).toBeVisible()
+
   await page.getByRole('link', { name: 'System Info' }).click()
   await expect(page.getByRole('heading', { name: 'System Info' })).toBeVisible()
 
@@ -60,6 +63,51 @@ test('a trip can be created, exported, forecast, and deleted', async ({ page }) 
   await selectAirport(page, 'Arrival Airport', 'LHR')
   await page.getByRole('button', { name: 'Calculate Forecast' }).click()
   await expect(page.getByRole('heading', { name: 'Current (Last 365 Days)' })).toBeVisible()
+})
+
+test('a second traveller keeps a separate day count', async ({ page }) => {
+  await page.goto('/travellers')
+  await page.getByLabel('Name').fill('Sam')
+  await page.getByRole('button', { name: 'Add traveller' }).click()
+  await expect(page.getByText('Sam', { exact: true })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Manage Trips' }).click()
+  await page.getByRole('button', { name: 'Add Trip' }).first().click()
+  await selectAirport(page, 'Departure Airport', 'YHZ')
+  await selectAirport(page, 'Arrival Airport', 'LHR')
+  await page.getByLabel('Departure Date').fill('2026-01-02')
+  await page.getByLabel('Arrival Date').fill('2026-01-20')
+  await page.getByRole('checkbox', { name: 'Sam' }).check()
+  await page.getByRole('button', { name: 'Save Trip' }).click()
+  await expect(page.getByText('LHR - London')).toBeVisible()
+
+  await page.getByLabel('Traveller').selectOption('Sam')
+  await expect(page.getByText('LHR - London')).toBeVisible()
+  await page.getByRole('button', { name: 'Add Trip' }).first().click()
+  await selectAirport(page, 'Departure Airport', 'YUL')
+  await selectAirport(page, 'Arrival Airport', 'CDG')
+  await page.getByLabel('Departure Date').fill('2026-02-01')
+  await page.getByLabel('Arrival Date').fill('2026-02-10')
+  await page.getByRole('button', { name: 'Save Trip' }).click()
+  await expect(page.getByText('CDG - Paris')).toBeVisible()
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'France' })).toBeVisible()
+  await page.getByLabel('Traveller').selectOption({ index: 0 })
+  await expect(page.getByRole('heading', { name: 'United Kingdom' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'France' })).toHaveCount(0)
+
+  await page.goto('/manage-trips')
+  await page.getByRole('button', { name: 'Delete' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+  await page.getByLabel('Traveller').selectOption('Sam')
+  for (const _ of [0, 1]) {
+    await page.getByRole('button', { name: 'Delete' }).first().click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+  }
+  await page.goto('/travellers')
+  await page.getByRole('button', { name: 'Delete' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
 })
 
 async function selectAirport(page: import('@playwright/test').Page, label: string, code: string) {

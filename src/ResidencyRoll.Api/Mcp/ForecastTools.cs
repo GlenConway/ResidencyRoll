@@ -19,20 +19,22 @@ public sealed class ForecastTools
     public static async Task<CallToolResult> ForecastTrips(
         ResidencyQueryService query,
         ResidencyCalculationService rules,
-        UserProfileService profiles,
         AirportCatalog airports,
+        TravellerService travellerService,
         ClaimsPrincipal user,
         [Description("Hypothetical flight legs, in order.")] List<McpTripLeg> trips,
         [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null,
         [Description("Country name. Optional. Returns only this country, plus rollingAroundPeak.")] string? country = null,
-        [Description("Extend the scenario through this date, yyyy-MM-dd. Optional. Includes saved trips after the last hypothetical leg.")] string? through = null)
+        [Description("Extend the scenario through this date, yyyy-MM-dd. Optional. Includes saved trips after the last hypothetical leg.")] string? through = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
-        var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
+        var person = await McpTravellers.Resolve(travellerService, user, traveller);
+        var userId = person.OwnerUserId;
+        var home = SavedHomeCountry.Resolve(person, homeCountry);
         var legs = (trips ?? []).Select(leg => TripLegResolver.Resolve(leg, userId, airports)).ToList();
         DateOnly? throughDate = string.IsNullOrWhiteSpace(through) ? null : TripLegResolver.ParseDate(through, "through");
-        var forecast = await query.ForecastBreakdownAsync(userId, legs, throughDate);
+        var forecast = await query.ForecastBreakdownAsync(userId, legs, throughDate, person);
         var today = DateOnly.FromDateTime(DateTime.Today);
         var current = forecast.Current
             .Select(pair => ToStatus(pair.Key, pair.Value, rules, home, today))
@@ -62,14 +64,14 @@ public sealed class ForecastTools
             HomeCountry = home,
             DaysAwayCurrent = awayCurrent,
             DaysAwayForecast = awayForecast,
-            RollingAroundPeak = await RollingAroundPeak(query, userId, legs, country, forecastRows)
+            RollingAroundPeak = await RollingAroundPeak(query, userId, legs, country, forecastRows, person)
         };
         var text = $"Forecast window {forecast.WindowStart:yyyy-MM-dd} to {forecast.WindowEnd:yyyy-MM-dd}. "
             + SummarizeCurrent(current) + " " + SummarizeForecast(forecastRows);
         text += home is null
             ? " No home country is saved, so days away from home are not calculated. Ask the user, then call set_home_country."
             : $" Days away from {home} at the end of each window: current {awayCurrent}, forecast {awayForecast}.";
-        return McpResults.Ok(text, result);
+        return McpResults.For(person, text, result);
     }
 
     [McpServerTool(Name = "max_trip_end_date", Title = "Latest trip end under the day limit", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpMaxEndDate))]
@@ -77,6 +79,7 @@ public sealed class ForecastTools
     public static async Task<CallToolResult> MaxTripEndDate(
         ResidencyQueryService query,
         AirportCatalog airports,
+        TravellerService travellerService,
         ClaimsPrincipal user,
         [Description("Local arrival date-time in the destination, yyyy-MM-ddTHH:mm.")] string tripStart,
         [Description("Day limit for the arrival country. Defaults to 183. Reaching the limit counts as residency.")] int dayLimit = 183,
@@ -88,15 +91,18 @@ public sealed class ForecastTools
         string? arrivalIataCode = null,
         string? arrivalCity = null,
         string? arrivalCountry = null,
-        string? arrivalTimezone = null)
+        string? arrivalTimezone = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
+        var person = await McpTravellers.Resolve(travellerService, user, traveller);
+        var userId = person.OwnerUserId;
         var request = StayRequest(airports, tripStart, dayLimit, departureIataCode, departureCity, departureCountry, departureTimezone, arrivalIataCode, arrivalCity, arrivalCountry, arrivalTimezone);
         var extra = ResolveLegs(trips, userId, airports);
-        var result = await query.CalculateMaxEndDateAsync(userId, request, extra);
+        var result = await query.CalculateMaxEndDateAsync(userId, request, extra, person);
         var payload = McpMaxEndDate.From(result);
-        return McpResults.Ok(
+        return McpResults.For(
+            person,
             $"Last midnight still in {request.ArrivalCountry} is {payload.MaxEndDate:yyyy-MM-dd} ({payload.RuleType}), with a peak of {payload.DaysAtLimit} days in the window {payload.WindowStart:yyyy-MM-dd} to {payload.WindowEnd:yyyy-MM-dd}, against a limit of {request.DayLimit}.",
             payload);
     }
@@ -106,6 +112,7 @@ public sealed class ForecastTools
     public static async Task<CallToolResult> StandardDurationForecasts(
         ResidencyQueryService query,
         AirportCatalog airports,
+        TravellerService travellerService,
         ClaimsPrincipal user,
         [Description("Local arrival date-time in the destination, yyyy-MM-ddTHH:mm.")] string tripStart,
         [Description("Day limit for the arrival country. Defaults to 183. Reaching the limit counts as residency.")] int dayLimit = 183,
@@ -118,10 +125,12 @@ public sealed class ForecastTools
         string? arrivalIataCode = null,
         string? arrivalCity = null,
         string? arrivalCountry = null,
-        string? arrivalTimezone = null)
+        string? arrivalTimezone = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
+        var person = await McpTravellers.Resolve(travellerService, user, traveller);
+        var userId = person.OwnerUserId;
         var stay = StayRequest(airports, tripStart, dayLimit, departureIataCode, departureCity, departureCountry, departureTimezone, arrivalIataCode, arrivalCity, arrivalCountry, arrivalTimezone);
         var extra = ResolveLegs(trips, userId, airports);
         var request = new StandardDurationForecastRequestDto
@@ -138,11 +147,11 @@ public sealed class ForecastTools
             DayLimit = stay.DayLimit,
             Durations = durations
         };
-        var rows = (await query.GetStandardDurationForecastsAsync(userId, request, extra))
+        var rows = (await query.GetStandardDurationForecastsAsync(userId, request, extra, person))
             .Select(McpDurationForecast.From)
             .ToList();
         var text = string.Join(" ", rows.Select(row => $"{row.DurationDays} days ends {row.EndDate} with {row.TotalDaysInCountry} in {stay.ArrivalCountry}{(row.ExceedsLimit ? " (over the limit)" : "")}."));
-        return McpResults.Ok(text, rows);
+        return McpResults.For(person, text, rows);
     }
 
     [McpServerTool(Name = "lookup_airport", Title = "Look up an airport", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(AirportMatch[]))]
@@ -179,6 +188,7 @@ public sealed class ForecastTools
     public static async Task<CallToolResult> MaxTripStartDate(
         ResidencyQueryService query,
         AirportCatalog airports,
+        TravellerService travellerService,
         ClaimsPrincipal user,
         [Description("Local departure date-time from the destination, yyyy-MM-ddTHH:mm.")] string tripEnd,
         [Description("Day limit for the arrival country. Defaults to 183. Reaching the limit counts as residency.")] int dayLimit = 183,
@@ -190,13 +200,15 @@ public sealed class ForecastTools
         string? arrivalIataCode = null,
         string? arrivalCity = null,
         string? arrivalCountry = null,
-        string? arrivalTimezone = null)
+        string? arrivalTimezone = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
+        var person = await McpTravellers.Resolve(travellerService, user, traveller);
+        var userId = person.OwnerUserId;
         var request = StayRequest(airports, tripEnd, dayLimit, departureIataCode, departureCity, departureCountry, departureTimezone, arrivalIataCode, arrivalCity, arrivalCountry, arrivalTimezone);
         var departure = TripLegResolver.ParseLocal(tripEnd, "tripEnd");
-        var result = await query.CalculateEarliestArrivalAsync(userId, request, departure, ResolveLegs(trips, userId, airports));
+        var result = await query.CalculateEarliestArrivalAsync(userId, request, departure, ResolveLegs(trips, userId, airports), person);
         var payload = new McpEarliestArrival
         {
             EarliestArrival = DateOnly.FromDateTime(result.Arrival),
@@ -206,7 +218,8 @@ public sealed class ForecastTools
             WindowType = result.WindowType,
             DaysAtLimit = result.DaysAtLimit
         };
-        return McpResults.Ok(
+        return McpResults.For(
+            person,
             $"Earliest arrival in {request.ArrivalCountry} before leaving on {departure:yyyy-MM-dd} is {payload.EarliestArrival:yyyy-MM-dd} ({payload.RuleType}, {payload.WindowType}), with {payload.DaysAtLimit} days against a limit of {request.DayLimit}.",
             payload);
     }
@@ -215,14 +228,17 @@ public sealed class ForecastTools
     [Description("Arrival and departure dates that add the most days in a country while the country's count stays at or under dayLimit. It fills the earliest open days, then later days once earlier ones roll out of a rolling window. departure is the last midnight you are still there. blackoutRanges are dates you must be elsewhere, such as Christmas at home. Saved trips are included. Reaching dayLimit counts as residency, so pass 182 to stay short of a 183-day test. " + Semantics)]
     public static async Task<CallToolResult> PlanMaxPresence(
         ResidencyQueryService query,
+        TravellerService travellerService,
         ClaimsPrincipal user,
         [Description("Country to maximize.")] string country,
         [Description("First date you could be there, yyyy-MM-dd.")] string from,
         [Description("Last date you could be there, yyyy-MM-dd.")] string to,
         [Description("Dates you cannot be in the country. Optional.")] List<DateSpan>? blackoutRanges = null,
-        [Description("Maximum days in the country's window. Defaults to 183.")] int dayLimit = 183)
+        [Description("Maximum days in the country's window. Defaults to 183.")] int dayLimit = 183,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
+        var person = await McpTravellers.Resolve(travellerService, user, traveller);
         if (string.IsNullOrWhiteSpace(country))
         {
             throw new McpException("country is required.");
@@ -238,7 +254,7 @@ public sealed class ForecastTools
         var blackouts = (blackoutRanges ?? [])
             .Select(range => (TripLegResolver.ParseDate(range.From, "blackout from"), TripLegResolver.ParseDate(range.To, "blackout to")))
             .ToList();
-        var plan = await query.PlanMaxPresenceAsync(McpScopes.UserId(user), country.Trim(), start, end, blackouts, dayLimit);
+        var plan = await query.PlanMaxPresenceAsync(person.OwnerUserId, country.Trim(), start, end, blackouts, dayLimit, person);
         var payload = new PresencePlanResult
         {
             Country = plan.Country,
@@ -255,7 +271,8 @@ public sealed class ForecastTools
         var stays = payload.Stays.Count == 0
             ? "no stays"
             : string.Join("; ", payload.Stays.Select(stay => $"{stay.Arrival:yyyy-MM-dd} to {stay.Departure:yyyy-MM-dd} ({stay.Days} days)"));
-        return McpResults.Ok(
+        return McpResults.For(
+            person,
             $"{payload.PlannedDays} planned days in {payload.Country}, peak {payload.PeakDays} against a limit of {payload.DayLimit}. {stays}.",
             payload);
     }
@@ -298,7 +315,8 @@ public sealed class ForecastTools
         string userId,
         List<Trip> legs,
         string? country,
-        IReadOnlyList<McpForecastCountry> forecastRows)
+        IReadOnlyList<McpForecastCountry> forecastRows,
+        Traveller person)
     {
         if (string.IsNullOrWhiteSpace(country))
         {
@@ -313,7 +331,7 @@ public sealed class ForecastTools
 
         var from = match.PeakDate.AddDays(-7);
         var to = match.PeakDate.AddDays(7);
-        var rows = await query.GetRollingCountAsync(userId, country.Trim(), from, to, legs);
+        var rows = await query.GetRollingCountAsync(userId, country.Trim(), from, to, legs, person);
         return rows.Select(RollingCountPoint.From).ToList();
     }
 
@@ -423,6 +441,8 @@ public sealed class ForecastTools
 
 public sealed class ForecastToolResult
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     [Description("First day of the rolling forecast window, yyyy-MM-dd.")]
     public DateOnly WindowStart { get; set; }
 
@@ -441,6 +461,8 @@ public sealed class ForecastToolResult
 
 public sealed class McpEarliestArrival
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     [Description("Earliest day you can arrive and still be at or under the limit when you leave on the fixed date, yyyy-MM-dd.")]
     public DateOnly EarliestArrival { get; set; }
 
@@ -462,6 +484,8 @@ public sealed class DateSpan
 
 public sealed class PresencePlanResult
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public string Country { get; set; } = string.Empty;
     public int DayLimit { get; set; }
     public int PlannedDays { get; set; }

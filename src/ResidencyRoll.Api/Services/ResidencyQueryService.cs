@@ -19,14 +19,14 @@ public class ResidencyQueryService
         _residency = residency;
     }
 
-    public async Task<ForecastResponseDto> ForecastAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null)
+    public async Task<ForecastResponseDto> ForecastAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null, Traveller? traveller = null)
     {
         Dictionary<string, int> current;
         Dictionary<string, int> forecast;
 
         if (hypotheticalTrips.Count > 0)
         {
-            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList(), through);
+            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList(), through, traveller);
         }
         else
         {
@@ -41,9 +41,9 @@ public class ResidencyQueryService
         };
     }
 
-    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null)
+    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null, Traveller? traveller = null)
     {
-        var basic = await ForecastAsync(userId, hypotheticalTrips, through);
+        var basic = await ForecastAsync(userId, hypotheticalTrips, through, traveller);
         var current = basic.Current.ToDictionary(row => row.CountryName, row => row.Days);
         var forecast = basic.Forecast.ToDictionary(row => row.CountryName, row => row.Days);
         if (hypotheticalTrips.Count == 0)
@@ -53,7 +53,7 @@ public class ResidencyQueryService
         }
 
         var window = _trips.ScenarioWindow(hypotheticalTrips, through);
-        var existing = await _trips.GetAllTripsAsync(userId);
+        var existing = await _trips.GetAllTripsAsync(userId, traveller);
         var combined = new List<Trip>(existing);
         combined.AddRange(hypotheticalTrips);
         var presence = _residency.GenerateDailyPresenceLog(combined);
@@ -69,9 +69,9 @@ public class ResidencyQueryService
         return new ForecastBreakdown(window.Start, window.End, current, forecast, peaks);
     }
 
-    public async Task<List<DailyPresenceDto>> GetDailyPresenceAsync(string userId, DateOnly? startDate, DateOnly? endDate)
+    public async Task<List<DailyPresenceDto>> GetDailyPresenceAsync(string userId, DateOnly? startDate, DateOnly? endDate, Traveller? traveller = null)
     {
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         var dailyPresence = _residency.GenerateDailyPresenceLog(trips);
 
         var filteredPresence = dailyPresence.AsEnumerable();
@@ -97,9 +97,9 @@ public class ResidencyQueryService
             .ToList();
     }
 
-    public async Task<List<ResidencySummaryDto>> GetResidencySummaryAsync(string userId, DateOnly? startDate, DateOnly? endDate)
+    public async Task<List<ResidencySummaryDto>> GetResidencySummaryAsync(string userId, DateOnly? startDate, DateOnly? endDate, Traveller? traveller = null)
     {
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         var dailyPresence = _residency.GenerateDailyPresenceLog(trips);
         if (startDate.HasValue)
         {
@@ -129,9 +129,9 @@ public class ResidencyQueryService
         return summary.OrderByDescending(row => row.TotalDays).ToList();
     }
 
-    public async Task<RecordCoverage> GetRecordCoverageAsync(string userId)
+    public async Task<RecordCoverage> GetRecordCoverageAsync(string userId, Traveller? traveller = null)
     {
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         DateOnly? first = null;
         DateOnly? last = null;
         foreach (var trip in trips)
@@ -156,7 +156,7 @@ public class ResidencyQueryService
         }
     }
 
-    public async Task<MinimumPresence?> MeasureMinimumPresenceAsync(string userId, string country, DateOnly referenceEnd)
+    public async Task<MinimumPresence?> MeasureMinimumPresenceAsync(string userId, string country, DateOnly referenceEnd, Traveller? traveller = null)
     {
         var rule = _residency.GetCountryRule(country);
         if (rule.MinimumPresenceDays is not int minimum || rule.MinimumWindowType is not CountingWindowType windowType)
@@ -170,7 +170,7 @@ public class ResidencyQueryService
             TaxYearStartMonth = rule.TaxYearStartMonth,
             TaxYearStartDay = rule.TaxYearStartDay
         }, referenceEnd);
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         var presence = _residency.GenerateDailyPresenceLog(trips);
         var days = CountCountry(_residency.CalculateResidencyDays(presence, period.Start, period.End), rule.CountryName);
         var shortfall = Math.Max(0, minimum - days);
@@ -207,10 +207,11 @@ public class ResidencyQueryService
     public async Task<MaxTripEndDateResponseDto> CalculateMaxEndDateAsync(
         string userId,
         MaxTripEndDateRequestDto request,
-        IReadOnlyList<Trip>? additionalTrips = null)
+        IReadOnlyList<Trip>? additionalTrips = null,
+        Traveller? traveller = null)
     {
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
-        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
         if (additionalTrips is { Count: > 0 })
         {
             existing.AddRange(additionalTrips);
@@ -257,10 +258,11 @@ public class ResidencyQueryService
         string userId,
         MaxTripEndDateRequestDto request,
         DateTime departure,
-        IReadOnlyList<Trip>? additionalTrips = null)
+        IReadOnlyList<Trip>? additionalTrips = null,
+        Traveller? traveller = null)
     {
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
-        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
         if (additionalTrips is { Count: > 0 })
         {
             existing.AddRange(additionalTrips);
@@ -326,15 +328,15 @@ public class ResidencyQueryService
         return new StayMeasure(peakDays, endDays, window.Start, window.End);
     }
 
-    public async Task<LocationOnDate> GetLocationOnAsync(string userId, DateOnly day)
+    public async Task<LocationOnDate> GetLocationOnAsync(string userId, DateOnly day, Traveller? traveller = null)
     {
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         return LocationFrom(trips, day);
     }
 
-    public async Task<CurrentLocation> GetCurrentLocationAsync(string userId)
+    public async Task<CurrentLocation> GetCurrentLocationAsync(string userId, Traveller? traveller = null)
     {
-        var trips = await _trips.GetAllTripsAsync(userId);
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
         var now = DateTime.UtcNow;
         Trip? lastArrival = null;
         var lastArrivalUtc = DateTime.MinValue;
@@ -380,11 +382,12 @@ public class ResidencyQueryService
     public async Task<List<StandardDurationForecastItemDto>> GetStandardDurationForecastsAsync(
         string userId,
         StandardDurationForecastRequestDto request,
-        IReadOnlyList<Trip>? additionalTrips = null)
+        IReadOnlyList<Trip>? additionalTrips = null,
+        Traveller? traveller = null)
     {
         var limit = request.DayLimit <= 0 ? 183 : request.DayLimit;
         var durations = request.Durations is { Length: > 0 } ? request.Durations : DefaultDurations;
-        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        var existing = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
         if (additionalTrips is { Count: > 0 })
         {
             existing.AddRange(additionalTrips);
@@ -426,9 +429,10 @@ public class ResidencyQueryService
         string country,
         DateOnly from,
         DateOnly to,
-        IReadOnlyList<Trip>? additionalTrips = null)
+        IReadOnlyList<Trip>? additionalTrips = null,
+        Traveller? traveller = null)
     {
-        var trips = new List<Trip>(await _trips.GetAllTripsAsync(userId));
+        var trips = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
         if (additionalTrips is { Count: > 0 })
         {
             trips.AddRange(additionalTrips);
@@ -470,11 +474,12 @@ public class ResidencyQueryService
         DateOnly from,
         DateOnly to,
         IReadOnlyList<(DateOnly From, DateOnly To)> blackouts,
-        int dayLimit)
+        int dayLimit,
+        Traveller? traveller = null)
     {
         var limit = dayLimit <= 0 ? 183 : dayLimit;
         var rule = _residency.GetCountryRule(country);
-        var presence = _residency.GenerateDailyPresenceLog(await _trips.GetAllTripsAsync(userId));
+        var presence = _residency.GenerateDailyPresenceLog(await _trips.GetAllTripsAsync(userId, traveller));
         var byDate = presence.ToDictionary(day => day.Date);
         var counted = new SortedSet<DateOnly>();
         foreach (var day in presence)

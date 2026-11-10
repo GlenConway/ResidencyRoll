@@ -8,32 +8,86 @@ public class TripService
 {
     private readonly ApplicationDbContext _context;
     private readonly ResidencyCalculationService _residencyService;
+    private readonly TravellerAccess _access;
 
-    public TripService(ApplicationDbContext context, ResidencyCalculationService residencyService)
+    public TripService(ApplicationDbContext context, ResidencyCalculationService residencyService, TravellerAccess? access = null)
     {
         _context = context;
         _residencyService = residencyService;
+        _access = access ?? new TravellerAccess(context);
     }
 
-    public async Task<List<Trip>> GetAllTripsAsync(string userId)
+    public Task<Traveller> ResolveSelfAsync(string userId) => _access.ResolveSelfAsync(userId);
+
+    public async Task<List<Trip>> GetAllTripsAsync(string userId, Traveller? traveller = null)
     {
-        return await _context.Trips
-            .Where(t => t.UserId == userId)
-            .OrderBy(t => t.DepartureDateTime)
-            .ToListAsync();
+        var scope = await Scope(userId, traveller);
+        return await _access.TripsFor(scope).OrderBy(trip => trip.DepartureDateTime).ToListAsync();
     }
 
-    public async Task<Trip?> GetTripByIdAsync(int id, string userId)
+    public async Task<Trip?> GetTripByIdAsync(int id, string userId, Traveller? traveller = null)
     {
-        return await _context.Trips
-            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
+        var scope = await Scope(userId, traveller);
+        return await _access.TripsFor(scope).FirstOrDefaultAsync(trip => trip.Id == id);
     }
 
-    public async Task<Trip> CreateTripAsync(Trip trip)
+    public async Task<Trip> CreateTripAsync(Trip trip, string? actorUserId = null)
     {
+        if (!string.IsNullOrEmpty(actorUserId))
+        {
+            trip.CreatedByUserId ??= actorUserId;
+        }
+
         _context.Trips.Add(trip);
         await _context.SaveChangesAsync();
         return trip;
+    }
+
+    public async Task<List<Trip>> CreateForTravellersAsync(Trip template, IReadOnlyList<Traveller> travellers, string actorUserId)
+    {
+        if (travellers.Count == 0)
+        {
+            throw new ArgumentException("At least one traveller is required.", nameof(travellers));
+        }
+
+        var created = travellers.Select(traveller => TripCopies.Onto(template, traveller, actorUserId)).ToList();
+        return await SaveCreatedAsync(created);
+    }
+
+    public async Task<List<Trip>> CreateLegsForTravellersAsync(IReadOnlyList<Trip> templates, IReadOnlyList<Traveller> travellers, string actorUserId)
+    {
+        if (travellers.Count == 0 || templates.Count == 0)
+        {
+            throw new ArgumentException("At least one traveller and one leg are required.");
+        }
+
+        var created = new List<Trip>();
+        foreach (var template in templates)
+        {
+            foreach (var traveller in travellers)
+            {
+                created.Add(TripCopies.Onto(template, traveller, actorUserId));
+            }
+        }
+
+        return await SaveCreatedAsync(created);
+    }
+
+    private async Task<List<Trip>> SaveCreatedAsync(List<Trip> created)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            _context.Trips.AddRange(created);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return created;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -61,21 +115,27 @@ public class TripService
         }
     }
 
-    public async Task<Trip> UpdateTripAsync(Trip trip, string userId)
+    public async Task<Trip> UpdateTripAsync(Trip trip, string userId, Traveller? traveller = null)
     {
-        var existing = await GetTripByIdAsync(trip.Id, userId);
+        var existing = await GetTripByIdAsync(trip.Id, userId, traveller);
         if (existing == null)
         {
             throw new UnauthorizedAccessException("Trip not found or you don't have permission to update it.");
         }
-        _context.Trips.Update(trip);
+
+        if (!ReferenceEquals(existing, trip))
+        {
+            _context.Entry(existing).CurrentValues.SetValues(trip);
+        }
+
+        existing.UpdatedByUserId = userId;
         await _context.SaveChangesAsync();
-        return trip;
+        return existing;
     }
 
-    public async Task DeleteTripAsync(int id, string userId)
+    public async Task DeleteTripAsync(int id, string userId, Traveller? traveller = null)
     {
-        var trip = await GetTripByIdAsync(id, userId);
+        var trip = await GetTripByIdAsync(id, userId, traveller);
         if (trip != null)
         {
             _context.Trips.Remove(trip);
@@ -83,36 +143,28 @@ public class TripService
         }
     }
 
-    public async Task<Dictionary<string, int>> GetTotalDaysPerCountryAsync(string userId)
+    public async Task<Dictionary<string, int>> GetTotalDaysPerCountryAsync(string userId, Traveller? traveller = null)
     {
-        var trips = await _context.Trips
-            .Where(t => t.UserId == userId)
-            .ToListAsync();
-
+        var trips = await GetAllTripsAsync(userId, traveller);
         var presenceLog = _residencyService.GenerateDailyPresenceLog(trips);
         return _residencyService.CalculateResidencyDays(presenceLog);
     }
 
-    public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync(string userId)
+    public async Task<Dictionary<string, int>> GetDaysPerCountryInLast365DaysAsync(string userId, Traveller? traveller = null)
     {
         var today = DateTime.Today;
         var windowStart = RollingWindow.StartOn(today);
-
-        var trips = await _context.Trips
-            .Where(t => t.UserId == userId)
-            .ToListAsync();
-
+        var trips = await GetAllTripsAsync(userId, traveller);
         return CalculateDaysPerCountryByDateRange(trips, windowStart, today);
     }
 
     public async Task<(Dictionary<string, int> Current, Dictionary<string, int> Forecast)> ForecastDaysWithTripsAsync(
         string userId,
         List<Trip> hypotheticalTrips,
-        DateOnly? through = null)
+        DateOnly? through = null,
+        Traveller? traveller = null)
     {
-        var trips = await _context.Trips
-            .Where(t => t.UserId == userId)
-            .ToListAsync();
+        var trips = await GetAllTripsAsync(userId, traveller);
         return ForecastDays(trips, hypotheticalTrips, through);
     }
 
@@ -209,25 +261,23 @@ public class TripService
             DateOnly.FromDateTime(forecastWindowEnd.Date));
     }
 
-    public async Task<int> GetTotalDaysAwayInLast365DaysAsync(string userId)
+    public async Task<int> GetTotalDaysAwayInLast365DaysAsync(string userId, Traveller? traveller = null)
     {
-        var daysPerCountry = await GetDaysPerCountryInLast365DaysAsync(userId);
+        var daysPerCountry = await GetDaysPerCountryInLast365DaysAsync(userId, traveller);
         return daysPerCountry.Values.Sum();
     }
 
-    public async Task<int> GetDaysAtHomeInLast365DaysAsync(string userId)
+    public async Task<int> GetDaysAtHomeInLast365DaysAsync(string userId, Traveller? traveller = null)
     {
-        var totalDaysAway = await GetTotalDaysAwayInLast365DaysAsync(userId);
+        var totalDaysAway = await GetTotalDaysAwayInLast365DaysAsync(userId, traveller);
         return 365 - totalDaysAway;
     }
 
-    public async Task<List<Trip>> GetTripsForTimelineAsync(string userId)
-    {
-        return await _context.Trips
-            .Where(t => t.UserId == userId)
-            .OrderBy(t => t.DepartureDateTime)
-            .ToListAsync();
-    }
+    public Task<List<Trip>> GetTripsForTimelineAsync(string userId, Traveller? traveller = null) =>
+        GetAllTripsAsync(userId, traveller);
+
+    private async Task<Traveller> Scope(string userId, Traveller? traveller) =>
+        traveller ?? await _access.ResolveSelfAsync(userId);
 
     private Dictionary<string, int> CalculateDaysPerCountryByDateRange(
         IEnumerable<Trip> trips,

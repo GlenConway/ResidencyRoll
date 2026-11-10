@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-10). Supersedes [ADR-017](ADR-017-home-country-on-the-user-profile.md) once accepted.
+Accepted (2026-11-10). Supersedes [ADR-017](ADR-017-home-country-on-the-user-profile.md).
 
 ## Context
 

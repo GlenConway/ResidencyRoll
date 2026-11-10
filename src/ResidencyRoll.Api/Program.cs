@@ -12,6 +12,7 @@ using ResidencyRoll.Api.Services;
 using ResidencyRoll.Shared.Extensions;
 using Serilog;
 using System.Reflection;
+using System.Security.Claims;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -40,6 +41,8 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=residencyroll.db"));
 
+builder.Services.AddScoped<TravellerAccess>();
+builder.Services.AddScoped<TravellerService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<ItineraryParsingService>();
@@ -185,7 +188,7 @@ app.UseConfiguredForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.Migrate();
+    DatabaseStartup.Apply(dbContext);
 }
 
 if (app.Environment.IsDevelopment())
@@ -210,6 +213,30 @@ app.UseCors(FrontendCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        try
+        {
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var name = context.User.Identity?.Name
+                ?? context.User.FindFirstValue("name");
+            if (!string.IsNullOrEmpty(userId))
+            {
+                await using var scope = context.RequestServices.CreateAsyncScope();
+                var access = scope.ServiceProvider.GetRequiredService<TravellerAccess>();
+                await access.ApplySignInNameAsync(userId, name);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not apply the sign-in name to the traveller");
+        }
+    }
+
+    await next();
+});
 app.UseResidencyMcpGuards();
 
 app.MapResidencyMcp();

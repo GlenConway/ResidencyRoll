@@ -1,4 +1,4 @@
-import type { CurrentUser, DailyPresence, ForecastResponse, ImportResult, ItineraryParsingResponse, McpInfo, ResidencySummary, SystemInfo, Trip, TripLeg } from './types.ts'
+import type { CurrentUser, DailyPresence, ForecastResponse, ImportResult, ItineraryParsingResponse, McpInfo, ResidencySummary, SystemInfo, Traveller, Trip, TripLeg } from './types.ts'
 
 export class ApiError extends Error {
   readonly status: number
@@ -102,55 +102,103 @@ export async function getCurrentUser(): Promise<CurrentUser> {
   return readJson<CurrentUser>(await apiFetch('/bff/user'))
 }
 
-export async function getTrips(): Promise<Trip[]> {
-  return readJson<Trip[]>(await apiFetch('/api/v1/trips'))
+function withTraveller(path: string, travellerId?: number | null): string {
+  if (travellerId == null) {
+    return path
+  }
+
+  const join = path.includes('?') ? '&' : '?'
+  return `${path}${join}travellerId=${travellerId}`
 }
 
-export async function getTrip(id: number): Promise<Trip> {
-  return readJson<Trip>(await apiFetch(`/api/v1/trips/${id}`))
+export async function getTravellers(): Promise<Traveller[]> {
+  const body = await readJson<unknown>(await apiFetch('/api/v1/travellers'))
+  return Array.isArray(body) ? (body as Traveller[]) : []
 }
 
-export async function createTrip(trip: Omit<Trip, 'id'>): Promise<Trip> {
-  return readJson<Trip>(await apiFetch('/api/v1/trips', { method: 'POST', body: JSON.stringify(trip) }))
+export async function createTraveller(name: string, homeCountry: string | null): Promise<Traveller> {
+  return readJson<Traveller>(
+    await apiFetch('/api/v1/travellers', {
+      method: 'POST',
+      body: JSON.stringify({ name, homeCountry }),
+    }),
+  )
 }
 
-export async function updateTrip(id: number, trip: Trip): Promise<void> {
-  const response = await apiFetch(`/api/v1/trips/${id}`, { method: 'PUT', body: JSON.stringify(trip) })
+export async function updateTraveller(id: number, name: string, homeCountry: string | null): Promise<Traveller> {
+  return readJson<Traveller>(
+    await apiFetch(`/api/v1/travellers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, homeCountry }),
+    }),
+  )
+}
+
+export async function deleteTraveller(id: number, deleteTrips = false): Promise<void> {
+  const response = await apiFetch(`/api/v1/travellers/${id}?deleteTrips=${deleteTrips ? 'true' : 'false'}`, { method: 'DELETE' })
   if (!response.ok) {
     throw new ApiError(await response.text(), response.status)
   }
 }
 
-export async function deleteTrip(id: number): Promise<void> {
-  const response = await apiFetch(`/api/v1/trips/${id}`, { method: 'DELETE' })
+export async function getTrips(travellerId?: number | null): Promise<Trip[]> {
+  return readJson<Trip[]>(await apiFetch(withTraveller('/api/v1/trips', travellerId)))
+}
+
+export async function getTrip(id: number, travellerId?: number | null): Promise<Trip> {
+  return readJson<Trip>(await apiFetch(withTraveller(`/api/v1/trips/${id}`, travellerId)))
+}
+
+export async function createTrip(trip: Omit<Trip, 'id'>, travellerIds?: number[]): Promise<Trip> {
+  const params = new URLSearchParams()
+  for (const id of travellerIds ?? []) {
+    params.append('travellerIds', String(id))
+  }
+
+  const query = params.size > 0 ? `?${params}` : ''
+  const payload = await readJson<Trip | Trip[]>(
+    await apiFetch(`/api/v1/trips${query}`, { method: 'POST', body: JSON.stringify(trip) }),
+  )
+  return Array.isArray(payload) ? payload[0]! : payload
+}
+
+export async function updateTrip(id: number, trip: Trip, travellerId?: number | null): Promise<void> {
+  const response = await apiFetch(withTraveller(`/api/v1/trips/${id}`, travellerId), { method: 'PUT', body: JSON.stringify(trip) })
   if (!response.ok) {
     throw new ApiError(await response.text(), response.status)
   }
 }
 
-export async function getResidencySummary(startDate: string, endDate: string): Promise<ResidencySummary[]> {
+export async function deleteTrip(id: number, travellerId?: number | null): Promise<void> {
+  const response = await apiFetch(withTraveller(`/api/v1/trips/${id}`, travellerId), { method: 'DELETE' })
+  if (!response.ok) {
+    throw new ApiError(await response.text(), response.status)
+  }
+}
+
+export async function getResidencySummary(startDate: string, endDate: string, travellerId?: number | null): Promise<ResidencySummary[]> {
   const params = new URLSearchParams({ startDate, endDate })
-  return readJson<ResidencySummary[]>(await apiFetch(`/api/v1/trips/residency-summary?${params}`))
+  return readJson<ResidencySummary[]>(await apiFetch(withTraveller(`/api/v1/trips/residency-summary?${params}`, travellerId)))
 }
 
-export async function getDailyPresence(startDate: string, endDate: string): Promise<DailyPresence[]> {
+export async function getDailyPresence(startDate: string, endDate: string, travellerId?: number | null): Promise<DailyPresence[]> {
   const params = new URLSearchParams({ startDate, endDate })
-  return readJson<DailyPresence[]>(await apiFetch(`/api/v1/trips/daily-presence?${params}`))
+  return readJson<DailyPresence[]>(await apiFetch(withTraveller(`/api/v1/trips/daily-presence?${params}`, travellerId)))
 }
 
-export function downloadDailyPresence(startDate: string, endDate: string): Promise<void> {
+export function downloadDailyPresence(startDate: string, endDate: string, travellerId?: number | null): Promise<void> {
   const params = new URLSearchParams({ startDate, endDate })
-  return downloadFile(`/api/v1/trips/daily-presence-export?${params}`)
+  return downloadFile(withTraveller(`/api/v1/trips/daily-presence-export?${params}`, travellerId))
 }
 
-export function downloadTrips(): Promise<void> {
-  return downloadFile('/api/v1/trips/export')
+export function downloadTrips(travellerId?: number | null): Promise<void> {
+  return downloadFile(withTraveller('/api/v1/trips/export', travellerId))
 }
 
-export async function importTrips(file: File): Promise<ImportResult> {
+export async function importTrips(file: File, travellerId?: number | null): Promise<ImportResult> {
   const body = new FormData()
   body.append('file', file)
-  return readJson<ImportResult>(await apiFetch('/api/v1/trips/import', { method: 'POST', body }))
+  return readJson<ImportResult>(await apiFetch(withTraveller('/api/v1/trips/import', travellerId), { method: 'POST', body }))
 }
 
 export async function getItineraryParserAvailability(): Promise<boolean> {
@@ -166,9 +214,9 @@ export async function parseItinerary(itineraryText: string): Promise<ItineraryPa
   )
 }
 
-export async function forecast(legs: TripLeg[]): Promise<ForecastResponse> {
+export async function forecast(legs: TripLeg[], travellerId?: number | null): Promise<ForecastResponse> {
   return readJson<ForecastResponse>(
-    await apiFetch('/api/v1/trips/forecast', { method: 'POST', body: JSON.stringify({ legs }) }),
+    await apiFetch(withTraveller('/api/v1/trips/forecast', travellerId), { method: 'POST', body: JSON.stringify({ legs }) }),
   )
 }
 

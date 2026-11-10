@@ -373,6 +373,14 @@ public class McpServerTests : IClassFixture<McpApiFactory>
         await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdId });
         await AssertCall(mcp, tools, "delete_trip", new Dictionary<string, object?> { ["id"] = createdManyId });
 
+        var listedTravellers = await AssertCall(mcp, tools, "list_travellers", new Dictionary<string, object?>());
+        var selfId = listedTravellers.StructuredContent!.Value.EnumerateArray().Single(row => row.GetProperty("isSelf").GetBoolean()).GetProperty("id").GetInt32();
+        var createdTraveller = await AssertCall(mcp, tools, "create_traveller", new Dictionary<string, object?> { ["name"] = "Ada" });
+        var adaId = createdTraveller.StructuredContent!.Value.GetProperty("id").GetInt32();
+        await AssertCall(mcp, tools, "update_traveller", new Dictionary<string, object?> { ["traveller"] = "ada", ["name"] = "Ada Lovelace", ["homeCountry"] = "Canada" });
+        await AssertCall(mcp, tools, "copy_trips", new Dictionary<string, object?> { ["source"] = selfId.ToString(), ["target"] = adaId.ToString() });
+        await AssertCall(mcp, tools, "delete_traveller", new Dictionary<string, object?> { ["traveller"] = "Ada Lovelace", ["deleteTrips"] = true });
+
         var called = new[]
         {
             "list_trips", "get_trip", "get_days_per_country", "get_residency_summary", "get_daily_presence",
@@ -380,7 +388,8 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             "get_record_coverage", "find_suspect_trips", "forecast_trips",
             "max_trip_end_date", "max_trip_start_date", "plan_max_presence", "standard_duration_forecasts",
             "lookup_airport", "get_home_country", "set_home_country",
-            "create_trip", "create_trips", "update_trip", "delete_trip"
+            "create_trip", "create_trips", "update_trip", "delete_trip",
+            "list_travellers", "create_traveller", "update_traveller", "delete_traveller", "copy_trips"
         };
         Assert.Equal(tools.Select(tool => tool.Name).OrderBy(name => name), called.OrderBy(name => name));
     }

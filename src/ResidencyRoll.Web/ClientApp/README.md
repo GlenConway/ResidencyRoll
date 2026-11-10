@@ -1,6 +1,6 @@
 # Residency Roll web client
 
-React UI for Residency Roll. Until cut-over it runs on the Vite dev server and talks to the existing web host, which proxies `/api` and owns sign-in.
+React UI for Residency Roll. The web host serves the built files and owns sign-in. During development the Vite server proxies `/api`, `/auth`, `/bff`, and `/mcp` to that host. The traveller selected in the header is stored in this browser (`residencyroll_traveller_id`). The home country for that person is also mirrored in `localStorage` (`residencyroll_home_country`).
 
 ## Scripts
 

@@ -35,10 +35,13 @@ import {
   validationMessage,
   type TripDraft,
 } from '../lib/tripEditor.ts'
+import { PageHeading, useTravellers } from '../shell/travellers.tsx'
 
 export function ManageTripsPage() {
   const queryClient = useQueryClient()
-  const tripsQuery = useQuery({ queryKey: ['trips'], queryFn: getTrips })
+  const { travellers, selected } = useTravellers()
+  const travellerId = selected?.id
+  const tripsQuery = useQuery({ queryKey: ['trips', travellerId ?? null], queryFn: () => getTrips(travellerId) })
   const parserQuery = useQuery({ queryKey: ['parser-availability'], queryFn: getItineraryParserAvailability })
   const [filter, setFilter] = useState('')
   const [showImport, setShowImport] = useState(false)
@@ -55,6 +58,7 @@ export function ManageTripsPage() {
   const [parserError, setParserError] = useState('')
   const [parserSuccess, setParserSuccess] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Trip | null>(null)
+  const [targets, setTargets] = useState<number[]>([])
 
   const trips = useMemo(() => {
     const rows = Array.isArray(tripsQuery.data) ? [...tripsQuery.data] : []
@@ -77,6 +81,7 @@ export function ManageTripsPage() {
     setParserSuccess(false)
     setValidation('')
     setDraft(newTripDraft())
+    setTargets(selected ? [selected.id] : [])
     setAdding(true)
     setTab('editor')
   }
@@ -127,10 +132,11 @@ export function ManageTripsPage() {
     const body = toTripBody(draft)
     let saved: Trip
     if (draft.id > 0) {
-      await updateTrip(draft.id, { ...body, id: draft.id })
-      saved = await getTrip(draft.id)
+      await updateTrip(draft.id, { ...body, id: draft.id }, travellerId)
+      saved = await getTrip(draft.id, travellerId)
     } else {
-      saved = await createTrip(body)
+      const ids = targets.length > 0 ? targets : selected ? [selected.id] : undefined
+      saved = await createTrip(body, travellers.length > 0 ? ids : undefined)
     }
     await refresh()
     if (addLegAfter) {
@@ -149,8 +155,9 @@ export function ManageTripsPage() {
       setParsed(next)
       return
     }
+    const ids = targets.length > 0 ? targets : selected ? [selected.id] : undefined
     for (const item of next) {
-      await createTrip(toTripBody(item))
+      await createTrip(toTripBody(item), travellers.length > 0 ? ids : undefined)
     }
     await refresh()
     closeEditor()
@@ -180,7 +187,7 @@ export function ManageTripsPage() {
   }
 
   const remove = useMutation({
-    mutationFn: (trip: Trip) => deleteTrip(trip.id),
+    mutationFn: (trip: Trip) => deleteTrip(trip.id, travellerId),
     onSuccess: async () => {
       setPendingDelete(null)
       await refresh()
@@ -188,7 +195,7 @@ export function ManageTripsPage() {
   })
 
   const importing = useMutation({
-    mutationFn: (selected: File) => importTrips(selected),
+    mutationFn: (file: File) => importTrips(file, travellerId),
     onSuccess: async (result) => {
       setImportMessage(result.message)
       setImportError(result.errors > 0 && result.imported === 0)
@@ -202,7 +209,7 @@ export function ManageTripsPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Manage Trips</h1>
+      <PageHeading title="Manage Trips" />
       <Tabs value={draft ? tab : 'list'} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="list">Trip List</TabsTrigger>
@@ -223,7 +230,7 @@ export function ManageTripsPage() {
           </div>
           {showImport ? (
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => void downloadTrips()}>
+              <Button variant="outline" onClick={() => void downloadTrips(travellerId)}>
                 Export Trips (CSV)
               </Button>
               <input
@@ -323,6 +330,27 @@ export function ManageTripsPage() {
                 setDraft(next)
               }}
             />
+            {adding && travellers.length > 1 ? (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-medium">Save for</legend>
+                <div className="flex flex-wrap gap-4">
+                  {travellers.map((person) => (
+                    <label key={person.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={targets.includes(person.id)}
+                        onChange={(event) => {
+                          setTargets((current) =>
+                            event.target.checked ? [...current, person.id] : current.filter((id) => id !== person.id),
+                          )
+                        }}
+                      />
+                      {person.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             {parsed.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 <Button variant="ghost" disabled={parsedIndex <= 0} onClick={() => showParsed(parsedIndex - 1)}>

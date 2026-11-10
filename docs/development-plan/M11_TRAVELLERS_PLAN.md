@@ -1,6 +1,8 @@
 # M11 — Travellers on One Account
 
-Track trips and residency for several people from one login. Design is in [ADR-020](../adr/ADR-020-travellers-on-an-account.md).
+Complete (2026-11-10). Track trips and residency for several people from one login. Design is in [ADR-020](../adr/ADR-020-travellers-on-an-account.md).
+
+Both migrations shipped together. API startup applies the migration that adds `Travellers`, runs `TravellerBackfill`, and then applies the migration that requires `Trip.TravellerId`. Copy the SQLite file before deploying. See [Travellers on one account](../guides/TRAVELLERS.md).
 
 ## Goals
 
@@ -19,7 +21,7 @@ Track trips and residency for several people from one login. Design is in [ADR-0
 - Services treat a null `TravellerId` as the owner's self traveller until Migration B ships.
 - On sign-in, a self traveller still named "Me" takes the name claim. A renamed traveller is left alone.
 - Release notes: back up the SQLite file before deploying.
-- **Migration B** (generated, next release after A has run everywhere): `TravellerId` required, foreign key, `(TravellerId, DepartureDateTime)` index.
+- **Migration B** (generated, in this release): `TravellerId` required, foreign key, `(TravellerId, DepartureDateTime)` index. Startup runs it only after the backfill.
 
 **Done when:** tests run the backfill on a seeded database and on a copy of a production database and show every trip has a traveller, a second run changes nothing, and residency counts for each existing user match before and after. Migration B applies cleanly on the backfilled copy.
 

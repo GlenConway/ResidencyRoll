@@ -3,6 +3,7 @@ import { HomePage } from './pages/HomePage.tsx'
 import { ForecastPage } from './pages/ForecastPage.tsx'
 import { SystemInfoPage } from './pages/SystemInfoPage.tsx'
 import { ManageTripsPage } from './pages/ManageTripsPage.tsx'
+import { TravellersPage } from './pages/TravellersPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { AppShell, PageTitle } from './shell/AppShell.tsx'
 
@@ -34,6 +35,15 @@ export default function App() {
             <>
               <PageTitle title="Forecast - Residency Roll" />
               <ForecastPage />
+            </>
+          }
+        />
+        <Route
+          path="travellers"
+          element={
+            <>
+              <PageTitle title="Travellers - Residency Roll" />
+              <TravellersPage />
             </>
           }
         />

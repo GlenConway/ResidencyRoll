@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-09). Supersedes [ADR-014](ADR-014-home-country-in-browser-storage.md).
+Superseded by [ADR-020](ADR-020-travellers-on-an-account.md) (2026-11-10). Accepted (2026-11-09). Supersedes [ADR-014](ADR-014-home-country-in-browser-storage.md).
 
 ## Context
 

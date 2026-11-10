@@ -31,10 +31,10 @@ ADR-001 to ADR-014 are **retrospective**. They were written on 2026-09-19 from t
 | [ADR-014](ADR-014-home-country-in-browser-storage.md) | Keep the Home Country in Browser localStorage | Superseded by ADR-017 |
 | [ADR-015](ADR-015-react-spa-replaces-blazor.md) | Replace the Blazor Server UI with a React SPA Served by the Existing Web Host | Accepted |
 | [ADR-016](ADR-016-mcp-server-streamable-http.md) | Expose ResidencyRoll to AI Clients as a Remote MCP Server over Streamable HTTP | Accepted |
-| [ADR-017](ADR-017-home-country-on-the-user-profile.md) | Store the Home Country on the User Profile | Accepted |
+| [ADR-017](ADR-017-home-country-on-the-user-profile.md) | Store the Home Country on the User Profile | Superseded by ADR-020 |
 | [ADR-018](ADR-018-per-country-counting-windows.md) | Count Each Country on Its Own Window | Accepted |
 | [ADR-019](ADR-019-trip-warnings-coverage-and-msi.md) | Warn on Suspect Legs, Report Record Coverage, and Count the Nova Scotia MSI Minimum | Accepted |
-| [ADR-020](ADR-020-travellers-on-an-account.md) | Track Several Travellers on One Account | Proposed |
+| [ADR-020](ADR-020-travellers-on-an-account.md) | Track Several Travellers on One Account | Accepted |
 
 ## Adding a new ADR
 

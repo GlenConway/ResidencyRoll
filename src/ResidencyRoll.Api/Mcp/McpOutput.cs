@@ -46,6 +46,8 @@ internal static class McpTime
 
 public class McpTrip
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public int Id { get; set; }
     public string DepartureCountry { get; set; } = string.Empty;
     public string DepartureCity { get; set; } = string.Empty;
@@ -99,6 +101,8 @@ public class McpTrip
 
 public sealed class McpMaxEndDate
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     [Description("Last day you can still be in the country at midnight while staying at or under the limit, yyyy-MM-dd.")]
     public DateOnly MaxEndDate { get; set; }
 
@@ -130,6 +134,8 @@ public sealed class McpMaxEndDate
 
 public sealed class DailyPresenceResponse
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     [Description("days or runs.")]
     public string Format { get; set; } = "days";
 
@@ -147,6 +153,8 @@ public sealed class PresenceRun
 
 public sealed class RollingCountPoint
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public DateOnly Date { get; set; }
     public int RollingDays { get; set; }
 
@@ -166,6 +174,8 @@ public sealed class RollingCountPoint
 
 public sealed class McpDurationForecast
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public int DurationDays { get; set; }
 
     [Description(McpTime.LocalTimeDescription)]
@@ -185,6 +195,8 @@ public sealed class McpDurationForecast
 
 public sealed class McpCountryDays
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public string CountryName { get; set; } = string.Empty;
     public int Days { get; set; }
 
@@ -209,6 +221,8 @@ public sealed class McpCountryDays
 
 public sealed class McpLocationOn
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public DateOnly Date { get; set; }
     public string LocationAtMidnight { get; set; } = string.Empty;
     public List<string> LocationsDuringDay { get; set; } = [];
@@ -229,6 +243,8 @@ public sealed class McpLocationOn
 
 public sealed class McpCurrentLocation
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     [Description("Country for today. IN_TRANSIT while a saved leg is in the air. Empty when there is no arrival at or before now.")]
     public string Country { get; set; } = string.Empty;
 

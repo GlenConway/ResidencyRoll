@@ -23,10 +23,11 @@ import {
   validationIssues,
   type ForecastLeg,
 } from '../lib/forecastPlan.ts'
-import { useHomeCountry } from '../lib/homeCountry.ts'
+import { PageHeading, useSelectedHomeCountry, useTravellers } from '../shell/travellers.tsx'
 
 export function ForecastPage() {
-  const [homeCountry] = useHomeCountry()
+  const [homeCountry] = useSelectedHomeCountry()
+  const { selected } = useTravellers()
   const [legs, setLegs] = useState<ForecastLeg[]>(() => [starterLeg()])
   const [issues, setIssues] = useState<string[]>([])
   const [result, setResult] = useState<ForecastResponse | null>(null)
@@ -48,7 +49,7 @@ export function ForecastPage() {
     }
     setIssues([])
     try {
-      setResult(await forecast(toForecastRequest(legs)))
+      setResult(await forecast(toForecastRequest(legs), selected?.id))
     } catch (error) {
       setResult(null)
       setIssues([error instanceof TypeError || (error instanceof ApiError && error.status === 0) ? apiUnreachableMessage : unexpectedForecastMessage])
@@ -79,7 +80,7 @@ export function ForecastPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Trip Forecast</h1>
+      <PageHeading title="Trip Forecast" />
       {parserQuery.data ? (
         <div>
           <h2>Quick Itinerary Parser</h2>

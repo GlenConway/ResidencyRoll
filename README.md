@@ -47,7 +47,8 @@ Trip and residency logic live in the API. The web app and MCP clients both call 
 
 ## Features
 
-- **Residency dashboard**: Country cards for a date range you choose, defaulting to the last 365 days. Each card shows the days counted, whether that country uses the midnight or partial-day rule, the day threshold, and progress toward it. The home country is saved on the user profile and changes the days-left and days-over wording.
+- **Residency dashboard**: Country cards for a date range you choose, defaulting to the last 365 days. Each card shows the days counted, whether that country uses the midnight or partial-day rule, the day threshold, and progress toward it. The home country is saved on the traveller you are looking at and changes the days-left and days-over wording.
+- **Travellers**: One login can track several people. The header chooses who you are looking at, and that choice stays in this browser. Each person has their own trips, day counts, and home country. A new trip can be saved for more than one person at once. See [Travellers on one account](docs/guides/TRAVELLERS.md).
 - **Daily presence timeline**: One cell per day, grouped by month and coloured by country, including days spent in transit. Select a day to see the midnight location and the countries visited. The same range can be exported as CSV.
 - **Trip management**: Add, edit, and delete flight legs, with airports and local departure and arrival times. Filter the list, import and export trips as CSV, and paste a booking to draft legs when itinerary parsing is configured.
 - **Forecast**: Plan a future trip of one or more legs and compare days in the last 365 days with the projected window. The forecast is not saved.
@@ -58,7 +59,7 @@ Trip and residency logic live in the API. The web app and MCP clients both call 
 
 ## MCP tools
 
-The server is on the web host at `/mcp`. Read tools need the `read:trips` scope. Write tools need `write:trips`, and write does not include read. When JWT authentication is off, calls run as the local user. The home country is saved on the user profile. `get_residency_summary` and `forecast_trips` use it when `homeCountry` is omitted.
+The server is on the web host at `/mcp`. Read tools need the `read:trips` scope. Write tools need `write:trips`, and write does not include read. When JWT authentication is off, calls run as the local user. A call is about the signed-in person unless you pass `traveller` (an id or a name). The home country is saved on that traveller. `get_residency_summary` and `forecast_trips` use it when `homeCountry` is omitted.
 
 | Tool | What it does |
 |---|---|
@@ -73,8 +74,13 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `get_country_rules` | Midnight or partial-day rule, threshold, counting window, and any home-country minimum |
 | `get_record_coverage` | Earliest saved date, latest saved date, and the number of legs |
 | `find_suspect_trips` | Legs whose duration, order, overlap, or country sequence looks wrong |
-| `get_home_country` | The home country saved for the signed-in user |
-| `set_home_country` | Save or clear the home country |
+| `get_home_country` | The home country saved on the chosen traveller |
+| `set_home_country` | Save or clear that traveller's home country |
+| `list_travellers` | The people on this account: id, name, home country, and whether the row is you |
+| `create_traveller` | Add a person, with an optional home country |
+| `update_traveller` | Rename a person or change their home country |
+| `delete_traveller` | Delete a person. Refuses you, and refuses someone who still has trips unless `deleteTrips` is true |
+| `copy_trips` | Copy saved legs from one person to another, skipping legs that are already there |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
 | `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, and a short rolling count around the peak |
 | `max_trip_end_date` | Last midnight you can still be in the arrival country while its count stays at or under a day limit (183 by default). Optional unsaved legs |
@@ -82,10 +88,10 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `plan_max_presence` | Arrival and departure dates that add the most days in a country without passing the limit, skipping blackout dates |
 | `standard_duration_forecasts` | Days in the arrival country for stay lengths such as 7, 14, 30, 60, 90, and 180 days. Optional unsaved legs |
 | `parse_itinerary` | Draft legs from pasted booking text. Listed only when an OpenAI model, endpoint, and API key are set. Nothing is saved |
-| `create_trip` | Save one leg. Returns warnings and the change in country day counts |
+| `create_trip` | Save one leg. An optional `travellers` list saves that same leg for several people in one transaction. Returns warnings and the change in country day counts |
 | `update_trip` | Change one leg. Omitted fields stay as they are. Returns warnings and the day-count change |
 | `delete_trip` | Delete one leg and report the day-count change |
-| `create_trips` | Save every leg, or none of them, in one transaction |
+| `create_trips` | Save every leg, or none of them, in one transaction. An optional `travellers` list does that for several people |
 
 There is also a `residency_check` prompt and a `residencyroll://rules/countries` resource. CSV import, backups, and system administration are not exposed as tools. Connection steps, OAuth, and rate limits are in [Connect an AI client](docs/guides/MCP_SETUP.md).
 
@@ -278,13 +284,7 @@ docker compose down -v  # The -v flag removes volumes
 git clone https://github.com/GlenConway/ResidencyRoll.git
 cd ResidencyRoll
 
-# Edit the docker-compose.yml to use local builds instead of GHCR images:
-# Replace 'image: ghcr.io/...' with:
-#   build:
-#     context: .
-#     dockerfile: Dockerfile.api  # (or Dockerfile for web)
-
-docker compose up -d --build
+docker compose -f docker-compose.build.yml up -d --build
 ```
 
 ### Local Development
@@ -305,7 +305,15 @@ docker compose up -d --build
    dotnet watch run
    ```
 
-3. **Access**: `https://localhost:5001` or `http://localhost:5000`
+3. **Access**: the web app at `https://localhost:5113` and the API at `https://localhost:5003` (Swagger at `https://localhost:5003/swagger`).
+
+For the Vite dev server, in a third terminal:
+
+```bash
+npm run dev --prefix src/ResidencyRoll.Web/ClientApp
+```
+
+That UI is at `http://127.0.0.1:5173` and proxies `/api` through the web host.
 
 Authentication is **disabled by default** for local development.
 
@@ -376,9 +384,9 @@ Authentication is **disabled by default** for development. To enable:
 - Name: `ResidencyRoll Web`
 - Type: **Regular Web Application**
 - Settings:
-  - Allowed Callback URLs: `https://localhost:5001/signin-oidc`
-  - Allowed Logout URLs: `https://localhost:5001/`
-  - Allowed Web Origins: `https://localhost:5001`
+  - Allowed Callback URLs: `https://localhost:5113/signin-oidc`
+  - Allowed Logout URLs: `https://localhost:5113/`
+  - Allowed Web Origins: `https://localhost:5113`
 - **Copy**: Domain, Client ID, Client Secret
 
 ##### 4. Configure Your Application
@@ -442,7 +450,7 @@ Or use the automated configuration script:
 ##### 5. Test Authentication
 
 1. Start both services
-2. Open `https://localhost:5001`
+2. Open `https://localhost:5113`
 3. Click **Login** button
 4. Authenticate with Auth0
 5. You should see your name in the top-right corner
@@ -558,7 +566,7 @@ Or use the automated configuration script:
 
 When running the API, Swagger UI is available at:
 
-- `http://localhost:5003/swagger` (local development)
+- `https://localhost:5003/swagger` (local development)
 - `http://localhost:8080/swagger` (Docker)
 
 The API supports versioning (`/api/v1/trips`) and includes comprehensive OpenAPI documentation.
@@ -580,15 +588,12 @@ curl -X GET "http://localhost:8080/api/v1/trips" \
 ResidencyRoll/
 ├── src/
 │   ├── ResidencyRoll.Api/               # API Backend
-│   │   ├── Controllers/
-│   │   │   └── TripsController.cs       # REST endpoints
+│   │   ├── Controllers/                 # Trips, travellers, profile, system
 │   │   ├── Mcp/                         # /mcp tools, OAuth metadata, transport guards
-│   │   ├── Services/
-│   │   │   └── TripService.cs           # Business logic
+│   │   ├── Services/                    # Trips, travellers, residency
 │   │   ├── Data/
 │   │   │   └── ApplicationDbContext.cs  # EF Core DbContext
-│   │   ├── Models/
-│   │   │   └── Trip.cs                  # Entity model
+│   │   ├── Models/                      # Trip, Traveller
 │   │   └── Program.cs                   # API configuration
 │   │
 │   ├── ResidencyRoll.Web/               # BFF and React UI
@@ -596,12 +601,8 @@ ResidencyRoll/
 │   │   ├── ClientApp/                   # Vite React application
 │   │   └── Program.cs                   # Web host configuration
 │   │
-│   └── ResidencyRoll.Shared/            # Shared DTOs
-│       └── Trips/
-│           └── TripDto.cs               # Data transfer objects
-│
-├── tests/
-│   └── ResidencyRoll.Tests/             # Unit tests
+│   ├── ResidencyRoll.Shared/            # Shared DTOs and the airport list
+│   └── ResidencyRoll.Tests/             # xUnit tests
 │
 ├── Dockerfile                           # Web container
 ├── Dockerfile.api                       # API container
@@ -615,17 +616,17 @@ ResidencyRoll/
 
 Each flight leg has a departure airport, an arrival airport, and local times. Those legs become a daily presence record: the country at local midnight, the countries visited during the day, and whether midnight was spent in transit. Gaps between trips stay in the last arrival country.
 
-A day counts for the country where you were at midnight. Partial-day countries, such as the United States substantial-presence test, also count a day when you were there for only part of it. The usual window is the 365 days ending today, and the usual threshold is 183 days. The home country is chosen in the browser and is not stored with the trips.
+A day counts for the country where you were at midnight. Partial-day countries, such as the United States substantial-presence test, also count a day when you were there for only part of it. The usual window is the 365 days ending today, and the usual threshold is 183 days. The home country is stored on the traveller. `GET` and `PUT /api/v1/profile/home-country` still read and write the signed-in person's traveller.
 
 See [Residency midnight logic](docs/guides/RESIDENCY_MIDNIGHT_LOGIC.md) and [Gap filling](docs/guides/GAP_FILLING_RULES.md).
 
 ### Data management
 
-Manage Trips lists every saved leg. **Add Trip** opens the editor, **Edit** replaces a leg, and **Delete** asks for confirmation. **Import / Export** downloads a CSV or uploads one. Changes are written to SQLite immediately.
+Manage Trips lists the legs for the person selected in the header. **Add Trip** opens the editor. When the account has more than one person, the editor can save the same leg for each person you check. **Edit** replaces a leg, and **Delete** asks for confirmation. **Import / Export** downloads a CSV or uploads one. An export adds a Traveller column at the end. An older file without that column imports onto the person selected in the header. Changes are written to SQLite immediately.
 
 ### Docker Volume
 
-The application uses a named Docker volume (`residencyroll-data`) stored in `/var/lib/docker/volumes/` to ensure your SQLite database persists across container restarts.
+The API database is the named Docker volume `residencyroll-api-data`, mounted at `/app/data` in the API container.
 
 ## Deployment
 
@@ -638,11 +639,11 @@ The project uses GitHub Actions to automatically build and push Docker images to
 ```yaml
 services:
   residencyroll-api:
-    image: ghcr.io/glenconway/residencyroll-api:latest
+    image: ghcr.io/glenconway/residencyroll/api:latest
     # ... configuration
   
   residencyroll-web:
-    image: ghcr.io/glenconway/residencyroll-web:latest
+    image: ghcr.io/glenconway/residencyroll/web:latest
     # ... configuration
 ```
 
@@ -666,6 +667,8 @@ The version is logged on startup:
 ```
 
 ### Database Backup & Restore
+
+Copy the SQLite file before upgrading a database that already has trips. That upgrade adds a traveller for each account and attaches the existing trips. Locally the file is under `./data`. In Docker it is `/app/data`. See [Travellers on one account](docs/guides/TRAVELLERS.md).
 
 **Backup:**
 

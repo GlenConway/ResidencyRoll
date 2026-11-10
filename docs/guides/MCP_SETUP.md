@@ -1,6 +1,6 @@
 # Connect an AI client
 
-ResidencyRoll exposes a stateless [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp` on the same host you already open in the browser. Claude Code, Claude Desktop, claude.ai, Cursor, VS Code, and the MCP Inspector can list trips, check residency days, forecast a stay, and create or update trips for the signed-in user.
+ResidencyRoll exposes a stateless [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp` on the same host you already open in the browser. Claude Code, Claude Desktop, claude.ai, Cursor, VS Code, and the MCP Inspector can list trips, check residency days, forecast a stay, and create or update trips for the signed-in person and for the other travellers on that account.
 
 The server is the official C# SDK, `ModelContextProtocol.AspNetCore` **2.4.0**. That release speaks protocol revision **2026-07-28** and still accepts the `initialize` handshake used by earlier Streamable HTTP clients, including **2025-11-25**. Design and tool rules are in [ADR-016](../adr/ADR-016-mcp-server-streamable-http.md).
 
@@ -16,7 +16,7 @@ claude mcp add --transport http residencyroll http://localhost:8081/mcp
 
 `8081` is the web port in `docker-compose.yml`. The compose file used by CI (`docker-compose.build.yml`) publishes the web host on `8080`. A `dotnet run` web host is `https://localhost:5113/mcp`. The API also answers on `https://localhost:5003/mcp` if you can reach it directly.
 
-Open Claude Code and ask, for example, "how many days have I spent in each country in the last 365 days?" No Authenticate step is required in this mode.
+Open Claude Code and ask, for example, "how many days have I spent in each country in the last 365 days?" No Authenticate step is required in this mode. "How many days has Sam spent in Canada?" should call `list_travellers` and then the residency tool with `traveller` set to Sam.
 
 ## OAuth mode
 
@@ -86,7 +86,11 @@ MCP Inspector: run `npx @modelcontextprotocol/inspector`, choose Streamable HTTP
 
 ## What the tools can do
 
-Read tools report trips, days per country, the residency summary, daily presence, a rolling count, one day's location, the current location, country rules, forecasts, and the saved home country. `locationAtMidnight` for a date is the country at 00:00 at the start of that date. `get_residency_summary` and `forecast_trips` use the saved home country when `homeCountry` is omitted, and each country is counted on its own window (`rolling365`, `taxYear`, or `calendarYear`). The United Kingdom tax year runs from 6 April to 5 April. Reaching the threshold counts as residency (`thresholdStatus` `reached`). Call `set_home_country` (or set it in the app) before answering days left, days over, or days away when none is saved.
+Read tools report trips, days per country, the residency summary, daily presence, a rolling count, one day's location, the current location, country rules, forecasts, and the saved home country. Omit `traveller` and the call is about the signed-in person. Pass an id or a name (`"Sam"`, case does not matter) to use someone else on the same account. No match, or more than one match, returns an error that lists the travellers. When someone asks about another person, or says "we" or "my wife", call `list_travellers` first and pass the matching name. Confirm that name before any write.
+
+`list_travellers`, `create_traveller`, `update_traveller`, `delete_traveller`, and `copy_trips` manage those people. Create and delete need `write:trips`. `delete_traveller` refuses the signed-in person. A traveller who still has trips is refused until `deleteTrips` is true. `copy_trips` copies legs from one traveller to another and skips a leg that is already there. `create_trip` and `create_trips` take an optional `travellers` array and save the same legs for each person in one transaction. A single id returns one trip; several return one result per person. Every structured result names the traveller, and the text summary starts with that name.
+
+`locationAtMidnight` for a date is the country at 00:00 at the start of that date. `get_residency_summary` and `forecast_trips` use the chosen traveller's saved home country when `homeCountry` is omitted, and each country is counted on its own window (`rolling365`, `taxYear`, or `calendarYear`). The United Kingdom tax year runs from 6 April to 5 April. Reaching the threshold counts as residency (`thresholdStatus` `reached`). Call `set_home_country` (or set it in the app) before answering days left, days over, or days away when none is saved. `lookup_airport`, `get_country_rules`, and `parse_itinerary` are not per traveller.
 
 `parse_itinerary` is listed only when an OpenAI model, endpoint, and API key are all set. It returns a draft and saves nothing. `lookup_airport` searches the shared airport list.
 

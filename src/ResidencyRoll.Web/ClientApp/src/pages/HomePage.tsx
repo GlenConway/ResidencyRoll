@@ -4,7 +4,7 @@ import { downloadDailyPresence, getDailyPresence, getResidencySummary } from '..
 import type { DailyPresence, ResidencySummary } from '../api/types.ts'
 import { Field } from '../components/Field.tsx'
 import { CountryColorService, transitColor } from '../lib/countryColor.ts'
-import { defaultHomeCountry, useHomeCountry } from '../lib/homeCountry.ts'
+import { defaultHomeCountry } from '../lib/homeCountry.ts'
 import {
   cardStatus,
   countriesInPresence,
@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
+import { PageHeading, useSelectedHomeCountry, useTravellers } from '../shell/travellers.tsx'
 
 export function HomePage() {
   const initial = defaultDateRange()
@@ -29,15 +30,17 @@ export function HomePage() {
   const [timelineStart, setTimelineStart] = useState(initial.start)
   const [timelineEnd, setTimelineEnd] = useState(initial.end)
   const [selected, setSelected] = useState<DailyPresence | null>(null)
-  const [homeCountry, setHomeCountry] = useHomeCountry()
+  const [homeCountry, setHomeCountry] = useSelectedHomeCountry()
+  const { selected: traveller } = useTravellers()
+  const travellerId = traveller?.id
 
   const summaryQuery = useQuery({
-    queryKey: ['residency-summary', applied.start, applied.end],
-    queryFn: () => getResidencySummary(applied.start, applied.end),
+    queryKey: ['residency-summary', applied.start, applied.end, travellerId ?? null],
+    queryFn: () => getResidencySummary(applied.start, applied.end, travellerId),
   })
   const presenceQuery = useQuery({
-    queryKey: ['daily-presence', timelineStart, timelineEnd],
-    queryFn: () => getDailyPresence(timelineStart, timelineEnd),
+    queryKey: ['daily-presence', timelineStart, timelineEnd, travellerId ?? null],
+    queryFn: () => getDailyPresence(timelineStart, timelineEnd, travellerId),
   })
 
   const days = useMemo(() => (Array.isArray(presenceQuery.data) ? presenceQuery.data : []), [presenceQuery.data])
@@ -54,7 +57,7 @@ export function HomePage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Residency Status Dashboard</h1>
+        <PageHeading title="Residency Status Dashboard" />
         <p className="mt-1 text-sm text-muted-foreground">Residency calculation based on midnight and partial-day rules</p>
       </header>
       <section className="flex flex-col gap-4 rounded-lg border bg-card p-5">
@@ -62,7 +65,7 @@ export function HomePage() {
           <Field className="w-44" id="summary-start" label="Start Date" type="date" value={draftStart} onChange={(event) => setDraftStart(event.target.value)} />
           <Field className="w-44" id="summary-end" label="End Date" type="date" value={draftEnd} onChange={(event) => setDraftEnd(event.target.value)} />
           <Button onClick={() => setApplied({ start: draftStart, end: draftEnd })}>Calculate</Button>
-          <Button variant="outline" onClick={() => void downloadDailyPresence(applied.start, applied.end)}>
+          <Button variant="outline" onClick={() => void downloadDailyPresence(applied.start, applied.end, travellerId)}>
             Export CSV
           </Button>
         </div>

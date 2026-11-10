@@ -1,9 +1,10 @@
-import { ChartLine, House, Info, List, Moon, Sun } from 'lucide-react'
+import { ChartLine, House, Info, List, Moon, Sun, Users } from 'lucide-react'
 import { Component, useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { getCurrentUser } from '../api/client.ts'
 import { Button } from '@/components/ui/button'
+import { TravellerProvider, useTravellers } from './travellers.tsx'
 
 const themeKey = 'residencyroll_theme'
 
@@ -11,6 +12,7 @@ const links = [
   { to: '/', label: 'Home', icon: House },
   { to: '/manage-trips', label: 'Manage Trips', icon: List },
   { to: '/forecast', label: 'Forecast', icon: ChartLine },
+  { to: '/travellers', label: 'Travellers', icon: Users },
   { to: '/system-info', label: 'System Info', icon: Info },
 ]
 
@@ -22,7 +24,16 @@ export function PageTitle({ title }: { title: string }) {
 }
 
 export function AppShell() {
+  return (
+    <TravellerProvider>
+      <ShellFrame />
+    </TravellerProvider>
+  )
+}
+
+function ShellFrame() {
   const user = useQuery({ queryKey: ['bff', 'user'], queryFn: getCurrentUser })
+  const { travellers, selected, select } = useTravellers()
   const [dark, setDark] = useState(() => window.localStorage.getItem(themeKey) === 'dark')
 
   useEffect(() => {
@@ -58,6 +69,23 @@ export function AppShell() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-end gap-3 border-b bg-sidebar px-5">
+          {travellers.length > 0 ? (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Traveller</span>
+              <select
+                aria-label="Traveller"
+                className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                value={selected?.id ?? ''}
+                onChange={(event) => select(Number(event.target.value))}
+              >
+                {travellers.map((traveller) => (
+                  <option key={traveller.id} value={traveller.id}>
+                    {traveller.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <span className="text-sm text-muted-foreground">{user.data?.name}</span>
           <Button variant="ghost" size="icon" aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setDark((value) => !value)}>
             {dark ? <Sun /> : <Moon />}

@@ -17,6 +17,46 @@ namespace ResidencyRoll.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("ResidencyRoll.Api.Models.Traveller", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HomeCountry")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinkedUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedUserId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("OwnerUserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Travellers");
+                });
+
             modelBuilder.Entity("ResidencyRoll.Api.Models.Trip", b =>
                 {
                     b.Property<int>("Id")
@@ -41,6 +81,10 @@ namespace ResidencyRoll.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DepartureCity")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -59,6 +103,13 @@ namespace ResidencyRoll.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("TravellerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -67,6 +118,8 @@ namespace ResidencyRoll.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("TravellerId", "DepartureDateTime");
 
                     b.ToTable("Trips");
                 });
@@ -84,6 +137,17 @@ namespace ResidencyRoll.Api.Migrations
                     b.HasKey("UserId");
 
                     b.ToTable("UserProfiles");
+                });
+
+            modelBuilder.Entity("ResidencyRoll.Api.Models.Trip", b =>
+                {
+                    b.HasOne("ResidencyRoll.Api.Models.Traveller", "Traveller")
+                        .WithMany()
+                        .HasForeignKey("TravellerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Traveller");
                 });
 #pragma warning restore 612, 618
         }

@@ -18,13 +18,15 @@ public sealed class TripReadTools
     [Description("Lists the signed-in user's flight legs, optionally overlapping a date range. Leg times are local wall-clock times with no offset. " + Semantics)]
     public static async Task<CallToolResult> ListTrips(
         TripService trips,
+        TravellerService travellers,
         ClaimsPrincipal user,
         [Description("Include legs that overlap this date (yyyy-MM-dd) or later. Optional.")] string? from = null,
-        [Description("Include legs that overlap this date (yyyy-MM-dd) or earlier. Optional.")] string? to = null)
+        [Description("Include legs that overlap this date (yyyy-MM-dd) or earlier. Optional.")] string? to = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
-        var all = await trips.GetAllTripsAsync(userId);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var all = await trips.GetAllTripsAsync(person.OwnerUserId, person);
         DateOnly? fromDate = string.IsNullOrWhiteSpace(from) ? null : TripLegResolver.ParseDate(from, "from");
         DateOnly? toDate = string.IsNullOrWhiteSpace(to) ? null : TripLegResolver.ParseDate(to, "to");
         var selected = all
@@ -34,25 +36,28 @@ public sealed class TripReadTools
         var summary = selected.Count == 0
             ? "No trips."
             : $"{selected.Count} trip{(selected.Count == 1 ? "" : "s")}: " + string.Join("; ", selected.Select(trip => $"{trip.DepartureIataCode ?? trip.DepartureCity} to {trip.ArrivalIataCode ?? trip.ArrivalCity}"));
-        return McpResults.Ok(summary, selected);
+        return McpResults.For(person, summary, selected);
     }
 
     [McpServerTool(Name = "get_trip", Title = "Get trip", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpTrip))]
     [Description("Returns one flight leg by id. A leg owned by someone else is reported as not found.")]
     public static async Task<CallToolResult> GetTrip(
         TripService trips,
+        TravellerService travellers,
         ClaimsPrincipal user,
-        [Description("Trip id.")] int id)
+        [Description("Trip id.")] int id,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var trip = await trips.GetTripByIdAsync(id, McpScopes.UserId(user));
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var trip = await trips.GetTripByIdAsync(id, person.OwnerUserId, person);
         if (trip is null)
         {
             throw new ModelContextProtocol.McpException("Trip not found.");
         }
 
         var dto = McpTrip.From(trip.ToDto());
-        return McpResults.Ok($"{dto.DepartureCity} ({dto.DepartureIataCode}) to {dto.ArrivalCity} ({dto.ArrivalIataCode}).", dto);
+        return McpResults.For(person, $"{dto.DepartureCity} ({dto.DepartureIataCode}) to {dto.ArrivalCity} ({dto.ArrivalIataCode}).", dto);
     }
 
     [McpServerTool(Name = "get_days_per_country", Title = "Days per country", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpCountryDays[]))]
@@ -60,15 +65,17 @@ public sealed class TripReadTools
     public static async Task<CallToolResult> GetDaysPerCountry(
         TripService trips,
         ResidencyCalculationService rules,
+        TravellerService travellers,
         ClaimsPrincipal user,
-        [Description("last365 or all.")] string window)
+        [Description("last365 or all.")] string window,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
         Dictionary<string, int> totals = window switch
         {
-            "last365" => await trips.GetDaysPerCountryInLast365DaysAsync(userId),
-            "all" => await trips.GetTotalDaysPerCountryAsync(userId),
+            "last365" => await trips.GetDaysPerCountryInLast365DaysAsync(person.OwnerUserId, person),
+            "all" => await trips.GetTotalDaysPerCountryAsync(person.OwnerUserId, person),
             _ => throw new ModelContextProtocol.McpException("window must be \"last365\" or \"all\".")
         };
 
@@ -80,7 +87,7 @@ public sealed class TripReadTools
         var summary = rows.Count == 0
             ? $"No days recorded ({window})."
             : string.Join(" ", rows.Select(row => $"{row.CountryName}: {row.Days} days, {row.RuleType}, threshold {row.ThresholdDays}."));
-        return McpResults.Ok(summary, rows);
+        return McpResults.For(person, summary, rows);
     }
 
     private static bool Overlaps(DateTime departure, DateTime arrival, DateOnly? from, DateOnly? to)
@@ -111,21 +118,23 @@ public sealed class ResidencyTools
     public static async Task<CallToolResult> GetResidencySummary(
         ResidencyQueryService query,
         ResidencyCalculationService rules,
-        UserProfileService profiles,
+        TravellerService travellers,
         ClaimsPrincipal user,
         [Description("Range start, yyyy-MM-dd. Optional. When omitted, each country uses its own counting window.")] string? startDate = null,
         [Description("Range end, yyyy-MM-dd. Defaults to today. Country windows end on this date when startDate is omitted.")] string? endDate = null,
-        [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null)
+        [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var userId = McpScopes.UserId(user);
-        var home = await SavedHomeCountry.Resolve(profiles, userId, homeCountry);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var userId = person.OwnerUserId;
+        var home = SavedHomeCountry.Resolve(person, homeCountry);
         DateOnly? end = string.IsNullOrWhiteSpace(endDate) ? null : TripLegResolver.ParseDate(endDate, "endDate");
         DateOnly? start = string.IsNullOrWhiteSpace(startDate) ? null : TripLegResolver.ParseDate(startDate, "startDate");
         var reference = end ?? DateOnly.FromDateTime(DateTime.Today);
-        var summary = await query.GetResidencySummaryAsync(userId, start, end);
+        var summary = await query.GetResidencySummaryAsync(userId, start, end, person);
         var rows = summary.Select(item => ResidencyCountryStatus.From(item, home)).ToList();
-        var coverage = await query.GetRecordCoverageAsync(userId);
+        var coverage = await query.GetRecordCoverageAsync(userId, person);
         if (!string.IsNullOrWhiteSpace(home) && rows.All(row => !row.CountryName.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             var rule = rules.GetCountryRule(home);
@@ -152,7 +161,7 @@ public sealed class ResidencyTools
 
         if (!string.IsNullOrWhiteSpace(home))
         {
-            var minimum = await query.MeasureMinimumPresenceAsync(userId, home, reference);
+            var minimum = await query.MeasureMinimumPresenceAsync(userId, home, reference, person);
             var homeRow = rows.FirstOrDefault(row => row.CountryName.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase));
             if (homeRow is not null && minimum is not null)
             {
@@ -168,7 +177,7 @@ public sealed class ResidencyTools
             text += " No home country is saved. Ask the user, then call set_home_country.";
         }
 
-        return McpResults.Ok(text, rows);
+        return McpResults.For(person, text, rows);
     }
 
     private static bool Involves(DailyPresenceDto day, string country) =>
@@ -211,13 +220,16 @@ public sealed class ResidencyTools
     [Description("Midnight location for each day in a range. locationAtMidnight is the country at 00:00 at the start of that date. format \"days\" returns one row per day. format \"runs\" returns contiguous stretches as country, from, to, and days. country limits the rows to that country. At most 366 days per call. Days after the last saved trip are omitted; use get_location_on to project those. " + Semantics)]
     public static async Task<CallToolResult> GetDailyPresence(
         ResidencyQueryService query,
+        TravellerService travellers,
         ClaimsPrincipal user,
         [Description("Range start, yyyy-MM-dd.")] string startDate,
         [Description("Range end, yyyy-MM-dd.")] string endDate,
         [Description("Country name. Optional. Limits the rows to that country.")] string? country = null,
-        [Description("days or runs. Defaults to days.")] string format = "days")
+        [Description("days or runs. Defaults to days.")] string format = "days",
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
         var start = TripLegResolver.ParseDate(startDate, "startDate");
         var end = TripLegResolver.ParseDate(endDate, "endDate");
         if (end < start)
@@ -231,7 +243,7 @@ public sealed class ResidencyTools
             throw new ModelContextProtocol.McpException("get_daily_presence returns at most 366 days per call.");
         }
 
-        var presence = await query.GetDailyPresenceAsync(McpScopes.UserId(user), start, end);
+        var presence = await query.GetDailyPresenceAsync(person.OwnerUserId, start, end, person);
         if (!string.IsNullOrWhiteSpace(country))
         {
             presence = presence.Where(day => Involves(day, country)).ToList();
@@ -242,23 +254,26 @@ public sealed class ResidencyTools
         if (mode == "runs")
         {
             response.Runs = PresenceRuns(presence, country);
-            return McpResults.Ok($"{response.Runs.Count} runs from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
+            return McpResults.For(person, $"{response.Runs.Count} runs from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
         }
 
         response.Days = presence;
-        return McpResults.Ok($"{presence.Count} days from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
+        return McpResults.For(person, $"{presence.Count} days from {start:yyyy-MM-dd} to {end:yyyy-MM-dd}.", response);
     }
 
     [McpServerTool(Name = "get_rolling_count", Title = "Rolling day count", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(RollingCountPoint[]))]
     [Description("Rolling 365-day count for one country on each day in a range, counting both ends. This view is always the rolling 365-day window, including when the country's own rule uses a tax year or a calendar year. anniversaryDate is the day that leaves the window when this date is included (365 days earlier). anniversaryCounted means that day counted, so a counted day on this date does not raise the total. " + Semantics)]
     public static async Task<CallToolResult> GetRollingCount(
         ResidencyQueryService query,
+        TravellerService travellers,
         ClaimsPrincipal user,
         [Description("Country name.")] string country,
         [Description("Range start, yyyy-MM-dd.")] string from,
-        [Description("Range end, yyyy-MM-dd.")] string to)
+        [Description("Range end, yyyy-MM-dd.")] string to,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
         if (string.IsNullOrWhiteSpace(country))
         {
             throw new ModelContextProtocol.McpException("country is required.");
@@ -276,22 +291,25 @@ public sealed class ResidencyTools
             throw new ModelContextProtocol.McpException("get_rolling_count returns at most 366 days per call.");
         }
 
-        var rows = (await query.GetRollingCountAsync(McpScopes.UserId(user), country.Trim(), start, end))
+        var rows = (await query.GetRollingCountAsync(person.OwnerUserId, country.Trim(), start, end, traveller: person))
             .Select(RollingCountPoint.From)
             .ToList();
-        return McpResults.Ok($"{rows.Count} days of rolling counts for {country.Trim()}.", rows);
+        return McpResults.For(person, $"{rows.Count} days of rolling counts for {country.Trim()}.", rows);
     }
 
     [McpServerTool(Name = "get_location_on", Title = "Location on a date", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpLocationOn))]
     [Description("Where the user was on one date. status is recorded, gapFilled, projected, or noData. A date after the last saved trip is projected from the last arrival country and marked projected. " + Semantics)]
     public static async Task<CallToolResult> GetLocationOn(
         ResidencyQueryService query,
+        TravellerService travellers,
         ClaimsPrincipal user,
-        [Description("Date, yyyy-MM-dd.")] string date)
+        [Description("Date, yyyy-MM-dd.")] string date,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
         var day = TripLegResolver.ParseDate(date, "date");
-        var location = await query.GetLocationOnAsync(McpScopes.UserId(user), day);
+        var location = await query.GetLocationOnAsync(person.OwnerUserId, day, person);
         var payload = McpLocationOn.From(location);
         var during = payload.LocationsDuringDay.Count == 0 ? "none" : string.Join(", ", payload.LocationsDuringDay);
         var text = location.Status switch
@@ -300,28 +318,31 @@ public sealed class ResidencyTools
             "projected" => $"No presence recorded for {day:yyyy-MM-dd}. Projected location is {location.LocationAtMidnight}. Status: projected.",
             _ => $"On {day:yyyy-MM-dd} the midnight location was {location.LocationAtMidnight}. Countries during the day: {during}. In transit at midnight: {(location.IsInTransitAtMidnight ? "yes" : "no")}. Status: {location.Status}."
         };
-        return McpResults.Ok(text, payload);
+        return McpResults.For(person, text, payload);
     }
 
     [McpServerTool(Name = "get_current_location", Title = "Current location", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpCurrentLocation))]
     [Description("Country the user is in now, the last arrival airport at or before now, and that arrival's local date. Use the airport as the departure airport when forecasting a future trip. status is recorded, gapFilled, projected, inTransit, or noData. " + Semantics)]
     public static async Task<CallToolResult> GetCurrentLocation(
         ResidencyQueryService query,
-        ClaimsPrincipal user)
+        TravellerService travellers,
+        ClaimsPrincipal user,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var location = await query.GetCurrentLocationAsync(McpScopes.UserId(user));
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var location = await query.GetCurrentLocationAsync(person.OwnerUserId, person);
         var payload = McpCurrentLocation.From(location);
         if (location.Status == "noData")
         {
-            return McpResults.Ok("No arrival at or before now.", payload);
+            return McpResults.For(person, "No arrival at or before now.", payload);
         }
 
         var airport = string.IsNullOrWhiteSpace(location.LastArrivalIataCode) ? location.LastArrivalCity : location.LastArrivalIataCode;
         var text = location.Status == "inTransit"
             ? $"In transit toward {location.InTransitArrivalCity} ({location.InTransitArrivalIataCode}), {location.InTransitArrivalCountry}. Last arrival was {airport} in {location.LastArrivalCountry} on {location.LastArrivalDate:yyyy-MM-dd}."
             : $"Current country is {location.Country} ({location.Status}). Last arrival was {airport} in {location.LastArrivalCountry} on {location.LastArrivalDate:yyyy-MM-dd}.";
-        return McpResults.Ok(text, payload);
+        return McpResults.For(person, text, payload);
     }
 
     [McpServerTool(Name = "get_country_rules", Title = "Country residency rules", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(CountryRuleResult[]))]
@@ -346,10 +367,15 @@ public sealed class ResidencyTools
 
     [McpServerTool(Name = "get_record_coverage", Title = "Record coverage", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(RecordCoverageResult))]
     [Description("How far the saved legs reach. firstTripDate and lastTripDate are the earliest and latest local dates on any leg. legCount is the number of saved legs. A summary window that starts before firstTripDate or ends after lastTripDate is incomplete.")]
-    public static async Task<CallToolResult> GetRecordCoverage(TripService trips, ClaimsPrincipal user)
+    public static async Task<CallToolResult> GetRecordCoverage(
+        TripService trips,
+        TravellerService travellers,
+        ClaimsPrincipal user,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var saved = await trips.GetAllTripsAsync(McpScopes.UserId(user));
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var saved = await trips.GetAllTripsAsync(person.OwnerUserId, person);
         DateOnly? first = null;
         DateOnly? last = null;
         foreach (var trip in saved)
@@ -372,25 +398,32 @@ public sealed class ResidencyTools
         var text = saved.Count == 0
             ? "No trips are saved."
             : $"{saved.Count} legs, from {first:yyyy-MM-dd} to {last:yyyy-MM-dd}.";
-        return McpResults.Ok(text, result);
+        return McpResults.For(person, text, result);
     }
 
-    [McpServerTool(Name = "find_suspect_trips", Title = "Find suspect trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(TripWarning[]))]
+    [McpServerTool(Name = "find_suspect_trips", Title = "Find suspect trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(SuspectTripsResult))]
     [Description("Checks every saved leg. Warns when arrival is before departure in UTC, a non-stop leg is over 20 hours, the duration is far from the usual time for the timezone difference, a leg overlaps another, or the arrival country does not match the next leg's departure country. Nothing is changed.")]
-    public static async Task<CallToolResult> FindSuspectTrips(TripService trips, ClaimsPrincipal user)
+    public static async Task<CallToolResult> FindSuspectTrips(
+        TripService trips,
+        TravellerService travellers,
+        ClaimsPrincipal user,
+        [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
-        var saved = await trips.GetAllTripsAsync(McpScopes.UserId(user));
+        var person = await McpTravellers.Resolve(travellers, user, traveller);
+        var saved = await trips.GetAllTripsAsync(person.OwnerUserId, person);
         var warnings = TripAuditor.InspectAll(saved);
         var text = warnings.Count == 0
             ? $"Checked {saved.Count} legs. None look suspicious."
             : $"{warnings.Count} warning{(warnings.Count == 1 ? "" : "s")}: " + string.Join(" ", warnings.Select(warning => warning.Message));
-        return McpResults.Ok(text, warnings);
+        return McpResults.For(person, text, new SuspectTripsResult { Warnings = warnings });
     }
 }
 
 public class ResidencyCountryStatus
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public string CountryName { get; set; } = string.Empty;
     public int TotalDays { get; set; }
     public string RuleType { get; set; } = string.Empty;
@@ -565,8 +598,16 @@ public sealed class CountryRuleResult
     };
 }
 
+public sealed class SuspectTripsResult
+{
+    public McpTravellerRef Traveller { get; set; } = new();
+    public List<TripWarning> Warnings { get; set; } = [];
+}
+
 public sealed class RecordCoverageResult
 {
+    public McpTravellerRef Traveller { get; set; } = new();
+
     public DateOnly? FirstTripDate { get; set; }
     public DateOnly? LastTripDate { get; set; }
     public int LegCount { get; set; }

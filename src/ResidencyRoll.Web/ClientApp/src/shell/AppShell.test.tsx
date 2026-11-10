@@ -30,6 +30,7 @@ describe('App shell', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Manage Trips' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Forecast' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Travellers' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'System Info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
     expect(document.title).toBe('Residency Roll - Travel Tracker')

@@ -20,15 +20,21 @@ public class TripsController : ControllerBase
     private readonly TripService _tripService;
     private readonly ResidencyQueryService _queryService;
     private readonly ItineraryParsingService _itineraryParsingService;
+    private readonly TravellerAccess _access;
+    private readonly TravellerService _travellers;
 
     public TripsController(
         TripService tripService,
         ResidencyQueryService queryService,
-        ItineraryParsingService itineraryParsingService)
+        ItineraryParsingService itineraryParsingService,
+        TravellerAccess access,
+        TravellerService travellers)
     {
         _tripService = tripService;
         _queryService = queryService;
         _itineraryParsingService = itineraryParsingService;
+        _access = access;
+        _travellers = travellers;
     }
 
     private string GetUserId()
@@ -41,69 +47,122 @@ public class TripsController : ControllerBase
         return userId;
     }
 
-    [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<TripDto>>> GetTrips()
+    private async Task<Models.Traveller?> AccessibleTraveller(int? travellerId)
     {
         var userId = GetUserId();
-        var trips = await _tripService.GetAllTripsAsync(userId);
+        if (travellerId is null)
+        {
+            return await _access.ResolveSelfAsync(userId);
+        }
+
+        return await _access.FindOwnedAsync(userId, travellerId.Value);
+    }
+
+    private void StampNew(Models.Trip entity, Models.Traveller traveller)
+    {
+        entity.TravellerId = traveller.Id;
+        entity.UserId = traveller.OwnerUserId;
+        entity.CreatedByUserId = GetUserId();
+    }
+
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<TripDto>>> GetTrips([FromQuery] int? travellerId = null)
+    {
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var trips = await _tripService.GetAllTripsAsync(GetUserId(), traveller);
         return Ok(trips.Select(t => t.ToDto()));
     }
 
     [HttpGet("timeline")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<TripDto>>> GetTimeline()
+    public async Task<ActionResult<IEnumerable<TripDto>>> GetTimeline([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var trips = await _tripService.GetTripsForTimelineAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var trips = await _tripService.GetTripsForTimelineAsync(GetUserId(), traveller);
         return Ok(trips.Select(t => t.ToDto()));
     }
 
     [HttpGet("days-per-country")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetTotalDaysPerCountry()
+    public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetTotalDaysPerCountry([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var totals = await _tripService.GetTotalDaysPerCountryAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var totals = await _tripService.GetTotalDaysPerCountryAsync(GetUserId(), traveller);
         var result = totals.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value });
         return Ok(result);
     }
 
     [HttpGet("days-per-country/last365")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetDaysPerCountryLast365()
+    public async Task<ActionResult<IEnumerable<CountryDaysDto>>> GetDaysPerCountryLast365([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var totals = await _tripService.GetDaysPerCountryInLast365DaysAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var totals = await _tripService.GetDaysPerCountryInLast365DaysAsync(GetUserId(), traveller);
         var result = totals.Select(kvp => new CountryDaysDto { CountryName = kvp.Key, Days = kvp.Value });
         return Ok(result);
     }
 
     [HttpGet("total-days-away/last365")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<int>> GetTotalDaysAwayLast365()
+    public async Task<ActionResult<int>> GetTotalDaysAwayLast365([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var total = await _tripService.GetTotalDaysAwayInLast365DaysAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var total = await _tripService.GetTotalDaysAwayInLast365DaysAsync(GetUserId(), traveller);
         return Ok(total);
     }
 
     [HttpGet("days-at-home/last365")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<int>> GetDaysAtHomeLast365()
+    public async Task<ActionResult<int>> GetDaysAtHomeLast365([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var total = await _tripService.GetDaysAtHomeInLast365DaysAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var total = await _tripService.GetDaysAtHomeInLast365DaysAsync(GetUserId(), traveller);
         return Ok(total);
     }
 
     [HttpGet("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<TripDto>> GetTrip(int id)
+    public async Task<ActionResult<TripDto>> GetTrip(int id, [FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var trip = await _tripService.GetTripByIdAsync(id, userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var trip = await _tripService.GetTripByIdAsync(id, GetUserId(), traveller);
         if (trip == null)
         {
             return NotFound();
@@ -114,40 +173,78 @@ public class TripsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<TripDto>> CreateTrip([FromBody] TripDto request)
+    public async Task<IActionResult> CreateTrip(
+        [FromBody] TripDto request,
+        [FromQuery] int? travellerId = null,
+        [FromQuery] int[]? travellerIds = null)
     {
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var userId = GetUserId();
-        var entity = request.ToEntity();
-        entity.UserId = userId;
-        var created = await _tripService.CreateTripAsync(entity);
-        var dto = created.ToDto();
-        return CreatedAtAction(nameof(GetTrip), new { id = dto.Id, version = "1.0" }, dto);
+        var targets = new List<Models.Traveller>();
+        if (travellerIds is { Length: > 0 })
+        {
+            foreach (var id in travellerIds.Distinct())
+            {
+                var person = await _access.FindOwnedAsync(GetUserId(), id);
+                if (person is null)
+                {
+                    return NotFound();
+                }
+
+                targets.Add(person);
+            }
+        }
+        else
+        {
+            var person = await AccessibleTraveller(travellerId);
+            if (person is null)
+            {
+                return NotFound();
+            }
+
+            targets.Add(person);
+        }
+
+        if (targets.Count == 1)
+        {
+            var entity = request.ToEntity();
+            StampNew(entity, targets[0]);
+            var created = await _tripService.CreateTripAsync(entity, GetUserId());
+            var dto = created.ToDto();
+            return CreatedAtAction(nameof(GetTrip), new { id = dto.Id, version = "1.0" }, dto);
+        }
+
+        var createdMany = await _tripService.CreateForTravellersAsync(request.ToEntity(), targets, GetUserId());
+        return CreatedAtAction(nameof(GetTrip), new { id = createdMany[0].Id, version = "1.0" }, createdMany.Select(trip => trip.ToDto()));
     }
 
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateTrip(int id, [FromBody] TripDto request)
+    public async Task<IActionResult> UpdateTrip(int id, [FromBody] TripDto request, [FromQuery] int? travellerId = null)
     {
         if (id != request.Id)
         {
             return BadRequest("ID mismatch");
         }
 
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
         var userId = GetUserId();
-        var existing = await _tripService.GetTripByIdAsync(id, userId);
+        var existing = await _tripService.GetTripByIdAsync(id, userId, traveller);
         if (existing == null)
         {
             return NotFound();
         }
 
-        // Update timezone-aware fields
         existing.DepartureCountry = request.DepartureCountry;
         existing.DepartureCity = request.DepartureCity;
         existing.DepartureDateTime = request.DepartureDateTime;
@@ -159,40 +256,52 @@ public class TripsController : ControllerBase
         existing.ArrivalTimezone = request.ArrivalTimezone;
         existing.ArrivalIataCode = request.ArrivalIataCode;
 
-        await _tripService.UpdateTripAsync(existing, userId);
+        await _tripService.UpdateTripAsync(existing, userId, traveller);
         return NoContent();
     }
 
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteTrip(int id)
+    public async Task<IActionResult> DeleteTrip(int id, [FromQuery] int? travellerId = null)
     {
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
         var userId = GetUserId();
-        var existing = await _tripService.GetTripByIdAsync(id, userId);
+        var existing = await _tripService.GetTripByIdAsync(id, userId, traveller);
         if (existing == null)
         {
             return NotFound();
         }
 
-        await _tripService.DeleteTripAsync(id, userId);
+        await _tripService.DeleteTripAsync(id, userId, traveller);
         return NoContent();
     }
 
     [HttpPost("forecast")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ForecastResponseDto>> Forecast([FromBody] ForecastRequestDto request)
+    public async Task<ActionResult<ForecastResponseDto>> Forecast([FromBody] ForecastRequestDto request, [FromQuery] int? travellerId = null)
     {
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var userId = GetUserId();
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
         var hypotheticalTrips = request.Legs.Select(leg => new Trip
         {
-            UserId = userId,
+            UserId = traveller.OwnerUserId,
+            TravellerId = traveller.Id,
             DepartureCountry = leg.DepartureCountry,
             DepartureCity = leg.DepartureCity,
             DepartureDateTime = leg.DepartureDateTime,
@@ -205,7 +314,7 @@ public class TripsController : ControllerBase
             ArrivalIataCode = leg.ArrivalIataCode
         }).ToList();
 
-        return Ok(await _queryService.ForecastAsync(userId, hypotheticalTrips));
+        return Ok(await _queryService.ForecastAsync(GetUserId(), hypotheticalTrips, traveller: traveller));
     }
 
     [HttpPost("forecast/max-end-date")]
@@ -230,32 +339,49 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<DailyPresenceDto>>> GetDailyPresence(
         [FromQuery] DateOnly? startDate = null,
-        [FromQuery] DateOnly? endDate = null)
+        [FromQuery] DateOnly? endDate = null,
+        [FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        return Ok(await _queryService.GetDailyPresenceAsync(userId, startDate, endDate));
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(await _queryService.GetDailyPresenceAsync(GetUserId(), startDate, endDate, traveller));
     }
 
     [HttpGet("residency-summary")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ResidencySummaryDto>>> GetResidencySummary(
         [FromQuery] DateOnly? startDate = null,
-        [FromQuery] DateOnly? endDate = null)
+        [FromQuery] DateOnly? endDate = null,
+        [FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        return Ok(await _queryService.GetResidencySummaryAsync(userId, startDate, endDate));
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(await _queryService.GetResidencySummaryAsync(GetUserId(), startDate, endDate, traveller));
     }
 
     [HttpGet("export")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> ExportTrips()
+    public async Task<IActionResult> ExportTrips([FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var trips = await _tripService.GetAllTripsAsync(userId);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
+
+        var trips = await _tripService.GetAllTripsAsync(GetUserId(), traveller);
         
         var csvLines = new List<string> 
         { 
-            "DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,DepartureIataCode,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone,ArrivalIataCode" 
+            "DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,DepartureIataCode,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone,ArrivalIataCode,Traveller" 
         };
 
         foreach (var trip in trips.OrderBy(t => t.ArrivalDateTime))
@@ -270,7 +396,8 @@ public class TripsController : ControllerBase
                 EscapeCsv(trip.ArrivalCity ?? string.Empty),
                 trip.ArrivalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 EscapeCsv(trip.ArrivalTimezone ?? "UTC"),
-                EscapeCsv(trip.ArrivalIataCode ?? string.Empty));
+                EscapeCsv(trip.ArrivalIataCode ?? string.Empty),
+                EscapeCsv(traveller.Name));
             csvLines.Add(line);
         }
 
@@ -284,12 +411,18 @@ public class TripsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportDailyPresence(
         [FromQuery] DateOnly? startDate = null,
-        [FromQuery] DateOnly? endDate = null)
+        [FromQuery] DateOnly? endDate = null,
+        [FromQuery] int? travellerId = null)
     {
-        var userId = GetUserId();
-        var presence = await _queryService.GetDailyPresenceAsync(userId, startDate, endDate);
+        var traveller = await AccessibleTraveller(travellerId);
+        if (traveller is null)
+        {
+            return NotFound();
+        }
 
-        var csvLines = new List<string> { "date,primary_country,secondary_country" };
+        var presence = await _queryService.GetDailyPresenceAsync(GetUserId(), startDate, endDate, traveller);
+
+        var csvLines = new List<string> { "date,primary_country,secondary_country,traveller" };
 
         foreach (var dp in presence)
         {
@@ -301,7 +434,8 @@ public class TripsController : ControllerBase
             csvLines.Add(string.Join(',',
                 dp.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 EscapeCsv(primary),
-                EscapeCsv(secondary)));
+                EscapeCsv(secondary),
+                EscapeCsv(traveller.Name)));
         }
 
         var bytes = Encoding.UTF8.GetBytes(string.Join('\n', csvLines));
@@ -312,11 +446,17 @@ public class TripsController : ControllerBase
     [HttpPost("import")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<object>> ImportTrips(IFormFile file)
+    public async Task<ActionResult<object>> ImportTrips(IFormFile file, [FromQuery] int? travellerId = null)
     {
         if (file == null || file.Length == 0)
         {
             return BadRequest("File is empty.");
+        }
+
+        var defaultTraveller = await AccessibleTraveller(travellerId);
+        if (defaultTraveller is null)
+        {
+            return NotFound();
         }
 
         var userId = GetUserId();
@@ -342,9 +482,10 @@ public class TripsController : ControllerBase
         var content = await reader.ReadToEndAsync();
         var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-        var newTrips = new List<Trip>();
+        var staged = new List<(Trip Trip, string? TravellerName)>();
         var invalidRows = new List<string>();
         var isFirst = true;
+        var travellerColumn = false;
 
         foreach (var rawLine in lines)
         {
@@ -357,6 +498,7 @@ public class TripsController : ControllerBase
             if (isFirst && (line.StartsWith("DepartureCountry", StringComparison.OrdinalIgnoreCase) || 
                             line.StartsWith("CountryName", StringComparison.OrdinalIgnoreCase)))
             {
+                travellerColumn = ParseCsvLine(line).Any(part => part.Equals("Traveller", StringComparison.OrdinalIgnoreCase));
                 isFirst = false;
                 continue;
             }
@@ -364,6 +506,7 @@ public class TripsController : ControllerBase
             isFirst = false;
 
             var parts = ParseCsvLine(line);
+            string? rowTraveller = travellerColumn && parts.Length > 10 ? parts[10] : null;
             
             // Support new format with IATA codes (v2): DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,DepartureIataCode,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone,ArrivalIataCode
             if (parts.Length >= 10)
@@ -387,9 +530,8 @@ public class TripsController : ControllerBase
                     continue;
                 }
 
-                newTrips.Add(new Trip
+                staged.Add((new Trip
                 {
-                    UserId = userId,
                     DepartureCountry = parts[0],
                     DepartureCity = parts[1],
                     DepartureDateTime = departureDateTime,
@@ -400,7 +542,7 @@ public class TripsController : ControllerBase
                     ArrivalDateTime = arrivalDateTime,
                     ArrivalTimezone = parts[8],
                     ArrivalIataCode = string.IsNullOrWhiteSpace(parts[9]) ? null : parts[9]
-                });
+                }, rowTraveller));
             }
             // Support old format (v1): DepartureCountry,DepartureCity,DepartureDateTime,DepartureTimezone,ArrivalCountry,ArrivalCity,ArrivalDateTime,ArrivalTimezone
             else if (parts.Length >= 8)
@@ -424,9 +566,8 @@ public class TripsController : ControllerBase
                     continue;
                 }
 
-                newTrips.Add(new Trip
+                staged.Add((new Trip
                 {
-                    UserId = userId,
                     DepartureCountry = parts[0],
                     DepartureCity = parts[1],
                     DepartureDateTime = departureDateTime,
@@ -435,7 +576,7 @@ public class TripsController : ControllerBase
                     ArrivalCity = parts[5],
                     ArrivalDateTime = arrivalDateTime,
                     ArrivalTimezone = parts[7]
-                });
+                }, null));
             }
             // Legacy format support (for migration): CountryName,StartDate,EndDate
             else if (parts.Length >= 3)
@@ -448,9 +589,8 @@ public class TripsController : ControllerBase
                 }
 
                 // Convert legacy format to new format with UTC
-                newTrips.Add(new Trip
+                staged.Add((new Trip
                 {
-                    UserId = userId,
                     DepartureCountry = parts[0],
                     DepartureCity = string.Empty,
                     DepartureDateTime = end,
@@ -459,7 +599,7 @@ public class TripsController : ControllerBase
                     ArrivalCity = string.Empty,
                     ArrivalDateTime = start,
                     ArrivalTimezone = "UTC"
-                });
+                }, null));
             }
             else
             {
@@ -468,7 +608,7 @@ public class TripsController : ControllerBase
             }
         }
 
-        if (newTrips.Count == 0)
+        if (staged.Count == 0)
         {
             var errorMessage = "No valid trips found in file.";
             if (invalidRows.Count > 0)
@@ -485,11 +625,32 @@ public class TripsController : ControllerBase
         var successCount = 0;
         var creationErrors = new List<string>();
         
-        foreach (var trip in newTrips)
+        var named = new Dictionary<string, Models.Traveller>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (trip, name) in staged)
         {
+            var target = defaultTraveller;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                var key = name.Trim();
+                if (!named.TryGetValue(key, out target!))
+                {
+                    try
+                    {
+                        target = await _travellers.ResolveAsync(userId, key);
+                        named[key] = target;
+                    }
+                    catch (TravellerResolutionException ex)
+                    {
+                        creationErrors.Add(ex.Message);
+                        continue;
+                    }
+                }
+            }
+
+            StampNew(trip, target);
             try
             {
-                await _tripService.CreateTripAsync(trip);
+                await _tripService.CreateTripAsync(trip, userId);
                 successCount++;
             }
             catch (Exception ex)

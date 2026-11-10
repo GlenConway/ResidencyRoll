@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-09). Supersedes [ADR-012](ADR-012-blazor-server-radzen-code-behind.md). Amends [ADR-001](ADR-001-split-api-and-web.md) (the Web frontend is React instead of Blazor) and [ADR-013](ADR-013-carbon-design-system-replaces-liquid-glass.md) (Carbon comes from `@carbon/react` instead of hand-written CSS over Radzen). Amended by [ADR-016](ADR-016-mcp-server-streamable-http.md): the Web host also proxies `/mcp` and OAuth protected-resource metadata to the API.
+Accepted (2026-11-09). Supersedes [ADR-012](ADR-012-blazor-server-radzen-code-behind.md). Amends [ADR-001](ADR-001-split-api-and-web.md) (the Web frontend is React instead of Blazor) and [ADR-013](ADR-013-carbon-design-system-replaces-liquid-glass.md) (Carbon comes from `@carbon/react` instead of hand-written CSS over Radzen). Amended by [ADR-016](ADR-016-mcp-server-streamable-http.md): the Web host also proxies `/mcp` and OAuth protected-resource metadata to the API. Amended by [ADR-020](ADR-020-travellers-on-an-account.md): the home country is stored on the selected traveller. The `residencyroll_home_country` key remains a browser mirror of that value.
 
 ## Context
 
