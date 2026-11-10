@@ -103,6 +103,21 @@ Expose residency queries, forecasts and trip editing to Claude Code and other MC
 
 ---
 
+### M11 — Travellers on One Account (Not started)
+
+Track trips and residency for several people, such as a spouse who does not sign in, from one login. Each traveller has their own trips and home country. The UI and MCP default to the account owner, and MCP tools take an optional `traveller` on every call. Plan and "done when" criteria are in [M11_TRAVELLERS_PLAN.md](M11_TRAVELLERS_PLAN.md).
+
+- M11.1 — Data model and migration
+- M11.2 — Service layer scoped by traveller
+- M11.3 — REST API
+- M11.4 — React UI
+- M11.5 — MCP tools and traveller parameter
+- M11.6 — Docs
+
+**ADR:** [ADR-020](../adr/ADR-020-travellers-on-an-account.md)
+
+---
+
 ## Adding a milestone
 
 1. Create a GitHub Milestone and attach issues/PRs to it.

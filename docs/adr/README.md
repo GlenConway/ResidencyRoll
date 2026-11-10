@@ -34,6 +34,7 @@ ADR-001 to ADR-014 are **retrospective**. They were written on 2026-09-19 from t
 | [ADR-017](ADR-017-home-country-on-the-user-profile.md) | Store the Home Country on the User Profile | Accepted |
 | [ADR-018](ADR-018-per-country-counting-windows.md) | Count Each Country on Its Own Window | Accepted |
 | [ADR-019](ADR-019-trip-warnings-coverage-and-msi.md) | Warn on Suspect Legs, Report Record Coverage, and Count the Nova Scotia MSI Minimum | Accepted |
+| [ADR-020](ADR-020-travellers-on-an-account.md) | Track Several Travellers on One Account | Proposed |
 
 ## Adding a new ADR
 
