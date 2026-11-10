@@ -104,6 +104,7 @@ jobs:
       - name: Tell the author both images were pushed
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.build-and-push.outputs.version }}
         run: |
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
