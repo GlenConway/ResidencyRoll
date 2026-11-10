@@ -164,12 +164,33 @@ public class ResidencyQueryService
         var combined = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
         combined.AddRange(extraTrips);
         var presence = _residency.GenerateDailyPresenceLog(combined);
+        DateOnly? lastRecorded = presence.Count == 0 ? null : presence.Max(day => day.Date);
+        string? stayCountry = null;
+        if (lastRecorded is DateOnly recorded)
+        {
+            var next = LocationFrom(combined, recorded.AddDays(1));
+            if (next.Status == "projected" && !string.IsNullOrWhiteSpace(next.LocationAtMidnight))
+            {
+                stayCountry = _residency.GetCountryRule(next.LocationAtMidnight).CountryName;
+            }
+        }
+
         var rows = new List<CalendarYearPresence>();
         for (var year = dates.Min().Year; year <= dates.Max().Year; year++)
         {
             var start = new DateOnly(year, 1, 1);
             var windowEnd = new DateOnly(year, 12, 31);
             var days = CountCountry(_residency.CalculateResidencyDays(presence, start, windowEnd), rule.CountryName);
+            DateOnly? projectedFrom = null;
+            if (lastRecorded is DateOnly last && stayCountry is not null && windowEnd > last)
+            {
+                projectedFrom = last.AddDays(1) > start ? last.AddDays(1) : start;
+                if (stayCountry.Equals(rule.CountryName, StringComparison.OrdinalIgnoreCase))
+                {
+                    days += windowEnd.DayNumber - projectedFrom.Value.DayNumber + 1;
+                }
+            }
+
             int? minimum = null;
             int? shortfall = null;
             string? status = null;
@@ -180,7 +201,17 @@ public class ResidencyQueryService
                 status = shortfall == 0 ? "reached" : shortfall <= 30 ? "approaching" : "under";
             }
 
-            rows.Add(new CalendarYearPresence(rule.CountryName, year, days, start, windowEnd, minimum, shortfall, status));
+            rows.Add(new CalendarYearPresence(
+                rule.CountryName,
+                year,
+                days,
+                start,
+                windowEnd,
+                minimum,
+                shortfall,
+                status,
+                projectedFrom,
+                projectedFrom is null ? null : stayCountry));
         }
 
         return rows;
@@ -849,7 +880,9 @@ public sealed record CalendarYearPresence(
     DateOnly WindowEnd,
     int? MinimumDays,
     int? DaysShort,
-    string? Status);
+    string? Status,
+    DateOnly? ProjectedFrom,
+    string? ProjectedCountry);
 
 public sealed record MinimumPresence(
     int MinimumDays,

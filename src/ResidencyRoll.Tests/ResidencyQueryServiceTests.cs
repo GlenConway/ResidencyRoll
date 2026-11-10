@@ -485,8 +485,13 @@ public class ResidencyQueryServiceTests
 
         Assert.Equal([2026, 2027], years.Select(year => year.Year).ToArray());
         Assert.All(years, year => Assert.True(year.Days > 0));
+        Assert.Null(years[0].ProjectedFrom);
+        Assert.Equal(new DateOnly(2027, 1, 6), years[1].ProjectedFrom);
+        Assert.Equal("United Kingdom", years[1].ProjectedCountry);
         Assert.Equal(2027, Assert.Single(june).Year);
         Assert.Equal(9, june[0].Days);
+        Assert.Equal(new DateOnly(2027, 6, 11), june[0].ProjectedFrom);
+        Assert.Equal("United Kingdom", june[0].ProjectedCountry);
         Assert.All(years.Concat(june), year =>
         {
             Assert.Equal("Canada", year.Country);
@@ -499,6 +504,28 @@ public class ResidencyQueryServiceTests
             Assert.Null(year.MinimumDays);
             Assert.Null(year.Status);
         });
+    }
+
+    [Fact]
+    public async Task CountCalendarYears_WhenThePlanEndsInCanada_ShouldAssumeTheStayContinues()
+    {
+        await using var db = NewDatabase();
+        var residency = new ResidencyCalculationService();
+        var query = new ResidencyQueryService(new TripService(db, residency), residency);
+        var plan = new List<Trip>
+        {
+            Leg("local", "United Kingdom", "Europe/London", new DateTime(2027, 2, 8, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2027, 2, 8, 16, 0, 0))
+        };
+
+        var year = Assert.Single(await query.CountCalendarYearsAsync("local", "Canada", plan, null));
+        var from = new DateOnly(2027, 2, 9);
+        var assumed = new DateOnly(2027, 12, 31).DayNumber - from.DayNumber + 1;
+
+        Assert.Equal(from, year.ProjectedFrom);
+        Assert.Equal("Canada", year.ProjectedCountry);
+        Assert.Equal(assumed, year.Days);
+        Assert.Equal("reached", year.Status);
+        Assert.Equal(0, year.DaysShort);
     }
 
     [Fact]

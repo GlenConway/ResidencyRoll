@@ -15,7 +15,7 @@ public sealed class ForecastTools
     private const string Semantics = McpSemantics.Rules + McpSemantics.Forecast + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "forecast_trips", Title = "Forecast trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ForecastToolResult))]
-    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. Pass traveller, an id or a name, for someone other than the signed-in person; omit it for yourself. windowStart and windowEnd bound the scenario. Each country is counted on its own window (rolling365, taxYear, or calendarYear) and includes that window, totalDays, peakDays, peakDate, and thresholdStatus (under, approaching, reached, over, or home). reached means the count equals the threshold. Both lists are sorted by days, descending. country limits both lists to one country and adds rollingAroundPeak. through extends the scenario through that date so saved trips after the last leg are included. homeCalendarYears is the home country's count in each calendar year the plan touches. When that country has a minimum, such as Canada's 183 days for Nova Scotia MSI, each year includes minimumStatus. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
+    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. Pass traveller, an id or a name, for someone other than the signed-in person; omit it for yourself. windowStart and windowEnd bound the scenario. Each country is counted on its own window (rolling365, taxYear, or calendarYear) and includes that window, totalDays, peakDays, peakDate, and thresholdStatus (under, approaching, reached, over, or home). reached means the count equals the threshold. Both lists are sorted by days, descending. country limits both lists to one country and adds rollingAroundPeak. through extends the scenario through that date so saved trips after the last leg are included. homeCalendarYears is the home country's count in each calendar year the plan touches. A year that runs past the last leg assumes you remain in the last arrival country through 31 December, and projectedFrom names the first assumed day. When that country has a minimum, such as Canada's 183 days for Nova Scotia MSI, each year includes minimumStatus. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
     public static async Task<CallToolResult> ForecastTrips(
         ResidencyQueryService query,
         ResidencyCalculationService rules,
@@ -78,9 +78,7 @@ public sealed class ForecastTools
             : $" Days away from {home} at the end of each window: current {awayCurrent}, forecast {awayForecast}.";
         if (result.HomeCalendarYears.Count > 0)
         {
-            text += " " + string.Join(" ", result.HomeCalendarYears.Select(year => year.MinimumStatus is null
-                ? $"{year.Country} {year.Days} days in {year.Year}."
-                : $"{year.Country} {year.Days} of {year.MinimumDays} in {year.Year}, {year.MinimumStatus}, {year.DaysShortOfMinimum} short."));
+            text += " " + string.Join(" ", result.HomeCalendarYears.Select(DescribeYear));
         }
 
         return McpResults.For(person, text, result);
@@ -439,6 +437,19 @@ public sealed class ForecastTools
     private static int DaysAway(IEnumerable<ResidencyCountryStatus> rows, string homeCountry) =>
         rows.Where(row => !row.CountryName.Equals(homeCountry.Trim(), StringComparison.OrdinalIgnoreCase)).Sum(row => row.TotalDays);
 
+    private static string DescribeYear(HomeCalendarYear year)
+    {
+        var text = year.MinimumStatus is null
+            ? $"{year.Country} {year.Days} days in {year.Year}."
+            : $"{year.Country} {year.Days} of {year.MinimumDays} in {year.Year}, {year.MinimumStatus}, {year.DaysShortOfMinimum} short.";
+        if (year.ProjectedFrom is DateOnly from)
+        {
+            text += $" Assumes you remain in {year.ProjectedCountry} from {from:yyyy-MM-dd} through {year.WindowEnd:yyyy-MM-dd}.";
+        }
+
+        return text;
+    }
+
     private static string SummarizeCurrent(IReadOnlyList<ResidencyCountryStatus> rows) =>
         rows.Count == 0
             ? "Current: no days."
@@ -470,7 +481,7 @@ public sealed class ForecastToolResult
     [Description("Rolling counts from seven days before the chosen country's peak through seven days after. Empty unless country is set.")]
     public List<RollingCountPoint> RollingAroundPeak { get; set; } = [];
 
-    [Description("Home country's day count in each calendar year the hypothetical legs touch, including saved trips. Empty when no home country is saved.")]
+    [Description("Home country's day count in each calendar year the hypothetical legs touch, including saved trips. A year that runs past the last leg continues the last arrival country through 31 December. Empty when no home country is saved.")]
     public List<HomeCalendarYear> HomeCalendarYears { get; set; } = [];
 }
 
@@ -491,8 +502,14 @@ public sealed class HomeCalendarYear
     [Description("Days still needed to meet the minimum. Zero once the minimum is met. Null when there is no minimum.")]
     public int? DaysShortOfMinimum { get; set; }
 
-    [Description("under, approaching, or reached. approaching means 30 or fewer days short. Null when there is no minimum.")]
+    [Description("under, approaching, or reached. approaching means 30 or fewer days short. Null when there is no minimum. Uses the assumed stay when projectedFrom is set.")]
     public string? MinimumStatus { get; set; }
+
+    [Description("First day the count assumes you remain in projectedCountry, through 31 December. Null when the saved and hypothetical legs already cover the year.")]
+    public DateOnly? ProjectedFrom { get; set; }
+
+    [Description("Country assumed from projectedFrom through 31 December, the last arrival country. Null when the year is fully covered.")]
+    public string? ProjectedCountry { get; set; }
 
     public static HomeCalendarYear From(CalendarYearPresence year) => new()
     {
@@ -503,7 +520,9 @@ public sealed class HomeCalendarYear
         WindowEnd = year.WindowEnd,
         MinimumDays = year.MinimumDays,
         DaysShortOfMinimum = year.DaysShort,
-        MinimumStatus = year.Status
+        MinimumStatus = year.Status,
+        ProjectedFrom = year.ProjectedFrom,
+        ProjectedCountry = year.ProjectedCountry
     };
 }
 

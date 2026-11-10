@@ -772,6 +772,9 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             Assert.Equal(183 - year.GetProperty("days").GetInt32(), year.GetProperty("daysShortOfMinimum").GetInt32());
         });
         Assert.Contains("183", McpClientConnector.Text(forecast));
+        Assert.Equal("2027-06-11", years[1].GetProperty("projectedFrom").GetString());
+        Assert.Equal("United Kingdom", years[1].GetProperty("projectedCountry").GetString());
+        Assert.Contains("Assumes you remain in United Kingdom", McpClientConnector.Text(forecast));
     }
 
     [Fact]
