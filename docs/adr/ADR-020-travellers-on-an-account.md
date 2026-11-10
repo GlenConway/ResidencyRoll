@@ -45,13 +45,15 @@ In this ADR the rule is: a user can read and write a traveller when they own it.
 
 ### Migration
 
-One EF migration, generated with `dotnet ef`:
+Migration files are generated with `dotnet ef` and never hand-edited, so the data backfill runs in code between two schema migrations:
 
-1. Create `Travellers`.
-2. For every distinct `UserId` in `Trips` or `UserProfiles`, insert a traveller with `OwnerUserId` and `LinkedUserId` both set to that user, named from the profile name claim, falling back to "Me", and copy `HomeCountry`.
-3. Set `Trip.TravellerId` to that traveller and `CreatedByUserId` to `UserId`, then make `TravellerId` required with a foreign key and an index on `(TravellerId, DepartureDateTime)`.
+1. **Migration A (generated):** create `Travellers`. Add `Trip.TravellerId` as nullable, and add `CreatedByUserId` and `UpdatedByUserId`.
+2. **Backfill (code):** a `TravellerBackfill` step that runs at API startup right after `Database.Migrate()`. For every distinct `UserId` in `Trips` or `UserProfiles` with no linked traveller, it inserts a traveller with `OwnerUserId` and `LinkedUserId` both set to that user, named "Me", and copies `HomeCountry`. It then sets `TravellerId` on every trip where it is null, and `CreatedByUserId` to `UserId`. It runs in one transaction, does nothing when there is nothing to fill, and is safe to run on every start.
+3. **Migration B (generated, next release):** make `TravellerId` required, add the foreign key and the `(TravellerId, DepartureDateTime)` index. It ships only after Migration A and the backfill have run in every deployment. Until then, services treat a null `TravellerId` as the owner's self traveller.
 
-Counts for existing users do not change.
+Claims exist only while someone is signed in, so the backfill cannot read a display name. On sign-in, a traveller still named "Me" and linked to the caller takes the name claim. A traveller the user has already renamed is left alone.
+
+Before deploying Migration A, back up the SQLite file (`./data` locally, `/app/data` in Docker). Counts for existing users do not change, and a test checks that.
 
 ### API
 

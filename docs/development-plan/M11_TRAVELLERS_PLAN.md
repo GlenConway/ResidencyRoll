@@ -14,10 +14,14 @@ Track trips and residency for several people from one login. Design is in [ADR-0
 ### M11.1 — Data model and migration
 
 - `Traveller` entity and `Travellers` table (`OwnerUserId`, `Name`, `HomeCountry`, `LinkedUserId` unique, `CreatedUtc`). No `IsSelf` flag: the self traveller is the one linked to the caller.
-- Required `Trip.TravellerId` with foreign key and `(TravellerId, DepartureDateTime)` index, plus `CreatedByUserId` and `UpdatedByUserId`.
-- EF migration generated with `dotnet ef` that creates a traveller per existing user with `LinkedUserId = OwnerUserId`, copies the home country, and backfills trips and `CreatedByUserId`.
+- **Migration A** (generated with `dotnet ef`, not hand-edited): `Travellers` table, nullable `Trip.TravellerId`, `CreatedByUserId`, `UpdatedByUserId`.
+- **`TravellerBackfill`** startup step after `Database.Migrate()`: one traveller per existing user (`OwnerUserId = LinkedUserId = UserId`, name "Me", home country copied), then `TravellerId` and `CreatedByUserId` on every trip missing them. One transaction, idempotent, does nothing when complete.
+- Services treat a null `TravellerId` as the owner's self traveller until Migration B ships.
+- On sign-in, a self traveller still named "Me" takes the name claim. A renamed traveller is left alone.
+- Release notes: back up the SQLite file before deploying.
+- **Migration B** (generated, next release after A has run everywhere): `TravellerId` required, foreign key, `(TravellerId, DepartureDateTime)` index.
 
-**Done when:** migration runs on a copy of a production database, every trip has a traveller, and residency counts for existing users match before and after.
+**Done when:** tests run the backfill on a seeded database and on a copy of a production database and show every trip has a traveller, a second run changes nothing, and residency counts for each existing user match before and after. Migration B applies cleanly on the backfilled copy.
 
 ### M11.2 — Service layer scoped by traveller
 
