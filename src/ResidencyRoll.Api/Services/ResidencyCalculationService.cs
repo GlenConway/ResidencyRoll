@@ -558,6 +558,30 @@ public class ResidencyCalculationService
     }
 
     /// <summary>
+    /// Days in the window that no country counts. A missing presence day, a country gap, or a midnight in transit leaves the day out.
+    /// </summary>
+    public int CountUnaccountedDays(List<DailyPresence> dailyPresenceLog, DateOnly start, DateOnly end)
+    {
+        if (end < start)
+        {
+            return 0;
+        }
+
+        var counted = new HashSet<DateOnly>();
+        foreach (var presence in dailyPresenceLog)
+        {
+            if (presence.Date < start || presence.Date > end || CountriesCountedOn(presence).Count == 0)
+            {
+                continue;
+            }
+
+            counted.Add(presence.Date);
+        }
+
+        return end.DayNumber - start.DayNumber + 1 - counted.Count;
+    }
+
+    /// <summary>
     /// Highest rolling count for each country. The window ending on day D is the 365 calendar
     /// days from D-364 through D, counting both ends. The recorded date is the first day that
     /// count was reached.

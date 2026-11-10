@@ -714,6 +714,67 @@ public class McpServerTests : IClassFixture<McpApiFactory>
     }
 
     [Fact]
+    public async Task ResidencySummary_WhenACountryGapLeavesDaysOut_ShouldReportUnaccountedDays()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("LHR", "2025-06-01T09:00", "YHZ", "2025-06-01T16:00")
+        });
+        await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("CDG", "2025-06-10T09:00", "LHR", "2025-06-10T11:00")
+        });
+
+        var summary = await AssertCall(mcp, tools, "get_residency_summary", new Dictionary<string, object?>
+        {
+            ["startDate"] = "2025-01-01",
+            ["endDate"] = "2025-12-31"
+        });
+        var rows = summary.StructuredContent!.Value.EnumerateArray().ToList();
+        Assert.All(rows, row => Assert.Equal(365 - 2, row.GetProperty("unaccountedDays").GetInt32()));
+        Assert.Contains("not counted for any country", McpClientConnector.Text(summary));
+    }
+
+    [Fact]
+    public async Task ForecastTrips_ForACanadaPlan_ShouldReportEachCalendarYearMinimum()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var forecast = await AssertCall(mcp, tools, "forecast_trips", new Dictionary<string, object?>
+        {
+            ["homeCountry"] = "Canada",
+            ["trips"] = new object[]
+            {
+                Leg("LHR", "2026-12-30T09:00", "YHZ", "2026-12-30T16:00"),
+                Leg("YHZ", "2027-01-05T08:00", "LHR", "2027-01-05T18:00"),
+                Leg("LHR", "2027-06-01T09:00", "YHZ", "2027-06-01T16:00"),
+                Leg("YHZ", "2027-06-10T08:00", "LHR", "2027-06-10T18:00")
+            }
+        });
+
+        var years = forecast.StructuredContent!.Value.GetProperty("homeCalendarYears").EnumerateArray().ToList();
+        Assert.Equal(2, years.Count);
+        Assert.Equal(2026, years[0].GetProperty("year").GetInt32());
+        Assert.True(years[0].GetProperty("days").GetInt32() > 0);
+        Assert.Equal(2027, years[1].GetProperty("year").GetInt32());
+        Assert.True(years[1].GetProperty("days").GetInt32() >= 10);
+        Assert.All(years, year =>
+        {
+            Assert.Equal("Canada", year.GetProperty("country").GetString());
+            Assert.Equal(183, year.GetProperty("minimumDays").GetInt32());
+            Assert.Equal("under", year.GetProperty("minimumStatus").GetString());
+            Assert.Equal(183 - year.GetProperty("days").GetInt32(), year.GetProperty("daysShortOfMinimum").GetInt32());
+        });
+        Assert.Contains("183", McpClientConnector.Text(forecast));
+    }
+
+    [Fact]
     public async Task ParseItineraryOutputSchema_ShouldNotUseDateTimeFormat()
     {
         await using var factory = new McpApiFactory { ParserConfigured = true };

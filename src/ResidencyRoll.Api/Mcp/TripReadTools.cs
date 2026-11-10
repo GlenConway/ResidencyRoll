@@ -114,7 +114,7 @@ public sealed class ResidencyTools
     private const string Semantics = McpSemantics.Rules + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "get_residency_summary", Title = "Residency summary", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ResidencyCountryStatus[]))]
-    [Description("Days per country, plus days left, days over, and threshold status (under, approaching, reached, over, or home). reached means the count equals the threshold, which counts as residency. over means the count is past it, and daysOverThreshold is then the number of days past. The home country has thresholdStatus home, isApproachingThreshold false, and null days left and days over. When the home country has a minimum presence, such as Canada's 183 calendar-year days for Nova Scotia MSI, the row also includes daysTowardMinimum and minimumStatus. coverageStart and coverageEnd are the part of each window the saved trips actually cover. isComplete is false when the window runs past the records, so days outside that span are not counted. When startDate is omitted, each country uses its own window (rolling365, taxYear, or calendarYear) ending on the end date. " + Semantics)]
+    [Description("Days per country for one traveller. Pass traveller, an id or a name, for someone other than the signed-in person; omit it for yourself. Includes days left, days over, and threshold status (under, approaching, reached, over, or home). reached means the count equals the threshold, which counts as residency. over means the count is past it, and daysOverThreshold is then the number of days past. The home country has thresholdStatus home, isApproachingThreshold false, and null days left and days over. When the home country has a minimum presence, such as Canada's 183 calendar-year days for Nova Scotia MSI, the row also includes daysTowardMinimum and minimumStatus. coverageStart and coverageEnd are the part of each window the saved trips actually cover. isComplete is false when the window runs past the records. unaccountedDays is the number of days in that window that no country counts, including a country gap and days before the first saved trip or after the last one. When startDate is omitted, each country uses its own window (rolling365, taxYear, or calendarYear) ending on the end date. " + Semantics)]
     public static async Task<CallToolResult> GetResidencySummary(
         ResidencyQueryService query,
         ResidencyCalculationService rules,
@@ -154,9 +154,18 @@ public sealed class ResidencyTools
             }
         }
 
+        var unaccountedByWindow = new Dictionary<(DateOnly Start, DateOnly End), int>();
         foreach (var row in rows)
         {
             ResidencyCountryStatus.ApplyCoverage(row, coverage);
+            var key = (row.WindowStart, row.WindowEnd);
+            if (!unaccountedByWindow.TryGetValue(key, out var unaccounted))
+            {
+                unaccounted = await query.CountUnaccountedDaysAsync(userId, row.WindowStart, row.WindowEnd, person);
+                unaccountedByWindow[key] = unaccounted;
+            }
+
+            row.UnaccountedDays = unaccounted;
         }
 
         if (!string.IsNullOrWhiteSpace(home))
@@ -298,7 +307,7 @@ public sealed class ResidencyTools
     }
 
     [McpServerTool(Name = "get_location_on", Title = "Location on a date", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(McpLocationOn))]
-    [Description("Where the user was on one date. status is recorded, gapFilled, projected, or noData. A date after the last saved trip is projected from the last arrival country and marked projected. " + Semantics)]
+    [Description("Where one traveller was on one date. Pass traveller, an id or a name, for someone other than the signed-in person. The home country is saved on that traveller. status is recorded, gapFilled, projected, or noData. A date after the last saved trip is projected from the last arrival country and marked projected. " + Semantics)]
     public static async Task<CallToolResult> GetLocationOn(
         ResidencyQueryService query,
         TravellerService travellers,
@@ -457,6 +466,9 @@ public class ResidencyCountryStatus
     [Description("False when this window starts before the first saved date or ends after the last saved date. Days outside the covered span are not counted.")]
     public bool IsComplete { get; set; }
 
+    [Description("Days in this window that no country counts. A country gap, or days before the first saved trip and after the last one, leaves these out. Zero when every day in the window counts for at least one country.")]
+    public int? UnaccountedDays { get; set; }
+
     [Description("Days required in the home country, such as 183 for Nova Scotia MSI. Null unless this row is that home country.")]
     public int? MinimumDays { get; set; }
 
@@ -552,6 +564,12 @@ public class ResidencyCountryStatus
             text += row.CoverageStart is DateOnly start && row.CoverageEnd is DateOnly end
                 ? $" Records cover {start:yyyy-MM-dd} to {end:yyyy-MM-dd}."
                 : " No saved trips cover this window.";
+        }
+
+        if (row.UnaccountedDays is int unaccounted && unaccounted > 0)
+        {
+            var span = row.WindowEnd.DayNumber - row.WindowStart.DayNumber + 1;
+            text += $" {unaccounted} of {span} days in this window are not counted for any country.";
         }
 
         return text;

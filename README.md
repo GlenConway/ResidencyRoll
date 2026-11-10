@@ -66,7 +66,7 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `list_trips` | Flight legs, optionally limited to those that overlap a date range |
 | `get_trip` | One leg by id |
 | `get_days_per_country` | Days per country for the last 365 days, or for the whole log |
-| `get_residency_summary` | Days, threshold status (`under`, `approaching`, `reached`, `over`, or `home`), days left, and days over. Says when the window runs past the saved trips. When Canada is home, also shows the 183-day calendar-year minimum |
+| `get_residency_summary` | Days, threshold status (`under`, `approaching`, `reached`, `over`, or `home`), days left, and days over. Says when the window runs past the saved trips, and how many days in the window no country counts. When Canada is home, also shows the 183-day calendar-year minimum |
 | `get_daily_presence` | Midnight location for each day, or contiguous runs. `locationAtMidnight` is 00:00 at the start of that date. Optional country filter. Up to 366 days per call |
 | `get_rolling_count` | Rolling 365-day total for one country on each day, and whether the anniversary day counted |
 | `get_location_on` | The presence record for a single date |
@@ -83,7 +83,7 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `copy_trips` | Copy saved legs from one person to another, skipping legs that are already there |
 | `get_server_info` | The release, git commit, and airport-table size of the build that answered |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
-| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, and a short rolling count around the peak |
+| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, a short rolling count around the peak, and the home country's calendar-year count for each year the plan touches |
 | `max_trip_end_date` | Last midnight you can still be in the arrival country while its count stays at or under a day limit (183 by default). Optional unsaved legs |
 | `max_trip_start_date` | Earliest arrival that stays at or under the day limit when the departure date is fixed |
 | `plan_max_presence` | Arrival and departure dates that add the most days in a country without passing the limit, skipping blackout dates |

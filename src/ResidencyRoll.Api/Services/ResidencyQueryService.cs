@@ -129,6 +129,63 @@ public class ResidencyQueryService
         return summary.OrderByDescending(row => row.TotalDays).ToList();
     }
 
+    public async Task<int> CountUnaccountedDaysAsync(string userId, DateOnly start, DateOnly end, Traveller? traveller = null)
+    {
+        var trips = await _trips.GetAllTripsAsync(userId, traveller);
+        var presence = _residency.GenerateDailyPresenceLog(trips);
+        return _residency.CountUnaccountedDays(presence, start, end);
+    }
+
+    public async Task<List<CalendarYearPresence>> CountCalendarYearsAsync(
+        string userId,
+        string country,
+        IReadOnlyList<Trip> extraTrips,
+        DateOnly? through,
+        Traveller? traveller = null)
+    {
+        var dates = new List<DateOnly>();
+        foreach (var trip in extraTrips)
+        {
+            dates.Add(DateOnly.FromDateTime(trip.DepartureDateTime));
+            dates.Add(DateOnly.FromDateTime(trip.ArrivalDateTime));
+        }
+
+        if (through is DateOnly throughDate)
+        {
+            dates.Add(throughDate);
+        }
+
+        if (dates.Count == 0 || string.IsNullOrWhiteSpace(country))
+        {
+            return [];
+        }
+
+        var rule = _residency.GetCountryRule(country);
+        var combined = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
+        combined.AddRange(extraTrips);
+        var presence = _residency.GenerateDailyPresenceLog(combined);
+        var rows = new List<CalendarYearPresence>();
+        for (var year = dates.Min().Year; year <= dates.Max().Year; year++)
+        {
+            var start = new DateOnly(year, 1, 1);
+            var windowEnd = new DateOnly(year, 12, 31);
+            var days = CountCountry(_residency.CalculateResidencyDays(presence, start, windowEnd), rule.CountryName);
+            int? minimum = null;
+            int? shortfall = null;
+            string? status = null;
+            if (rule.MinimumPresenceDays is int required && rule.MinimumWindowType == CountingWindowType.CalendarYear)
+            {
+                minimum = required;
+                shortfall = Math.Max(0, required - days);
+                status = shortfall == 0 ? "reached" : shortfall <= 30 ? "approaching" : "under";
+            }
+
+            rows.Add(new CalendarYearPresence(rule.CountryName, year, days, start, windowEnd, minimum, shortfall, status));
+        }
+
+        return rows;
+    }
+
     public async Task<RecordCoverage> GetRecordCoverageAsync(string userId, Traveller? traveller = null)
     {
         var trips = await _trips.GetAllTripsAsync(userId, traveller);
@@ -783,6 +840,16 @@ public class ResidencyQueryService
 }
 
 public sealed record RecordCoverage(DateOnly? FirstTripDate, DateOnly? LastTripDate, int LegCount);
+
+public sealed record CalendarYearPresence(
+    string Country,
+    int Year,
+    int Days,
+    DateOnly WindowStart,
+    DateOnly WindowEnd,
+    int? MinimumDays,
+    int? DaysShort,
+    string? Status);
 
 public sealed record MinimumPresence(
     int MinimumDays,

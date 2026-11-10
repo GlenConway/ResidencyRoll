@@ -433,6 +433,75 @@ public class ResidencyQueryServiceTests
     }
 
     [Fact]
+    public async Task CountUnaccountedDays_WhenTheNextLegLeavesAnotherCountry_ShouldCountTheGap()
+    {
+        await using var db = NewDatabase();
+        var residency = new ResidencyCalculationService();
+        var query = new ResidencyQueryService(new TripService(db, residency), residency);
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 6, 1, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 6, 1, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "France", "Europe/Paris", new DateTime(2026, 6, 10, 9, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 6, 10, 16, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var gap = await query.CountUnaccountedDaysAsync("local", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 10));
+
+        Assert.Equal(8, gap);
+    }
+
+    [Fact]
+    public async Task CountUnaccountedDays_WhenTheStayStaysInOneCountry_ShouldBeZero()
+    {
+        await using var db = NewDatabase();
+        var residency = new ResidencyCalculationService();
+        var query = new ResidencyQueryService(new TripService(db, residency), residency);
+        db.Trips.Add(Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 6, 1, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 6, 1, 16, 0, 0)));
+        db.Trips.Add(Leg("local", "Canada", "America/Halifax", new DateTime(2026, 6, 10, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2026, 6, 10, 18, 0, 0)));
+        await db.SaveChangesAsync();
+
+        var gap = await query.CountUnaccountedDaysAsync("local", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 10));
+
+        Assert.Equal(0, gap);
+    }
+
+    [Fact]
+    public async Task CountCalendarYears_ForCanada_ShouldReportTheMinimumForEachYearThePlanTouches()
+    {
+        await using var db = NewDatabase();
+        var residency = new ResidencyCalculationService();
+        var query = new ResidencyQueryService(new TripService(db, residency), residency);
+        var plan = new List<Trip>
+        {
+            Leg("local", "United Kingdom", "Europe/London", new DateTime(2026, 12, 30, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2026, 12, 30, 16, 0, 0)),
+            Leg("local", "Canada", "America/Halifax", new DateTime(2027, 1, 5, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2027, 1, 5, 18, 0, 0))
+        };
+
+        var years = await query.CountCalendarYearsAsync("local", "Canada", plan, null);
+        var unitedKingdom = await query.CountCalendarYearsAsync("local", "United Kingdom", plan, null);
+        var stay = new List<Trip>
+        {
+            Leg("local", "United Kingdom", "Europe/London", new DateTime(2027, 6, 1, 9, 0, 0), "Canada", "America/Halifax", new DateTime(2027, 6, 1, 16, 0, 0)),
+            Leg("local", "Canada", "America/Halifax", new DateTime(2027, 6, 10, 8, 0, 0), "United Kingdom", "Europe/London", new DateTime(2027, 6, 10, 18, 0, 0))
+        };
+        var june = await query.CountCalendarYearsAsync("local", "Canada", stay, null);
+
+        Assert.Equal([2026, 2027], years.Select(year => year.Year).ToArray());
+        Assert.All(years, year => Assert.True(year.Days > 0));
+        Assert.Equal(2027, Assert.Single(june).Year);
+        Assert.Equal(9, june[0].Days);
+        Assert.All(years.Concat(june), year =>
+        {
+            Assert.Equal("Canada", year.Country);
+            Assert.Equal(183, year.MinimumDays);
+            Assert.Equal(183 - year.Days, year.DaysShort);
+            Assert.Equal("under", year.Status);
+        });
+        Assert.All(unitedKingdom, year =>
+        {
+            Assert.Null(year.MinimumDays);
+            Assert.Null(year.Status);
+        });
+    }
+
+    [Fact]
     public async Task MeasureMinimumPresence_ForCanada_ShouldUseTheCalendarYear()
     {
         await using var db = NewDatabase();
