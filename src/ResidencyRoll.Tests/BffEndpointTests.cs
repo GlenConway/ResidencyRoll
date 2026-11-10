@@ -220,6 +220,16 @@ public class BffOidcEnabledTests : IClassFixture<OidcEnabledBffFactory>
     }
 
     [Fact]
+    public async Task SignInCallback_WithoutACorrelationCookie_RedirectsHome()
+    {
+        var client = CreateClient();
+        var response = await client.GetAsync("/signin-oidc?code=stale&state=stale");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.ToString());
+    }
+
+    [Fact]
     public async Task AnonymousApiCall_Returns401()
     {
         _factory.Capture.Reset();

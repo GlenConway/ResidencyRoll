@@ -155,6 +155,13 @@ if (oidcEnabled)
                     Log.Information("[OIDC] - access_token (first 30 chars): {TokenPrefix}...", tokenPrefix);
                 }
                 return Task.CompletedTask;
+            },
+            OnRemoteFailure = context =>
+            {
+                Log.Warning(context.Failure, "[OIDC] Remote login failed. Sending the browser home.");
+                context.HandleResponse();
+                context.Response.Redirect("/");
+                return Task.CompletedTask;
             }
         };
         
