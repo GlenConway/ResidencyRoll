@@ -162,17 +162,20 @@ public class TripService
         string userId,
         List<Trip> hypotheticalTrips,
         DateOnly? through = null,
-        Traveller? traveller = null)
+        Traveller? traveller = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
         var trips = await GetAllTripsAsync(userId, traveller);
-        return ForecastDays(trips, hypotheticalTrips, through);
+        return ForecastDays(trips, hypotheticalTrips, through, excludeTripIds);
     }
 
     public (Dictionary<string, int> Current, Dictionary<string, int> Forecast) ForecastDays(
         IReadOnlyList<Trip> existingTrips,
         IReadOnlyList<Trip> hypotheticalTrips,
-        DateOnly? through = null)
+        DateOnly? through = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
+        var baseline = Without(existingTrips, excludeTripIds);
         if (hypotheticalTrips == null || hypotheticalTrips.Count == 0)
         {
             return (new Dictionary<string, int>(), new Dictionary<string, int>());
@@ -183,12 +186,35 @@ public class TripService
 
         var currentDaysPerCountry = CountByCountryWindow(existingTrips, today);
 
-        var tripsWithHypothetical = new List<Trip>(existingTrips);
+        var tripsWithHypothetical = new List<Trip>(baseline);
         tripsWithHypothetical.AddRange(hypotheticalTrips);
 
         var forecastDaysPerCountry = CountByCountryWindow(tripsWithHypothetical, window.End);
 
         return (currentDaysPerCountry, forecastDaysPerCountry);
+    }
+
+    /// <summary>
+    /// Saved legs left out of a forecast, such as a booking a hypothetical plan would replace.
+    /// A missing id fails the call and names every missing id.
+    /// </summary>
+    public static IReadOnlyList<Trip> Without(IReadOnlyList<Trip> trips, IReadOnlyCollection<int>? excludeTripIds)
+    {
+        if (excludeTripIds is null || excludeTripIds.Count == 0)
+        {
+            return trips;
+        }
+
+        var ids = excludeTripIds.Distinct().ToList();
+        var present = trips.Select(trip => trip.Id).ToHashSet();
+        var missing = ids.Where(id => !present.Contains(id)).OrderBy(id => id).ToList();
+        if (missing.Count > 0)
+        {
+            throw new InvalidOperationException($"Trips not found: {string.Join(", ", missing)}.");
+        }
+
+        var excluded = ids.ToHashSet();
+        return trips.Where(trip => !excluded.Contains(trip.Id)).ToList();
     }
 
     public ForecastWindow ScenarioWindow(IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through)

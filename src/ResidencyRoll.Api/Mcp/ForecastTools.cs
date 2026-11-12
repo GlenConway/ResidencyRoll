@@ -15,7 +15,7 @@ public sealed class ForecastTools
     private const string Semantics = McpSemantics.Rules + McpSemantics.Forecast + McpSemantics.HomeCountry;
 
     [McpServerTool(Name = "forecast_trips", Title = "Forecast trips", ReadOnly = true, OpenWorld = false, Destructive = false, UseStructuredContent = true, OutputSchemaType = typeof(ForecastToolResult))]
-    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. Pass traveller, an id or a name, for someone other than the signed-in person; omit it for yourself. windowStart and windowEnd bound the scenario. Each country is counted on its own window (rolling365, taxYear, or calendarYear) and includes that window, totalDays, peakDays, peakDate, and thresholdStatus (under, approaching, reached, over, or home). reached means the count equals the threshold. Both lists are sorted by days, descending. country limits both lists to one country and adds rollingAroundPeak. through extends the scenario through that date so saved trips after the last leg are included. homeCalendarYears is the home country's count in each calendar year the plan touches. A year that runs past the last leg assumes you remain in the last arrival country through 31 December, and projectedFrom names the first assumed day. When that country has a minimum, such as Canada's 183 days for Nova Scotia MSI, each year includes minimumStatus. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
+    [Description("Projects days per country if the hypothetical legs were added. Nothing is saved. Pass traveller, an id or a name, for someone other than the signed-in person; omit it for yourself. windowStart and windowEnd bound the scenario. Each country is counted on its own window (rolling365, taxYear, or calendarYear) and includes that window, totalDays, peakDays, peakDate, and thresholdStatus (under, approaching, reached, over, or home). reached means the count equals the threshold. Both lists are sorted by days, descending. country limits both lists to one country and adds rollingAroundPeak. through extends the scenario through that date so saved trips after the last leg are included. excludeTripIds leaves those saved legs out of the forecast, peaks, rollingAroundPeak, and homeCalendarYears, so a changed booking can be tried without editing it. Current counts still include every saved leg. A missing id forecasts nothing and names every missing id. homeCalendarYears is the home country's count in each calendar year the plan touches. A year that runs past the last leg assumes you remain in the last arrival country through 31 December, and projectedFrom names the first assumed day. When that country has a minimum, such as Canada's 183 days for Nova Scotia MSI, each year includes minimumStatus. Pass IATA codes and local date-times (yyyy-MM-ddTHH:mm). City, country, and IANA timezone override the airport table and are required for unknown airports. " + Semantics)]
     public static async Task<CallToolResult> ForecastTrips(
         ResidencyQueryService query,
         ResidencyCalculationService rules,
@@ -26,6 +26,7 @@ public sealed class ForecastTools
         [Description("Home country name. Optional. Uses the saved home country when omitted.")] string? homeCountry = null,
         [Description("Country name. Optional. Returns only this country, plus rollingAroundPeak.")] string? country = null,
         [Description("Extend the scenario through this date, yyyy-MM-dd. Optional. Includes saved trips after the last hypothetical leg.")] string? through = null,
+        [Description("Saved trip ids to leave out of the forecast, such as the booking these legs would replace. Optional. Nothing is deleted.")] List<int>? excludeTripIds = null,
         [Description(McpTravellers.ParameterDescription)] string? traveller = null)
     {
         McpScopes.Require(user, McpScopes.Read);
@@ -34,7 +35,15 @@ public sealed class ForecastTools
         var home = SavedHomeCountry.Resolve(person, homeCountry);
         var legs = (trips ?? []).Select(leg => TripLegResolver.Resolve(leg, userId, airports)).ToList();
         DateOnly? throughDate = string.IsNullOrWhiteSpace(through) ? null : TripLegResolver.ParseDate(through, "through");
-        var forecast = await query.ForecastBreakdownAsync(userId, legs, throughDate, person);
+        ForecastBreakdown forecast;
+        try
+        {
+            forecast = await query.ForecastBreakdownAsync(userId, legs, throughDate, person, excludeTripIds);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new McpException(ex.Message);
+        }
         var today = DateOnly.FromDateTime(DateTime.Today);
         var current = forecast.Current
             .Select(pair => ToStatus(pair.Key, pair.Value, rules, home, today))
@@ -55,6 +64,22 @@ public sealed class ForecastTools
             awayForecast = DaysAway(forecastRows, home);
         }
 
+        List<RollingCountPoint> rolling;
+        List<HomeCalendarYear> years;
+        try
+        {
+            rolling = await RollingAroundPeak(query, userId, legs, country, forecastRows, person, excludeTripIds);
+            years = string.IsNullOrWhiteSpace(home)
+                ? []
+                : (await query.CountCalendarYearsAsync(userId, home, legs, throughDate, person, excludeTripIds))
+                    .Select(HomeCalendarYear.From)
+                    .ToList();
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new McpException(ex.Message);
+        }
+
         var result = new ForecastToolResult
         {
             WindowStart = forecast.WindowStart,
@@ -64,12 +89,8 @@ public sealed class ForecastTools
             HomeCountry = home,
             DaysAwayCurrent = awayCurrent,
             DaysAwayForecast = awayForecast,
-            RollingAroundPeak = await RollingAroundPeak(query, userId, legs, country, forecastRows, person),
-            HomeCalendarYears = string.IsNullOrWhiteSpace(home)
-                ? []
-                : (await query.CountCalendarYearsAsync(userId, home, legs, throughDate, person))
-                    .Select(HomeCalendarYear.From)
-                    .ToList()
+            RollingAroundPeak = rolling,
+            HomeCalendarYears = years
         };
         var text = $"Forecast window {forecast.WindowStart:yyyy-MM-dd} to {forecast.WindowEnd:yyyy-MM-dd}. "
             + SummarizeCurrent(current) + " " + SummarizeForecast(forecastRows);
@@ -79,6 +100,12 @@ public sealed class ForecastTools
         if (result.HomeCalendarYears.Count > 0)
         {
             text += " " + string.Join(" ", result.HomeCalendarYears.Select(DescribeYear));
+        }
+
+        var excluded = (excludeTripIds ?? []).Distinct().OrderBy(id => id).ToList();
+        if (excluded.Count > 0)
+        {
+            text += $" Forecast leaves out saved trips {string.Join(", ", excluded)}. Those legs are unchanged.";
         }
 
         return McpResults.For(person, text, result);
@@ -326,7 +353,8 @@ public sealed class ForecastTools
         List<Trip> legs,
         string? country,
         IReadOnlyList<McpForecastCountry> forecastRows,
-        Traveller person)
+        Traveller person,
+        IReadOnlyCollection<int>? excludeTripIds)
     {
         if (string.IsNullOrWhiteSpace(country))
         {
@@ -341,7 +369,7 @@ public sealed class ForecastTools
 
         var from = match.PeakDate.AddDays(-7);
         var to = match.PeakDate.AddDays(7);
-        var rows = await query.GetRollingCountAsync(userId, country.Trim(), from, to, legs, person);
+        var rows = await query.GetRollingCountAsync(userId, country.Trim(), from, to, legs, person, excludeTripIds);
         return rows.Select(RollingCountPoint.From).ToList();
     }
 

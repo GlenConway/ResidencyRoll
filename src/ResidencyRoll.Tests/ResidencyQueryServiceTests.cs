@@ -89,6 +89,49 @@ public class ResidencyQueryServiceTests
     }
 
     [Fact]
+    public async Task ForecastBreakdown_WhenSavedLegsAreExcluded_ShouldCountTheReplacementOnly()
+    {
+        await using var db = NewDatabase();
+        var residency = new ResidencyCalculationService();
+        var query = new ResidencyQueryService(new TripService(db, residency), residency);
+        var today = DateTime.Today;
+        var arrive = today.AddDays(-40);
+        var shortLeave = today.AddDays(-36);
+        var longLeave = today.AddDays(-10);
+        var outbound = Leg("local", "United Kingdom", "Europe/London", At(arrive, 9), "France", "Europe/Paris", At(arrive, 12));
+        var homeward = Leg("local", "France", "Europe/Paris", At(longLeave, 10), "United Kingdom", "Europe/London", At(longLeave, 12));
+        db.Trips.AddRange(outbound, homeward);
+        await db.SaveChangesAsync();
+
+        var replacement = new List<Trip>
+        {
+            Leg("local", "United Kingdom", "Europe/London", At(arrive, 9), "France", "Europe/Paris", At(arrive, 12)),
+            Leg("local", "France", "Europe/Paris", At(shortLeave, 10), "United Kingdom", "Europe/London", At(shortLeave, 12))
+        };
+        var through = DateOnly.FromDateTime(today.AddDays(-5));
+        var excluded = new[] { outbound.Id, homeward.Id };
+        var kept = await query.ForecastBreakdownAsync("local", replacement, through);
+        var replaced = await query.ForecastBreakdownAsync("local", replacement, through, excludeTripIds: excluded);
+
+        Assert.Equal(kept.Current["France"], replaced.Current["France"]);
+        Assert.True(kept.Forecast["France"] > replaced.Forecast["France"]);
+        Assert.True(replaced.Current["France"] > replaced.Forecast["France"]);
+        Assert.Equal(2, await db.Trips.CountAsync());
+
+        var missing = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            query.ForecastBreakdownAsync("local", replacement, through, excludeTripIds: [outbound.Id, 999_999]));
+        Assert.Contains("999999", missing.Message, StringComparison.Ordinal);
+
+        var withStay = await query.CountCalendarYearsAsync("local", "France", replacement, through);
+        var withoutStay = await query.CountCalendarYearsAsync("local", "France", replacement, through, excludeTripIds: excluded);
+        Assert.True(withStay.Sum(year => year.Days) > withoutStay.Sum(year => year.Days));
+
+        var rollingKept = await query.GetRollingCountAsync("local", "France", through, through, replacement);
+        var rollingReplaced = await query.GetRollingCountAsync("local", "France", through, through, replacement, excludeTripIds: excluded);
+        Assert.True(rollingKept[0].RollingDays > rollingReplaced[0].RollingDays);
+    }
+
+    [Fact]
     public async Task CalculateMaxEndDate_DaysAtLimit_ShouldBeThePeakInsideTheWindow()
     {
         await using var db = NewDatabase();
@@ -571,6 +614,8 @@ public class ResidencyQueryServiceTests
             });
         }
     }
+
+    private static DateTime At(DateTime day, int hour) => new(day.Year, day.Month, day.Day, hour, 0, 0);
 
     private static Trip Leg(string userId, string fromCountry, string fromZone, DateTime departure, string toCountry, string toZone, DateTime arrival, string? arrivalIata = null) => new()
     {

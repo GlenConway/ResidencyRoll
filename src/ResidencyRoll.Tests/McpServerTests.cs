@@ -714,6 +714,72 @@ public class McpServerTests : IClassFixture<McpApiFactory>
     }
 
     [Fact]
+    public async Task ForecastTrips_WhenExcludingSavedLegs_ShouldTryTheReplacementWithoutEditingThem()
+    {
+        await using var factory = new McpApiFactory { SeedExampleTrips = false };
+        var http = factory.CreateClient();
+        await using var mcp = await McpClientConnector.ConnectAsync(http);
+        var tools = (await mcp.ListToolsAsync()).ToList();
+        var today = DateTime.Today;
+        var arrive = today.AddDays(-40).ToString("yyyy-MM-dd");
+        var shortLeave = today.AddDays(-36).ToString("yyyy-MM-dd");
+        var longLeave = today.AddDays(-10).ToString("yyyy-MM-dd");
+        var through = today.AddDays(-5).ToString("yyyy-MM-dd");
+        var outbound = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("LHR", $"{arrive}T09:00", "CDG", $"{arrive}T12:00")
+        });
+        var homeward = await AssertCall(mcp, tools, "create_trip", new Dictionary<string, object?>
+        {
+            ["leg"] = Leg("CDG", $"{longLeave}T10:00", "LHR", $"{longLeave}T12:00")
+        });
+        var outboundId = outbound.StructuredContent!.Value.GetProperty("id").GetInt32();
+        var homewardId = homeward.StructuredContent!.Value.GetProperty("id").GetInt32();
+        try
+        {
+            var plan = new Dictionary<string, object?>
+            {
+                ["country"] = "France",
+                ["through"] = through,
+                ["trips"] = new object[]
+                {
+                    Leg("LHR", $"{arrive}T09:00", "CDG", $"{arrive}T12:00"),
+                    Leg("CDG", $"{shortLeave}T10:00", "LHR", $"{shortLeave}T12:00")
+                }
+            };
+            var kept = await AssertCall(mcp, tools, "forecast_trips", plan);
+            plan["excludeTripIds"] = new[] { homewardId, outboundId };
+            var replaced = await AssertCall(mcp, tools, "forecast_trips", plan);
+
+            var keptFrance = FranceDays(kept);
+            var replacedFrance = FranceDays(replaced);
+            Assert.True(keptFrance > replacedFrance);
+            Assert.Equal(CurrentDays(kept, "France"), CurrentDays(replaced, "France"));
+            var listed = string.Join(", ", new[] { outboundId, homewardId }.OrderBy(id => id));
+            Assert.Contains($"leaves out saved trips {listed}", McpClientConnector.Text(replaced));
+
+            var missing = await mcp.CallToolAsync("forecast_trips", new Dictionary<string, object?>
+            {
+                ["excludeTripIds"] = new[] { 999_999 },
+                ["trips"] = plan["trips"]
+            });
+            Assert.Equal(true, missing.IsError);
+            Assert.Contains("not found", McpClientConnector.Text(missing), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("999999", McpClientConnector.Text(missing));
+
+            var stillThere = await mcp.CallToolAsync("get_trip", new Dictionary<string, object?> { ["id"] = outboundId });
+            Assert.NotEqual(true, stillThere.IsError);
+            Assert.Equal($"{longLeave}T10:00", (await mcp.CallToolAsync("get_trip", new Dictionary<string, object?> { ["id"] = homewardId }))
+                .StructuredContent!.Value.GetProperty("departureDateTime").GetString());
+        }
+        finally
+        {
+            await mcp.CallToolAsync("delete_trip", new Dictionary<string, object?> { ["id"] = outboundId });
+            await mcp.CallToolAsync("delete_trip", new Dictionary<string, object?> { ["id"] = homewardId });
+        }
+    }
+
+    [Fact]
     public async Task ResidencySummary_WhenACountryGapLeavesDaysOut_ShouldReportUnaccountedDays()
     {
         await using var factory = new McpApiFactory { SeedExampleTrips = false };
@@ -864,6 +930,18 @@ public class McpServerTests : IClassFixture<McpApiFactory>
             arrivalTimezone = toZone
         }).GetAwaiter().GetResult();
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    private static int FranceDays(CallToolResult result) =>
+        result.StructuredContent!.Value.GetProperty("forecast").EnumerateArray()
+            .Single(row => row.GetProperty("countryName").GetString() == "France")
+            .GetProperty("totalDays").GetInt32();
+
+    private static int CurrentDays(CallToolResult result, string country)
+    {
+        var row = result.StructuredContent!.Value.GetProperty("current").EnumerateArray()
+            .SingleOrDefault(item => item.GetProperty("countryName").GetString() == country);
+        return row.ValueKind == JsonValueKind.Undefined ? 0 : row.GetProperty("totalDays").GetInt32();
     }
 
     private static Dictionary<string, object?> Leg(string from, string departure, string to, string arrival) => new()

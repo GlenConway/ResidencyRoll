@@ -83,7 +83,7 @@ The server is on the web host at `/mcp`. Read tools need the `read:trips` scope.
 | `copy_trips` | Copy saved legs from one person to another, skipping legs that are already there |
 | `get_server_info` | The release, git commit, and airport-table size of the build that answered |
 | `lookup_airport` | Search the shared airport list by IATA code, city, name, or country |
-| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, a short rolling count around the peak, and the home country's calendar-year count for each year the plan touches. A year past the last leg assumes you stay in the last arrival country through 31 December |
+| `forecast_trips` | Projected days if the hypothetical legs were added. Nothing is saved. Optional country filter, a through date, `excludeTripIds` to leave saved legs out of the forecast (a changed booking, without editing it), a short rolling count around the peak, and the home country's calendar-year count for each year the plan touches. A year past the last leg assumes you stay in the last arrival country through 31 December |
 | `max_trip_end_date` | Last midnight you can still be in the arrival country while its count stays at or under a day limit (183 by default). Optional unsaved legs |
 | `max_trip_start_date` | Earliest arrival that stays at or under the day limit when the departure date is fixed |
 | `plan_max_presence` | Arrival and departure dates that add the most days in a country without passing the limit, skipping blackout dates |

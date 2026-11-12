@@ -19,17 +19,27 @@ public class ResidencyQueryService
         _residency = residency;
     }
 
-    public async Task<ForecastResponseDto> ForecastAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null, Traveller? traveller = null)
+    public async Task<ForecastResponseDto> ForecastAsync(
+        string userId,
+        IReadOnlyList<Trip> hypotheticalTrips,
+        DateOnly? through = null,
+        Traveller? traveller = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
         Dictionary<string, int> current;
         Dictionary<string, int> forecast;
 
         if (hypotheticalTrips.Count > 0)
         {
-            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList(), through, traveller);
+            (current, forecast) = await _trips.ForecastDaysWithTripsAsync(userId, hypotheticalTrips.ToList(), through, traveller, excludeTripIds);
         }
         else
         {
+            if (excludeTripIds is { Count: > 0 })
+            {
+                TripService.Without(await _trips.GetAllTripsAsync(userId, traveller), excludeTripIds);
+            }
+
             current = new Dictionary<string, int>();
             forecast = new Dictionary<string, int>();
         }
@@ -41,11 +51,15 @@ public class ResidencyQueryService
         };
     }
 
-    public async Task<ForecastBreakdown> ForecastBreakdownAsync(string userId, IReadOnlyList<Trip> hypotheticalTrips, DateOnly? through = null, Traveller? traveller = null)
+    public async Task<ForecastBreakdown> ForecastBreakdownAsync(
+        string userId,
+        IReadOnlyList<Trip> hypotheticalTrips,
+        DateOnly? through = null,
+        Traveller? traveller = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
-        var basic = await ForecastAsync(userId, hypotheticalTrips, through, traveller);
-        var current = basic.Current.ToDictionary(row => row.CountryName, row => row.Days);
-        var forecast = basic.Forecast.ToDictionary(row => row.CountryName, row => row.Days);
+        var existing = await _trips.GetAllTripsAsync(userId, traveller);
+        var (current, forecast) = _trips.ForecastDays(existing, hypotheticalTrips, through, excludeTripIds);
         if (hypotheticalTrips.Count == 0)
         {
             var today = DateOnly.FromDateTime(DateTime.Today);
@@ -53,8 +67,7 @@ public class ResidencyQueryService
         }
 
         var window = _trips.ScenarioWindow(hypotheticalTrips, through);
-        var existing = await _trips.GetAllTripsAsync(userId, traveller);
-        var combined = new List<Trip>(existing);
+        var combined = new List<Trip>(TripService.Without(existing, excludeTripIds));
         combined.AddRange(hypotheticalTrips);
         var presence = _residency.GenerateDailyPresenceLog(combined);
         var earliest = hypotheticalTrips.Min(EarliestLocalDate);
@@ -141,7 +154,8 @@ public class ResidencyQueryService
         string country,
         IReadOnlyList<Trip> extraTrips,
         DateOnly? through,
-        Traveller? traveller = null)
+        Traveller? traveller = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
         var dates = new List<DateOnly>();
         foreach (var trip in extraTrips)
@@ -161,7 +175,7 @@ public class ResidencyQueryService
         }
 
         var rule = _residency.GetCountryRule(country);
-        var combined = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
+        var combined = new List<Trip>(TripService.Without(await _trips.GetAllTripsAsync(userId, traveller), excludeTripIds));
         combined.AddRange(extraTrips);
         var presence = _residency.GenerateDailyPresenceLog(combined);
         DateOnly? lastRecorded = presence.Count == 0 ? null : presence.Max(day => day.Date);
@@ -518,9 +532,10 @@ public class ResidencyQueryService
         DateOnly from,
         DateOnly to,
         IReadOnlyList<Trip>? additionalTrips = null,
-        Traveller? traveller = null)
+        Traveller? traveller = null,
+        IReadOnlyCollection<int>? excludeTripIds = null)
     {
-        var trips = new List<Trip>(await _trips.GetAllTripsAsync(userId, traveller));
+        var trips = new List<Trip>(TripService.Without(await _trips.GetAllTripsAsync(userId, traveller), excludeTripIds));
         if (additionalTrips is { Count: > 0 })
         {
             trips.AddRange(additionalTrips);
