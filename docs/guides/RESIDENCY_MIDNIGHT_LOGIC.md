@@ -14,8 +14,9 @@ Represents physical presence on a specific calendar date:
 - `IsInTransitAtMidnight`: Whether in transit (international waters/airspace) at midnight
 
 ### 2. Residency Rules (`ResidencyRuleType.cs`, `CountryResidencyRule.cs`)
-- **Midnight Rule**: Day counts only if present at midnight (Canada, UK, Australia, etc.)
-- **Partial Day Rule**: Day counts if present ANY part of the day (USA - Substantial Presence Test)
+- **Midnight Rule**: Day counts only if present at midnight (United Kingdom and any country without its own entry)
+- **Partial Day Rule**: Day counts if present ANY part of the day (Canada, United States, Australia, New Zealand)
+- Each country applies its own rule on every day. A midnight-rule country counts only when it is the location at 00:00, even when that midnight was in a partial-day country. A partial-day country counts whenever it is the midnight location or appears in `LocationsDuringDay`, including days in transit at midnight. Flying Halifax to London on a day flight counts that day for Canada and not for the UK.
 
 ### 3. Trip Model Updates (`Trip.cs`)
 Enhanced to include:

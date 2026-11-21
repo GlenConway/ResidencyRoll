@@ -86,7 +86,9 @@ public class OverlappingTripsTests : IDisposable
         var result = await _tripService.GetDaysPerCountryInLast365DaysAsync(_testUserId);
 
         // Assert
-        Assert.Equal(2, result.Count);
+        // The United States counts 20 December: the leg leaves Los Angeles that day and the US uses the partial-day rule.
+        Assert.Equal(3, result.Count);
+        Assert.True(result.ContainsKey("United States"));
         Assert.True(result["Australia"] >= 16, $"Should count at least 16 days in Australia, got {result["Australia"]}");
         Assert.True(result["New Zealand"] >= 2, $"Should count at least 2 days in NZ, got {result["New Zealand"]}");;
     }

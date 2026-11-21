@@ -157,7 +157,8 @@ public class ResidencyLogicTests
         Assert.Contains("Canada", feb8.LocationsDuringDay);
         var counted = _service.CalculateResidencyDays(log, new DateOnly(2026, 2, 8), new DateOnly(2026, 2, 8));
         Assert.Equal(1, counted["United Kingdom"]);
-        Assert.False(counted.ContainsKey("Canada"));
+        // Canada uses the partial-day rule, so landing in Montreal counts that day for Canada too.
+        Assert.Equal(1, counted["Canada"]);
     }
 
     [Fact]
@@ -950,6 +951,70 @@ public class ResidencyLogicTests
         
         // Should have a few days in New Zealand (2-3 days)
         Assert.True(nzDays >= 2, $"Expected at least 2 New Zealand days, got {nzDays}");
+    }
+
+    #endregion
+
+    #region Each country applies its own rule
+
+    private static Trip Leg(int id, string fromCountry, string fromCity, string fromIata, string fromZone, DateTime departs,
+        string toCountry, string toCity, string toIata, string toZone, DateTime arrives) => new()
+    {
+        Id = id,
+        UserId = "user1",
+        DepartureCountry = fromCountry,
+        DepartureCity = fromCity,
+        DepartureIataCode = fromIata,
+        DepartureTimezone = fromZone,
+        DepartureDateTime = departs,
+        ArrivalCountry = toCountry,
+        ArrivalCity = toCity,
+        ArrivalIataCode = toIata,
+        ArrivalTimezone = toZone,
+        ArrivalDateTime = arrives
+    };
+
+    private static List<Trip> HalifaxLondonDayFlights() =>
+    [
+        Leg(1, "Canada", "Halifax", "YHZ", "America/Halifax", new DateTime(2026, 12, 10, 11, 0, 0),
+            "United Kingdom", "London", "LHR", "Europe/London", new DateTime(2026, 12, 10, 21, 0, 0)),
+        Leg(2, "United Kingdom", "London", "LHR", "Europe/London", new DateTime(2026, 12, 22, 9, 0, 0),
+            "Canada", "Halifax", "YHZ", "America/Halifax", new DateTime(2026, 12, 22, 12, 0, 0))
+    ];
+
+    [Fact]
+    public void CalculateResidencyDays_SameDayArrivalInMidnightRuleCountry_ShouldNotCountTheArrivalDay()
+    {
+        var log = _service.GenerateDailyPresenceLog(HalifaxLondonDayFlights());
+
+        var days = _service.CalculateResidencyDays(log, new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 10));
+
+        Assert.Equal(1, days.GetValueOrDefault("Canada"));
+        Assert.Equal(0, days.GetValueOrDefault("United Kingdom"));
+    }
+
+    [Fact]
+    public void CalculateResidencyDays_DayFlightsToLondonAndBack_ShouldCountOnlyUkMidnights()
+    {
+        var log = _service.GenerateDailyPresenceLog(HalifaxLondonDayFlights());
+
+        var days = _service.CalculateResidencyDays(log, new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 22));
+
+        // UK at 00:00 on 11 through 22 December.
+        Assert.Equal(12, days.GetValueOrDefault("United Kingdom"));
+        // Canada is a partial-day country: present on the day out and the day back.
+        Assert.Equal(2, days.GetValueOrDefault("Canada"));
+    }
+
+    [Fact]
+    public void CalculateResidencyDays_ReturnFromMidnightRuleCountry_ShouldCountThePartialDayCountry()
+    {
+        var log = _service.GenerateDailyPresenceLog(HalifaxLondonDayFlights());
+
+        var days = _service.CalculateResidencyDays(log, new DateOnly(2026, 12, 22), new DateOnly(2026, 12, 22));
+
+        Assert.Equal(1, days.GetValueOrDefault("United Kingdom"));
+        Assert.Equal(1, days.GetValueOrDefault("Canada"));
     }
 
     #endregion

@@ -632,25 +632,37 @@ public class ResidencyCalculationService
         return peaks;
     }
 
+    /// <summary>
+    /// Countries that count this day. Each country applies its own rule: a midnight-rule country
+    /// counts only when it is the location at 00:00, and a partial-day country counts when the
+    /// person was there for any part of the day, including the midnight location.
+    /// </summary>
     private List<string> CountriesCountedOn(DailyPresence presence)
     {
-        if (presence.IsInTransitAtMidnight)
+        var counted = new List<string>();
+        var midnight = presence.LocationAtMidnight;
+        if (!presence.IsInTransitAtMidnight
+            && !string.IsNullOrWhiteSpace(midnight)
+            && midnight != "IN_TRANSIT")
         {
-            return [];
+            counted.Add(midnight);
         }
 
-        var rule = GetCountryRule(presence.LocationAtMidnight);
-        if (rule.RuleType == ResidencyRuleType.MidnightRule)
+        foreach (var country in presence.LocationsDuringDay)
         {
-            return [presence.LocationAtMidnight];
+            if (string.IsNullOrWhiteSpace(country) || country == "IN_TRANSIT")
+            {
+                continue;
+            }
+
+            if (GetCountryRule(country).RuleType == ResidencyRuleType.PartialDayRule
+                && !counted.Contains(country, StringComparer.OrdinalIgnoreCase))
+            {
+                counted.Add(country);
+            }
         }
 
-        if (rule.RuleType == ResidencyRuleType.PartialDayRule)
-        {
-            return presence.LocationsDuringDay.ToList();
-        }
-
-        return [];
+        return counted;
     }
 
     private static void Adjust(Dictionary<string, int> counts, IReadOnlyList<string> countries, int delta)

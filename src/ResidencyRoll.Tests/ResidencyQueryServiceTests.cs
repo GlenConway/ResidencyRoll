@@ -282,9 +282,9 @@ public class ResidencyQueryServiceTests
         Assert.Equal("taxYear", uk.WindowType);
         Assert.Equal(new DateOnly(2026, 4, 6), uk.WindowStart);
         Assert.Equal(new DateOnly(2027, 4, 5), uk.WindowEnd);
-        // June 2 and 3 are UK midnights. June 1 counts as well because midnight was in Canada, which uses the partial-day rule.
+        // June 2 and 3 are UK midnights. June 1 does not count: the UK uses the midnight rule and midnight was in Canada.
         // The February 2025 UK days fall in the previous tax year and are not included.
-        Assert.Equal(3, uk.TotalDays);
+        Assert.Equal(2, uk.TotalDays);
     }
 
     [Fact]
@@ -337,8 +337,8 @@ public class ResidencyQueryServiceTests
 
         var result = await query.CalculateEarliestArrivalAsync("local", request, departure);
 
-        // Arriving on 10 July makes that day count: midnight is still in Canada, and Canada counts every country visited.
-        Assert.Equal(new DateTime(2026, 7, 11, 12, 0, 0), result.Arrival);
+        // The UK uses the midnight rule, so the arrival day does not count. Arriving on 10 July gives UK midnights 11 to 20 July.
+        Assert.Equal(new DateTime(2026, 7, 10, 12, 0, 0), result.Arrival);
         Assert.Equal(10, result.DaysAtLimit);
         Assert.Equal("taxYear", result.WindowType);
     }
@@ -532,7 +532,8 @@ public class ResidencyQueryServiceTests
         Assert.Equal(new DateOnly(2027, 1, 6), years[1].ProjectedFrom);
         Assert.Equal("United Kingdom", years[1].ProjectedCountry);
         Assert.Equal(2027, Assert.Single(june).Year);
-        Assert.Equal(9, june[0].Days);
+        // 1 to 10 June: Canada counts the day it lands and the day it leaves.
+        Assert.Equal(10, june[0].Days);
         Assert.Equal(new DateOnly(2027, 6, 11), june[0].ProjectedFrom);
         Assert.Equal("United Kingdom", june[0].ProjectedCountry);
         Assert.All(years.Concat(june), year =>
@@ -566,7 +567,8 @@ public class ResidencyQueryServiceTests
 
         Assert.Equal(from, year.ProjectedFrom);
         Assert.Equal("Canada", year.ProjectedCountry);
-        Assert.Equal(assumed, year.Days);
+        // The landing day, 8 February, counts for Canada as well as the assumed stay.
+        Assert.Equal(assumed + 1, year.Days);
         Assert.Equal("reached", year.Status);
         Assert.Equal(0, year.DaysShort);
     }
